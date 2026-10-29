@@ -43,7 +43,7 @@ set_status() {
 case "$cmd" in
   start)
     gh issue edit "$num" -R "$REPO" --add-assignee @me >/dev/null
-    set_status "In Progress"
+    set_status "In Progress" || echo "看板更新失敗（可能沒有看板權限），略過；Issue 照常更新"
     gh issue comment "$num" -R "$REPO" \
       --body "開始處理（分支 \`$(git branch --show-current)\`）${msg:+：$msg}" >/dev/null
     ;;
