@@ -1,123 +1,80 @@
-# PersonaAI 團隊協作規則
+# PersonaAI 團隊協作規則（黑客松版）
 
-> 本文件給**團隊成員**與**每個人的 AI agent** 共同遵守。AI agent 的精簡版硬規則在 [AGENTS.md](AGENTS.md)。
-> 規則有爭議時，在 Issue 討論後修改本文件（走 PR），不要私下各做各的。
+> 給**團隊成員**與**每個人的 AI agent** 共同遵守。AI 的精簡硬規則在 [AGENTS.md](AGENTS.md)。
+> 黑客松時間短，規則的目標只有兩個：**不撞車、`main` 隨時能 demo**。
+> 技術規格（技術棧、資料夾、資料表、型別、跨線函式、時程）在 [docs/07_開發分工.md](docs/07_開發分工.md)。
 
-## 1. 核心原則
+## 1. 鐵則（違反會害到別人）
 
-1. **`main` 永遠是可運作的**。任何人（包含 AI）都不能直接 push 到 `main`。
-2. **一件事 = 一個 Issue = 一條分支 = 一個 PR = 一位負責人**。
-3. **先認領，再動手**。沒有認領的工作不要開始，避免兩個人（或兩個 AI）做同一件事。
-4. **小步快跑**。PR 越小越好（建議 < 400 行變更），盡早合併，減少衝突。
-5. **AI 是工具，人是負責人**。AI 產出的程式碼，由指派它的成員負責 review 與後果。
+1. **禁止直接 push 到 `main`**，一律分支 + PR（A0 專案骨架也一樣）。
+2. **只改自己那條線的檔案**（見第 2 節）。要改別條線的或共用檔，先在群組講。
+3. **`main` 永遠要能跑、能 demo**。合併後立刻確認；壞了就馬上修或 revert，其他人先停止合併。
+4. **每 1～2 小時合併一次**，不要累積到最後才整合。
+5. **共用雲端資料庫小心操作**：`db:reset`、migration、`seed`、`worker` 照 [07 第 0.8 節](docs/07_開發分工.md)。
+6. **絕不 commit 機密**：`.env.local`、Supabase key、LLM API key。金鑰私下傳，不貼群組。
+7. **禁止 `git push --force`**、`git reset --hard` 等破壞性操作。
+8. 所有檔案讀寫明確指定 `encoding="utf-8"`（開發環境是 Windows，會踩 cp950 亂碼）。
 
-## 2. 開始工作前：認領任務
+## 2. 分工與檔案歸屬
 
-1. 到 GitHub **Issues** 找任務（或自己開一個）。
-2. 在 Issue 把自己設為 **Assignee**，並留言「開始處理，預計動到：`路徑A`、`路徑B`」。
-3. 已有 Assignee 的 Issue 不要接手；要接手先在 Issue 留言與對方確認。
-4. 發現任務與別人預計動到的檔案重疊 → 先在 Issue 溝通，決定順序或切分範圍，再開工。
+| 線 | 成員 | 負責 | 規格 | 分支前綴 |
+|---|---|---|---|---|
+| A：AI 朋友線 | （待填） | 陪伴你、認識你、回報結果；專案骨架、登入、共用元件、部署 | [07A](docs/07A_AI朋友線.md) | `a/` |
+| B：社交 Agent 線 | （待填） | 接任務、挑人、判定、決策；LLM 封裝、日誌、常數 | [07B](docs/07B_社交Agent線.md) | `b/` |
+| C：分身與大廳線 | （待填） | 分身代聊、大廳、接手；Realtime、種子用戶 | [07C](docs/07C_分身與大廳線.md) | `c/` |
 
-> 沒有 Issue 的小修正（錯字、註解）可以直接開 PR，但仍需分支 + PR。
+- 每個檔案屬於哪條線，見 [07 第 3 節](docs/07_開發分工.md) 的專案結構。
+- 要用別條線的功能，**只能呼叫 `lib/contracts/`**，對方還沒好就用 stub。
+- **共用檔**（`lib/types.ts`、contracts 函式簽名、`supabase/migrations/`、`package.json`／lockfile、`.env.example`、`globals.css` token、本文件、`AGENTS.md`、`docs/`）照 [07 第 0.5 節](docs/07_開發分工.md) 改：群組提出 → 三人同意 → 提出的人改 → 請人看過再合併。
+- 新增套件找 A；lockfile 衝突不要手動合併，以 `main` 為準重新 `npm install`。
 
-## 3. 分支規則
-
-- 從最新的 `main` 開分支，命名：`<類型>/<issue編號>-<簡短描述>`
-  - 例：`feat/12-persona-editor`、`fix/27-login-crash`、`docs/5-readme`
-- 類型：`feat`（功能）、`fix`（修 bug）、`docs`、`refactor`、`test`、`chore`
-- **一條分支只屬於一個人（或一個 AI session）**。不要在別人的分支上 push，除非對方同意。
-- 分支壽命盡量 < 3 天；太久就拆小或先合併一部分。
-- 合併後立刻刪除分支。
+## 3. 每個任務的流程
 
 ```bash
+# 1. 從最新 main 開分支：<線別>/<任務ID>-<簡述>
 git checkout main
+git pull
+git checkout -b b/B3-runner
+
+# 2. 交給 AI（指令範本見 07 第 0.4 節）→ 先寫測試 → 實作 → npm test
+
+# 3. 推上去前合入最新 main，再測一次
 git pull origin main
-git checkout -b feat/12-persona-editor
+npm test
+git add <你改的檔案>
+git commit -m "feat: B3 Agent 迴圈與 worker"
+git push -u origin b/B3-runner
 ```
 
-## 4. 避免同時更新的衝突（重點）
+到 GitHub 開 PR：
+- **只改自己那條線** → `npm test` 通過、網站能跑，**自己合併**。
+- **動到共用檔或別條線** → 請相關的人看過再合併。
+- 合併後刪分支、在群組通知大家 `git pull`。
 
-### 4.1 人與人
-- 開工前、午休後、準備開 PR 前，各做一次 `git pull --rebase origin main`（或把 main 合進自己的分支）。
-- 每天結束前，把進度 push 到自己的分支（即使未完成，PR 標成 Draft）。
+Commit 格式：`<type>: <任務ID> <描述>`，type 用 `feat`、`fix`、`refactor`、`test`、`docs`、`chore`。
 
-### 4.2 AI agent 同時作業
-- **每個 AI agent 必須在獨立的工作目錄**，不可兩個 agent 共用同一個資料夾。
-  - 同一台電腦要跑多個 agent：用 `git worktree`，一個分支一個資料夾：
-    ```bash
-    git worktree add ../PersonaAI-feat-12 feat/12-persona-editor
-    ```
-- **一個分支同一時間只能有一個 AI session 在寫**。
-- AI 只能動 Issue 裡聲明的範圍；需要改範圍外的檔案，先停下來問負責人。
+## 4. 使用 AI agent
 
-### 4.3 高衝突檔案（熱點）
-以下檔案最容易撞車，**修改前必須在 Issue/群組先喊一聲，且改動要小、要快合**：
-- 依賴與鎖定檔：`package.json`、`package-lock.json` / `pnpm-lock.yaml` / `requirements.txt` 等
-- 全域設定、路由總表、資料庫 schema / migration
-- `README.md`、本文件、`AGENTS.md`
+- AI 要讀 [AGENTS.md](AGENTS.md)。Claude Code 會透過 `CLAUDE.md` 自動載入；Codex、Cursor 會自動讀 `AGENTS.md`；其他 AI 請手動貼給它。
+- 開工指令用 [07 第 0.4 節](docs/07_開發分工.md) 的範本，或各線文件第 0 節的「第一個交給 Agent 的指令」。一定要給：**線別、任務 ID、分支名**。
+- **一個 AI 一個工作資料夾**。同一台電腦要同時跑多個 AI，用 `git worktree`：
+  ```bash
+  git worktree add ../PersonaAI-B3 b/B3-runner
+  ```
+  每個 worktree 都要各自 `npm install`，並複製一份 `.env.local`。
+- **同一條分支同一時間只能有一個 AI 在寫。**
+- AI 寫完，**人要先跑過、看過**再合併。
 
-規則：
-- **鎖定檔（lockfile）發生衝突時，不要手動合併**：以 `main` 的版本為準，重新執行安裝指令產生。
-- **資料庫 migration 一次只允許一個人新增**，編號/時間戳衝突時由後開 PR 的人重新產生。
-- 新功能盡量**新增檔案**而不是大改既有檔案；多人共用的大檔案先拆分（單獨一個 refactor PR）。
-- 不要順手「整理格式」或大規模重新命名，這類改動單獨開 PR 並事先公告。
+## 5. 時程
 
-## 5. Commit 規則
+照 [07 第 9 節](docs/07_開發分工.md) 的 M1～M5 里程碑，另外：
 
-格式（Conventional Commits）：
+- **M1（前 4 小時）最關鍵**：A0 骨架、B0 LLM 封裝、C0 種子用戶與各線 contracts stub。`lib/types.ts` 在 M1 定稿，之後要改就走共用檔流程。
+- **功能凍結：結束前 3～4 小時**。不加新功能，只修 bug、整合、調 Prompt。
+- **最後 1 小時**：用 `main` 最新版照 07 第 10 節跑完整 Demo，錄備用影片。
 
-```
-<類型>(<範圍>): <簡短說明>
+## 6. 出問題時
 
-(可選) 詳細說明、原因
-Refs #12
-```
-
-- 例：`feat(editor): 新增 persona 編輯頁面`、`fix(auth): 修正 token 過期未重新整理`
-- 一個 commit 做一件事；不要把無關改動混在一起。
-- **嚴禁 commit**：密碼、API Key、`.env`、個人憑證、大型二進位檔、`node_modules` 等。
-- 禁止 `git push --force` 到共用分支（`main`）；自己的分支 rebase 後可用 `--force-with-lease`。
-
-## 6. Pull Request 規則
-
-1. 推上分支後開 PR，base 為 `main`，內文用 PR 範本填寫，並連結 Issue（`Closes #12`）。
-2. 未完成先開 **Draft PR**，讓大家看見進度與範圍。
-3. 合併條件：
-   - 至少 **1 位其他成員** approve（AI 不能 approve 或 merge 自己的 PR）
-   - CI / 測試通過（若已設定）
-   - 與 `main` 沒有衝突
-   - 所有 review 留言已處理
-4. 合併方式：**Squash and merge**，保持 `main` 歷史乾淨。
-5. 作者本人（人類）負責合併；合併前再 rebase/merge 一次最新的 `main`。
-6. Review 要在 **24 小時內**回覆；卡住就在群組提醒。
-
-## 7. 使用 AI agent 的規範
-
-- 成員要確保自己的 AI 已讀過 [AGENTS.md](AGENTS.md)（本 repo 已提供 `CLAUDE.md` 指向它）。
-- 下指令時要明確給 AI：**Issue 編號、分支名、允許修改的範圍**。
-- AI 產出的程式碼，提 PR 前**人要先自己看過、跑過**，不要把未檢查的輸出直接丟給 reviewer。
-- 在 PR 描述註明哪些部分由 AI 產生，方便 reviewer 重點檢查。
-- AI 不確定、遇到衝突、或要做破壞性操作時，必須停下來問人，不可自行猜測。
-
-## 8. 溝通與決策
-
-- 任務/範圍/技術決策 → 寫在 **Issue**（有紀錄）。
-- 即時協調（誰在動哪個檔案、熱點檔案）→ 團隊群組。
-- 重大決策（換框架、改資料結構、改本規則）→ 開 Issue 標 `decision`，大家同意後再做，並更新文件。
-- 發現 `main` 壞掉：**立刻通知大家**，優先修復或 revert，其他 PR 暫停合併。
-
-## 9. 快速檢查清單
-
-**開工前**
-- [ ] Issue 已認領並寫明預計動到的檔案
-- [ ] 已從最新 `main` 開新分支（AI 用獨立 worktree/資料夾）
-
-**開 PR 前**
-- [ ] 已 rebase / merge 最新 `main`，無衝突
-- [ ] 本地跑過建置與測試
-- [ ] 沒有 secrets、沒有無關改動
-- [ ] PR 範本已填、已連結 Issue
-
-**合併後**
-- [ ] 刪除分支、Issue 已關閉
-- [ ] 其他人若受影響，通知更新 `main`
+- **合併衝突**：只改自己的檔案的話很少發生。發生時找改到同一處的人一起決定；不確定就 `git merge --abort` 再問。
+- **`main` 壞了**：群組喊一聲 → 最後合併的人優先修，修不好就 revert 那個 PR。
+- **契約對不上 / 文件沒寫到**：以 `docs/` 為準；沒寫的三人討論後補進文件再繼續（見 07 第 0.7 節）。
