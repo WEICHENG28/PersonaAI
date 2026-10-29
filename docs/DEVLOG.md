@@ -26,6 +26,12 @@
 
 ## 共用與決策
 
+### 2026-10-30｜README 與進度追蹤｜Peter
+- **做了什麼**：新增 `README.md`（新成員開工步驟、進度在哪看、文件索引）；新增 `.github/scripts/task.sh`，AI 開工／卡住／完成時自動更新 Issue 留言與看板狀態；AGENTS.md 規定開工就開 Draft PR 並寫 `Closes #`；建立 GitHub Projects 進度看板。
+- **為什麼這樣做**：讓 Peter 和大家上 GitHub 就看得到每個人做到哪，不用在群組問；PR 合併時 Issue 自動關閉、看板自動移到 Done。
+- **踩到的坑／注意事項**：腳本需要 `gh` 有 project 權限（`gh auth refresh -s project`），沒有時 AI 會請使用者手動更新。
+- **還沒做完／待辦**：無。
+
 ### 2026-10-29｜開發前準備｜Peter｜PR #1、#37
 - **做了什麼**：建立 repo 協作規則（`CONTRIBUTING.md`、`AGENTS.md`、`CLAUDE.md`、PR 範本）、放入 01～07 規格文件、開好 A0～C10 共 34 個 Issue。
 - **為什麼這樣做**：三個人、多個 AI 同時寫同一個 repo，靠「線別目錄所有權＋`lib/contracts` 介面＋分支/PR」避免互相覆蓋；黑客松時間短，只改自己線的 PR 可以自己合併。

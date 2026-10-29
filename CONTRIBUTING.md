@@ -26,7 +26,7 @@
 
 - 每個檔案屬於哪條線，見 [07 第 3 節](docs/07_開發分工.md) 的專案結構。
 - 要用別條線的功能，**只能呼叫 `lib/contracts/`**，對方還沒好就用 stub。
-- **共用檔**（`lib/types.ts`、contracts 函式簽名、`supabase/migrations/`、`package.json`／lockfile、`.env.example`、`globals.css` token、本文件、`AGENTS.md`、`docs/`）照 [07 第 0.5 節](docs/07_開發分工.md) 改：群組提出 → 三人同意 → 提出的人改 → 請人看過再合併。
+- **共用檔**（`lib/types.ts`、contracts 函式簽名、`supabase/migrations/`、`package.json`／lockfile、`.env.example`、`globals.css` token、本文件、`AGENTS.md`、`README.md`、`.github/`、`docs/`）照 [07 第 0.5 節](docs/07_開發分工.md) 改：群組提出 → 三人同意 → 提出的人改 → 請人看過再合併。
 - 新增套件找 A；lockfile 衝突不要手動合併，以 `main` 為準重新 `npm install`。
 
 ## 3. 每個任務的流程
@@ -55,6 +55,18 @@ commit 前，在 [docs/DEVLOG.md](docs/DEVLOG.md) 自己那條線的區塊最上
 - 合併後刪分支、在群組通知大家 `git pull`。
 
 Commit 格式：`<type>: <任務ID> <描述>`，type 用 `feat`、`fix`、`refactor`、`test`、`docs`、`chore`。
+
+### 進度怎麼更新（AI 會照 AGENTS.md 自動做）
+
+| 時機 | 做什麼 | 看板狀態 |
+|------|--------|---------|
+| 開工 | `bash .github/scripts/task.sh start <issue編號>`：指派自己、在 Issue 留言 | In Progress |
+| 第一個 commit 推上去 | 開 **Draft PR**，第一行寫 `Closes #<issue編號>` | In Progress |
+| 卡住／等別條線 | `bash .github/scripts/task.sh note <issue編號> "說明"` | — |
+| 完成 | Draft 改成 Ready，`bash .github/scripts/task.sh done <issue編號> "驗收結果"` | In Progress |
+| PR 合併 | Issue 自動關閉 | Done |
+
+腳本要用 `gh`（GitHub CLI）：安裝後 `gh auth login`，再 `gh auth refresh -s project` 取得看板權限。
 
 ## 4. 使用 AI agent
 

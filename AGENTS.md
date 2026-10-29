@@ -28,6 +28,8 @@
    git checkout -b <線別>/<任務ID>-<簡述> origin/main
    ```
 5. 確認沒有其他 AI 在同一個資料夾或同一條分支作業；需要平行時用 `git worktree` 開獨立資料夾。
+6. **更新進度**：找到這個任務的 Issue（標題以任務 ID 開頭，例如 `B3 …`），執行 `bash .github/scripts/task.sh start <issue編號>`：指派給使用者、看板改成 In Progress、在 Issue 留言。`gh` 沒登入或沒有 project 權限就告訴使用者，請他手動把自己設成 Assignee。
+7. 第一個 commit 推上去後，**馬上開 Draft PR**（`gh pr create --draft`），描述第一行寫 `Closes #<issue編號>`，讓大家看得到進度。
 
 ## 工作中
 
@@ -39,6 +41,7 @@
 - 做畫面時用 Hallmark skill 的 **Hum** 主題（07 第 8.1 節），但只用 `app/globals.css` 的 token，不新增顏色、字型或 `tokens.css`。
 - 每完成一個能跑的小段落就 commit（格式 `<type>: <任務ID> <描述>`）；commit 前看一次 `git diff --staged`，確認沒有金鑰、除錯碼、無關改動。
 - 以「1～2 小時內可以合併」為單位切工作；任務太大就先做出能跑的最小版本。
+- 卡住、改變做法、在等別條線時，用 `bash .github/scripts/task.sh note <issue編號> "說明"` 在 Issue 留言。
 
 ## 遇到衝突或不確定時
 
@@ -49,8 +52,9 @@
 ## 完成時
 
 1. `npm test` 全部通過；照任務的「驗收」逐條確認。失敗或沒驗到要如實說明。
-1. **在 [docs/DEVLOG.md](docs/DEVLOG.md) 該線區塊的最上面新增一筆紀錄**（格式見該檔）：做了什麼、為什麼這樣做、改了哪些檔案、踩到的坑、待辦。只寫自己那條線的區塊；跨線決定寫在「共用與決策」並告知使用者。和程式碼放在同一個 PR。
-2. `git pull origin main` 合入最新版，再跑一次 `npm test`。
-3. push 到任務分支，開 PR，描述寫清楚做了什麼、驗收結果，並註明由 AI 協助產生。
-4. 回報使用者：做了什麼、改了哪些檔案、驗收逐條結果、是否動到共用檔（若有，需要別人 review）、有哪些未完成或風險。
-5. **不要自己合併 PR**，由使用者確認能跑後合併。
+2. **在 [docs/DEVLOG.md](docs/DEVLOG.md) 該線區塊的最上面新增一筆紀錄**（格式見該檔）：做了什麼、為什麼這樣做、改了哪些檔案、踩到的坑、待辦。只寫自己那條線的區塊；跨線決定寫在「共用與決策」並告知使用者。和程式碼放在同一個 PR。
+3. `git pull origin main` 合入最新版，再跑一次 `npm test`。
+4. push 到任務分支；Draft PR 改成 Ready for review（`gh pr ready`），描述包含 `Closes #<issue編號>`、做了什麼、驗收結果，並註明由 AI 協助產生。
+5. 執行 `bash .github/scripts/task.sh done <issue編號> "驗收結果摘要"`，在 Issue 留言回報。PR 合併後 Issue 會自動關閉，看板自動移到 Done。
+6. 回報使用者：做了什麼、改了哪些檔案、驗收逐條結果、是否動到共用檔（若有，需要別人 review）、有哪些未完成或風險。
+7. **不要自己合併 PR**，由使用者確認能跑後合併。
