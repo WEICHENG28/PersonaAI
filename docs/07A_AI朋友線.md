@@ -72,7 +72,7 @@
 5. 註冊後的初始化 `POST /api/profile/init`：建立 `users`（display_name 用註冊時填的暱稱）、`ai_friends`、`user_profiles` 三筆資料；重複呼叫不會重複建立。
 6. `middleware.ts`：沒登入就導向 `/login`。
 7. 版面與導覽列：AI 朋友（`/friend`，首頁）、大廳（`/lobby`）、歷史（`/history`）、我的檔案（`/profile`）、設定（`/settings`）；導覽列右側留位置給 C 的 `<NotificationBell/>`；`dev_mode` 開啟時在右側放 B 的 `<AgentLogPanel/>`。
-8. `app/globals.css`：建立 07 第 8 節列出的 token。
+8. `app/globals.css`：建立 07 第 8 節列出的 token，數值照第 8.1 節用 Hallmark Hum 主題（含 Chillax＋中文圓體字型）。
 9. `components/ui/`：`Button`、`Card`、`Modal`、`Avatar`、`AiBadge`、`ChatBubble`。
    - `ChatBubble` props：`{ side: 'me' | 'other'; variant: 'friend' | 'twin' | 'human'; isAi: boolean; label?: string; children }`；`isAi` 為 true 時一定顯示 `AiBadge`。
 10. `lib/contracts/friend.ts` 的 stub：回傳 `fixtures/friend.ts` 的假檔案。

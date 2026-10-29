@@ -14,6 +14,7 @@
 6. **絕不 commit 機密**：`.env.local`、Supabase key、LLM API key。金鑰私下傳，不貼群組。
 7. **禁止 `git push --force`**、`git reset --hard` 等破壞性操作。
 8. 所有檔案讀寫明確指定 `encoding="utf-8"`（開發環境是 Windows，會踩 cp950 亂碼）。
+9. **每個 PR 都要在 [docs/DEVLOG.md](docs/DEVLOG.md) 自己那條線的區塊寫一筆紀錄**：做了什麼、為什麼、改了哪些檔案、踩到的坑、待辦。方便之後維護。
 
 ## 2. 分工與檔案歸屬
 
@@ -45,6 +46,8 @@ git add <你改的檔案>
 git commit -m "feat: B3 Agent 迴圈與 worker"
 git push -u origin b/B3-runner
 ```
+
+commit 前，在 [docs/DEVLOG.md](docs/DEVLOG.md) 自己那條線的區塊最上面加一筆紀錄（格式見該檔）。
 
 到 GitHub 開 PR：
 - **只改自己那條線** → `npm test` 通過、網站能跑，**自己合併**。
