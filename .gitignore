@@ -1,0 +1,19 @@
+# 機密
+.env
+.env.*
+!.env.example
+
+# 依賴與建置輸出
+node_modules/
+__pycache__/
+.venv/
+dist/
+build/
+
+# 編輯器 / 本機設定
+.continue/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/settings.local.json
