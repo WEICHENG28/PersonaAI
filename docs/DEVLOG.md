@@ -14,7 +14,7 @@
 ### 格式
 
 ```markdown
-### 2026-10-30｜B3 Agent 迴圈與 worker｜WEICHENG28｜PR #40
+### 2026-10-30｜B3 Agent 迴圈與 worker｜Peter｜PR #40
 - **做了什麼**：一兩句話。
 - **為什麼這樣做**：做的決定與原因；考慮過但沒採用的做法。
 - **改了哪些檔案**：主要檔案就好。
@@ -26,11 +26,11 @@
 
 ## 共用與決策
 
-### 2026-10-29｜開發前準備｜WEICHENG28｜PR #1、#37
+### 2026-10-29｜開發前準備｜Peter｜PR #1、#37
 - **做了什麼**：建立 repo 協作規則（`CONTRIBUTING.md`、`AGENTS.md`、`CLAUDE.md`、PR 範本）、放入 01～07 規格文件、開好 A0～C10 共 34 個 Issue。
 - **為什麼這樣做**：三個人、多個 AI 同時寫同一個 repo，靠「線別目錄所有權＋`lib/contracts` 介面＋分支/PR」避免互相覆蓋；黑客松時間短，只改自己線的 PR 可以自己合併。
 - **重要決定**：
-  - 分工：A＝Vincent、B＝WEICHENG28、C＝Jerry。
+  - 分工：A＝Vincent、B＝Peter、C＝Jerry。
   - A0 不可直接 push main；骨架建在 repo 根目錄。
   - 三人共用一個雲端 Supabase：`db:reset`、migration、`seed`、`worker` 都要先在群組說，AI 不可自行執行（07 第 0.8 節）。
   - 代聊結果改成雙方各自視角的大綱與「為什麼你們合」（`fit_points`），只看得到自己那份（PR #37）。
@@ -45,7 +45,7 @@
 
 ---
 
-## B：社交 Agent 線（WEICHENG28）
+## B：社交 Agent 線（Peter）
 
 （還沒有紀錄）
 
