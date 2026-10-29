@@ -2,89 +2,79 @@
 
 > 給**團隊成員**與**每個人的 AI agent** 共同遵守。AI 的精簡硬規則在 [AGENTS.md](AGENTS.md)。
 > 黑客松時間短，規則的目標只有兩個：**不撞車、`main` 隨時能 demo**。
+> 技術規格（技術棧、資料夾、資料表、型別、跨線函式、時程）在 [docs/07_開發分工.md](docs/07_開發分工.md)。
 
 ## 1. 鐵則（違反會害到別人）
 
-1. **禁止直接 push 到 `main`**，一律分支 + PR。
-2. **只改自己負責的目錄**（見第 2 節分工表）。要改別人的或共用檔案，先講。
+1. **禁止直接 push 到 `main`**，一律分支 + PR（A0 專案骨架也一樣）。
+2. **只改自己那條線的檔案**（見第 2 節）。要改別條線的或共用檔，先在群組講。
 3. **`main` 永遠要能跑、能 demo**。合併後立刻確認；壞了就馬上修或 revert，其他人先停止合併。
 4. **每 1～2 小時合併一次**，不要累積到最後才整合。
-5. **絕不 commit 機密**：`.env`、API key、token、密碼。
-6. **禁止 `git push --force`**、`git reset --hard` 等破壞性操作。
-7. 所有檔案讀寫明確指定 `encoding="utf-8"`（開發環境是 Windows，會踩 cp950 亂碼）。
+5. **共用雲端資料庫小心操作**：`db:reset`、migration、`seed`、`worker` 照 [07 第 0.8 節](docs/07_開發分工.md)。
+6. **絕不 commit 機密**：`.env.local`、Supabase key、LLM API key。金鑰私下傳，不貼群組。
+7. **禁止 `git push --force`**、`git reset --hard` 等破壞性操作。
+8. 所有檔案讀寫明確指定 `encoding="utf-8"`（開發環境是 Windows，會踩 cp950 亂碼）。
 
-## 2. 分工與目錄所有權
+## 2. 分工與檔案歸屬
 
-> ⚠️ 待填：產品規劃與分工確定後補上。
-
-| 角色 | 成員 | 負責內容 | 負責目錄 | 分支前綴 |
+| 線 | 成員 | 負責 | 規格 | 分支前綴 |
 |---|---|---|---|---|
-| A | （待填） | （待填） | `（待填）/` | `a/` |
-| B | （待填） | （待填） | `（待填）/` | `b/` |
-| C | （待填） | （待填） | `（待填）/` | `c/` |
-| D | （待填） | （待填） | `（待填）/` | `d/` |
+| A：AI 朋友線 | （待填） | 陪伴你、認識你、回報結果；專案骨架、登入、共用元件、部署 | [07A](docs/07A_AI朋友線.md) | `a/` |
+| B：社交 Agent 線 | （待填） | 接任務、挑人、判定、決策；LLM 封裝、日誌、常數 | [07B](docs/07B_社交Agent線.md) | `b/` |
+| C：分身與大廳線 | （待填） | 分身代聊、大廳、接手；Realtime、種子用戶 | [07C](docs/07C_分身與大廳線.md) | `c/` |
 
-**共用檔案管理人：（待填）**
-以下檔案只有管理人改，其他人要改請告訴他：
-- 依賴與鎖定檔（`package.json`、lockfile、`requirements.txt` 等）
-- 全域設定、環境變數範本（`.env.example`）
-- `docs/interface.md`、`README.md`、本文件、`AGENTS.md`
+- 每個檔案屬於哪條線，見 [07 第 3 節](docs/07_開發分工.md) 的專案結構。
+- 要用別條線的功能，**只能呼叫 `lib/contracts/`**，對方還沒好就用 stub。
+- **共用檔**（`lib/types.ts`、contracts 函式簽名、`supabase/migrations/`、`package.json`／lockfile、`.env.example`、`globals.css` token、本文件、`AGENTS.md`、`docs/`）照 [07 第 0.5 節](docs/07_開發分工.md) 改：群組提出 → 三人同意 → 提出的人改 → 請人看過再合併。
+- 新增套件找 A；lockfile 衝突不要手動合併，以 `main` 為準重新 `npm install`。
 
-lockfile 衝突時**不要手動合併**：以 `main` 的版本為準，重新執行安裝指令產生。
-
-## 3. 介面契約（開場第一小時完成）
-
-各角色之間怎麼呼叫（API 路徑、函式名稱、資料格式），開場就寫進 [docs/interface.md](docs/interface.md)。
-- 定好之後大家照契約各寫各的，**不用等對方做完**；對方還沒好就先用假資料（mock）。
-- 要改契約 → 先在群組講，由共用檔案管理人更新，所有相關的人確認過才算數。
-
-## 4. 每輪工作流程（約 1～2 小時一輪）
+## 3. 每個任務的流程
 
 ```bash
-# 1. 拉最新的 main，開新分支
+# 1. 從最新 main 開分支：<線別>/<任務ID>-<簡述>
 git checkout main
 git pull
-git checkout -b a/login-page        # <角色前綴>/<簡短描述>
+git checkout -b b/B3-runner
 
-# 2. ...寫程式（只動自己的目錄）...
+# 2. 交給 AI（指令範本見 07 第 0.4 節）→ 先寫測試 → 實作 → npm test
 
-# 3. 推上去前，再合一次最新 main，確認能跑
+# 3. 推上去前合入最新 main，再測一次
 git pull origin main
+npm test
 git add <你改的檔案>
-git commit -m "新增登入頁面與表單驗證"
-git push -u origin a/login-page
+git commit -m "feat: B3 Agent 迴圈與 worker"
+git push -u origin b/B3-runner
 ```
 
-接著到 GitHub 開 PR：
-- **只動自己目錄** → 確認能跑後，**自己合併**。
-- **動到共用檔案或別人的目錄** → 找相關的人看過再合併。
-- 合併後刪掉分支，下一輪從最新 `main` 開新分支。
+到 GitHub 開 PR：
+- **只改自己那條線** → `npm test` 通過、網站能跑，**自己合併**。
+- **動到共用檔或別條線** → 請相關的人看過再合併。
+- 合併後刪分支、在群組通知大家 `git pull`。
 
-commit 訊息讓人一看就懂即可：「新增登入頁面」可以，「update」「修改」不行。
+Commit 格式：`<type>: <任務ID> <描述>`，type 用 `feat`、`fix`、`refactor`、`test`、`docs`、`chore`。
 
-## 5. 使用 AI agent
+## 4. 使用 AI agent
 
-- 確保自己的 AI 讀過 [AGENTS.md](AGENTS.md)。Claude Code 會透過 `CLAUDE.md` 自動載入；Codex、Cursor 會自動讀 `AGENTS.md`；其他 AI 請手動貼給它。
-- 開工時這樣下指令：
-  > 先讀 AGENTS.md 和 CONTRIBUTING.md。我是角色 A，這次要做「登入頁面」，分支用 `a/login-page`，只能改 `frontend/` 底下的檔案。
+- AI 要讀 [AGENTS.md](AGENTS.md)。Claude Code 會透過 `CLAUDE.md` 自動載入；Codex、Cursor 會自動讀 `AGENTS.md`；其他 AI 請手動貼給它。
+- 開工指令用 [07 第 0.4 節](docs/07_開發分工.md) 的範本，或各線文件第 0 節的「第一個交給 Agent 的指令」。一定要給：**線別、任務 ID、分支名**。
 - **一個 AI 一個工作資料夾**。同一台電腦要同時跑多個 AI，用 `git worktree`：
   ```bash
-  git worktree add ../PersonaAI-login a/login-page
+  git worktree add ../PersonaAI-B3 b/B3-runner
   ```
+  每個 worktree 都要各自 `npm install`，並複製一份 `.env.local`。
 - **同一條分支同一時間只能有一個 AI 在寫。**
 - AI 寫完，**人要先跑過、看過**再合併。
 
-## 6. 時程
+## 5. 時程
 
-| 階段 | 時間 | 重點 |
-|---|---|---|
-| 開場 | 第 1 小時 | 定分工、目錄結構、介面契約；共用檔案管理人建好專案骨架 |
-| 開發 | 中段 | 每 1～2 小時一輪合併；定時在群組同步進度與卡點 |
-| **功能凍結** | **結束前 3～4 小時** | 不加新功能，只修 bug、整合、準備 demo |
-| Demo 準備 | 最後 1 小時 | 用 `main` 最新版跑完整 demo 流程，錄備用影片 |
+照 [07 第 9 節](docs/07_開發分工.md) 的 M1～M5 里程碑，另外：
 
-## 7. 出問題時
+- **M1（前 4 小時）最關鍵**：A0 骨架、B0 LLM 封裝、C0 種子用戶與各線 contracts stub。`lib/types.ts` 在 M1 定稿，之後要改就走共用檔流程。
+- **功能凍結：結束前 3～4 小時**。不加新功能，只修 bug、整合、調 Prompt。
+- **最後 1 小時**：用 `main` 最新版照 07 第 10 節跑完整 Demo，錄備用影片。
 
-- **合併衝突**：只動自己目錄的話很少發生。發生時找改到同一處的人一起決定；不確定就先 `git merge --abort`，再問。
+## 6. 出問題時
+
+- **合併衝突**：只改自己的檔案的話很少發生。發生時找改到同一處的人一起決定；不確定就 `git merge --abort` 再問。
 - **`main` 壞了**：群組喊一聲 → 最後合併的人優先修，修不好就 revert 那個 PR。
-- **契約對不上**：以 `docs/interface.md` 為準；文件沒寫的地方，當面講清楚再補進文件。
+- **契約對不上 / 文件沒寫到**：以 `docs/` 為準；沒寫的三人討論後補進文件再繼續（見 07 第 0.7 節）。

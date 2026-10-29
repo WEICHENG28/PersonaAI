@@ -9,6 +9,12 @@ __pycache__/
 .venv/
 dist/
 build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+.vercel/
+supabase/.temp/
 
 # 編輯器 / 本機設定
 .continue/
