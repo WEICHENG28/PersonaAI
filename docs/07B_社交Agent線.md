@@ -184,7 +184,7 @@
 4. 每次的判定：模型回 `enough_info = false` → uncertain；否則 `direction_score ≥ JUDGE_THRESHOLD` → suitable，反之 unsuitable。
 5. `aggregateRuns(runs)`：三次中有 2 次以上相同就取那個；三次都不同 → uncertain。分數取多數那幾次的平均。不合適原因取多數那幾次中第一個非 null 的。
 6. 寫入 `match_scores`（兩筆，各一個視角）；寫日誌：`第 N 輪：你的視角合適、對方視角不合適（3 次判定：2 合適 1 不合適）`。
-7. `outline` 取我方視角第一次的結果。
+7. `pickOutline(runs, verdict)`：**每個視角各自**取多數那幾次中第一次的 `outline`，放進該視角的 `Verdict.outline`。該視角不是 suitable 時 `fit_points` 設為 `[]`；是 suitable 時，每點的 `evidence` 先經過 C 的 `guardText`（`ownerUserId` 用被描述的對方）。
 
 **檔位與結果**
 
@@ -203,13 +203,13 @@ unsuitableReason(mine, theirs):
   其他 → 我方判定的 reason_type（沒有就 'friction'）
 ```
 
-**必測**：`directionScore`、`aggregateRuns`（3 種多數情況＋全部不同）、`isNotifiable`、`attemptResult`、`unsuitableReason`。
+**必測**：`directionScore`、`aggregateRuns`（3 種多數情況＋全部不同）、`isNotifiable`、`attemptResult`、`unsuitableReason`、`pickOutline`（兩個視角拿到各自的大綱；不合適時 `fit_points` 為空）。
 
 ---
 
 ### B6｜歷史嘗試＋重啟對話
 
-- `recordAttempt(...)`：寫入 `match_attempts`。對方不是種子用戶時，也幫對方寫一筆（用對方視角的判定）。`reason_text` 寫入前先經過 C 的 `guardText`。
+- `recordAttempt(...)`：寫入 `match_attempts`，`outline` 存**我方視角**的 `Verdict.outline`。對方不是種子用戶時，也幫對方寫一筆（用對方視角的判定與對方視角的 `outline`）。`reason_text` 寫入前先經過 C 的 `guardText`。
 - `app/history/page.tsx`：列出所有嘗試（對象卡片、時間、發起方式、結果、抽象原因、對話大綱）；**不顯示任何分數**。
 - 累積 3 筆以上不合適時，頁面上方顯示 AI 朋友的觀察（從原因類型統計，例：「最近 5 次沒成的裡面，有 3 次是對方偏好節奏比較慢的人。這不是誰的錯，只是剛好不同步。」），用固定模板產生即可。
 - 「重啟對話」`POST /api/history/[id]/reopen`，`{ mode: 'twin' | 'human' }`：
@@ -363,7 +363,10 @@ runner 的每一步都包在 try/catch：失敗時 `fail_count + 1`、寫日誌�
 
 enough_info：對話內容不足以判斷時為 false。
 reason_type 與 reason_text：只在你認為不合適時填寫。reason_type 為 condition_mismatch（對方特點不符合條件）或 friction（冷場、敷衍、觀點衝突）；reason_text 用抽象特質描述，不提對方的具體事件與個資，30 字內。
-outline：這段對話的大綱，各項最多 3 點。
+outline：站在 {{perspective_name}} 的角度寫這段對話的大綱，各項最多 3 點；highlights 是對方的亮點。
+fit_points：只在你認為合適時填寫，最多 3 點，每點對應一個 {{perspective_name}} 在意的條件或特質（concern），
+  寫出對方在對話中的具體表現（evidence，20–40 字，不寫地址、學校、電話、真實人名等個資）與出現的輪數（round）。
+  不合適時輸出空陣列。
 
 只輸出 JSON：
 {
@@ -371,7 +374,10 @@ outline：這段對話的大綱，各項最多 3 點。
   "enough_info": true,
   "reason_type": null,
   "reason_text": null,
-  "outline": {"topics": ["…"], "fits": ["…"], "frictions": ["…"], "highlights": ["…"]}
+  "outline": {
+    "topics": ["…"], "fits": ["…"], "frictions": ["…"], "highlights": ["…"],
+    "fit_points": [{"concern": "喜歡登山", "evidence": "主動分享最近的登山行程，還追問你常去哪裡", "round": 5}]
+  }
 }
 ```
 
