@@ -14,14 +14,15 @@
 6. **絕不 commit 機密**：`.env.local`、Supabase key、LLM API key。金鑰私下傳，不貼群組。
 7. **禁止 `git push --force`**、`git reset --hard` 等破壞性操作。
 8. 所有檔案讀寫明確指定 `encoding="utf-8"`（開發環境是 Windows，會踩 cp950 亂碼）。
+9. **每個 PR 都要在 [docs/DEVLOG.md](docs/DEVLOG.md) 自己那條線的區塊寫一筆紀錄**：做了什麼、為什麼、改了哪些檔案、踩到的坑、待辦。方便之後維護。
 
 ## 2. 分工與檔案歸屬
 
 | 線 | 成員 | 負責 | 規格 | 分支前綴 |
 |---|---|---|---|---|
-| A：AI 朋友線 | （待填） | 陪伴你、認識你、回報結果；專案骨架、登入、共用元件、部署 | [07A](docs/07A_AI朋友線.md) | `a/` |
-| B：社交 Agent 線 | （待填） | 接任務、挑人、判定、決策；LLM 封裝、日誌、常數 | [07B](docs/07B_社交Agent線.md) | `b/` |
-| C：分身與大廳線 | （待填） | 分身代聊、大廳、接手；Realtime、種子用戶 | [07C](docs/07C_分身與大廳線.md) | `c/` |
+| A：AI 朋友線 | Vincent | 陪伴你、認識你、回報結果；專案骨架、登入、共用元件、部署 | [07A](docs/07A_AI朋友線.md) | `a/` |
+| B：社交 Agent 線 | WEICHENG28 | 接任務、挑人、判定、決策；LLM 封裝、日誌、常數 | [07B](docs/07B_社交Agent線.md) | `b/` |
+| C：分身與大廳線 | Jerry | 分身代聊、大廳、接手；Realtime、種子用戶 | [07C](docs/07C_分身與大廳線.md) | `c/` |
 
 - 每個檔案屬於哪條線，見 [07 第 3 節](docs/07_開發分工.md) 的專案結構。
 - 要用別條線的功能，**只能呼叫 `lib/contracts/`**，對方還沒好就用 stub。
@@ -45,6 +46,8 @@ git add <你改的檔案>
 git commit -m "feat: B3 Agent 迴圈與 worker"
 git push -u origin b/B3-runner
 ```
+
+commit 前，在 [docs/DEVLOG.md](docs/DEVLOG.md) 自己那條線的區塊最上面加一筆紀錄（格式見該檔）。
 
 到 GitHub 開 PR：
 - **只改自己那條線** → `npm test` 通過、網站能跑，**自己合併**。
