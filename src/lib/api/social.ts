@@ -42,6 +42,36 @@ export class ApiError extends Error {}
 
 const useHttp = import.meta.env.VITE_API_MODE === 'http'
 
+/** http 模式才有真的歷史資料；mock 模式頁面用 demo store。 */
+export const historyFromApi = useHttp
+
+export type AttemptResult = 'mutual' | 'one_way' | 'unsuitable' | 'ongoing'
+export type ReasonType = 'not_mutual' | 'condition_mismatch' | 'friction'
+
+/** 歷史嘗試一筆（後端不回傳任何分數）。 */
+export interface HistoryEntry {
+  id: string
+  target_user_id: string
+  target_name: string
+  conversation_id: string
+  origin: 'auto' | 'manual'
+  result: AttemptResult
+  reason_type: ReasonType | null
+  reason_text: string | null
+  outline: { topics: string[]; fits: string[]; frictions: string[]; highlights: string[] } | null
+  reopened_at: string | null
+  created_at: string
+}
+
+export function getHistory(): Promise<{ items: HistoryEntry[]; insight: string | null }> {
+  return request('GET', '/api/history')
+}
+
+/** twin：讓分身再試一次（回 taskId）；human：本人去聊（回 conversationId）。 */
+export function reopenHistory(id: string, mode: 'twin' | 'human'): Promise<{ mode: 'twin' | 'human'; taskId?: string; conversationId?: string }> {
+  return request('POST', `/api/history/${id}/reopen`, { mode })
+}
+
 export function createTask(text: string): Promise<TaskView> {
   return useHttp ? request('POST', '/api/tasks', { text }) : mock.create(text)
 }

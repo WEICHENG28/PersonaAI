@@ -4,6 +4,9 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { LlmError } from '../lib/llm'
 import { TaskError, changeTaskStatus, createTaskFromText, getOwnTask, type TaskAction } from '../social/task'
+import { startConversation } from '../contracts/twin'
+import { getAgentStore } from '../social/agentStore'
+import { listHistory, reopenAttempt } from '../social/history'
 import { runTaskStepSafely } from '../social/runner'
 import { defaultRunnerDeps } from '../social/runnerDeps'
 import { requireUserId } from '../social/user'
@@ -35,6 +38,18 @@ socialRoutes.post('/tasks/:id/step', (c) =>
     return { outcome, task: await getOwnTask(userId, id) }
   }),
 )
+
+/** B6：歷史嘗試（不含分數）＋阿澈的觀察。 */
+socialRoutes.get('/history', (c) => respond(c, (userId) => listHistory(userId, getAgentStore())))
+
+const reopenBody = z.object({ mode: z.enum(['twin', 'human']) })
+
+/** B6：重啟對話。twin → 新的單人任務；human → 本人直接開聊，前端導向 /chat/:conversationId。 */
+socialRoutes.post('/history/:id/reopen', async (c) => {
+  const body = reopenBody.safeParse(await c.req.json().catch(() => null))
+  if (!body.success) return c.json({ ok: false, error: '请选择本人去聊或让分身再试一次' }, 400)
+  return respond(c, (userId) => reopenAttempt(userId, c.req.param('id'), body.data.mode, { store: getAgentStore(), startConversation }))
+})
 
 /**
  * 先確認登入者，再執行 run。

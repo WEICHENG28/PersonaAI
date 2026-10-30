@@ -193,6 +193,20 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B6 歷史嘗試＋重啟對話｜Peter（AI 協助）｜Closes #35
+- **做了什麼**：
+  - 迴圈寫歷史改成 `recordAttempts`：我方一筆；對方不是種子用戶時也幫對方寫一筆（對方視角的判定與大綱）；不合適原因先過 C 的 `guardText`（守的是被描述的一方）。代聊結束時雙方都記「不合適」（只有一方覺得合適就是「匹配不雙向」）；通知本人時各記自己視角的結果。
+  - `server/social/history.ts`：`listHistory`（最多 50 筆、新的在前、不回 user_id 與任何分數）、`buildInsight`（最近 10 筆裡不合適 ≥3 筆時，統計最多的原因，用固定模板產生阿澈的觀察）、`reopenAttempt`（twin → 新的單人任務；human → C 的 `startConversation`，本人直接開聊；記 `reopened_at`）。
+  - `createSingleTargetTask` 從 stub 換成真的（running 的單人任務，開始前檢查對外檔案與社交 Agent），contract 也接上。
+  - API：`GET /api/history`、`POST /api/history/:id/reopen`；`agentStore` 加 `listAttempts`／`getAttempt`／`markReopened`／`isSeedUser`。
+  - 前端：`src/lib/api/social.ts` 加 `getHistory`／`reopenHistory`；新元件 `HistoryList`；`HistoryPage` 在 http 模式改用真資料，mock 模式畫面不變。
+- **給 C（Jerry）**：歷史頁的「看對話紀錄」連到 `/chat/<conversation_id>/result`，「本人去聊」連到 `/chat/<conversation_id>`。這兩個路由等 C4（#67）接上真的對話 ID 後才會通。
+- **改了哪些檔案**：`server/social/{runner,runnerDeps,agentStore,history,task}.ts`、`server/contracts/social.ts`、`server/routes/social.ts`、`src/lib/api/social.ts`、`src/features/social/{HistoryPage.tsx,components/HistoryList.tsx}`、`tests/social/{runner,history}.test.ts`。
+- **驗證**：`tsc -b`；vitest 306/306（雙方各記一筆、種子用戶只記我方、匹配不雙向、原因過守門、觀察模板、只回自己的紀錄且不含分數、重啟 twin／human、未確認檔案被擋、404／400）；`npm run build`；對雲端 Supabase **唯讀**跑 `listAttempts`（含對方名稱的 join）與 `isSeedUser`，語法正確。
+- **還沒做完／待辦**：畫面要在 http 模式用瀏覽器看一次（AI 無法截圖）。
+
+---
+
 ### 2026-10-30｜B3 修正：對方本人接手時迴圈放手｜Peter（AI 協助）｜分支 b/B3-side-b-takeover
 - **做了什麼**：`ConversationState` 加上 `sideBController`（Supabase 版多讀 `side_b_controller`，記憶體版預設 `twin`）；`advanceChat` 改成任一方是本人就清掉 `active_conversation_id`、寫日誌、回 `chat_cleared`，不再呼叫 `runTwinRounds`。日誌分成「你已接手」和「对方本人已接手」。
 - **為什麼這樣做**：C3（#62）的 `runTwinRounds` 會跳過本人在聊的那一方。原本迴圈只看 a 方，對方按「我來聊」後，我方分身會一次連發 4 則、不等對方回話，聊夠輪數後還會拿這種對話去判定。

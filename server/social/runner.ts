@@ -1,6 +1,6 @@
 // B3｜社交 Agent 工作循環：目標 → 規劃 → 執行 → 評估 → 決策 → 回報（02 第 4 節、07B 的 B3）。擁有者：B。
 // 每呼叫一次 runTaskStep 推進一步；worker（scripts/worker.ts）或 POST /api/tasks/:id/step 會呼叫它。
-import type { AgentTask, Evaluation, LobbyCandidate, LobbyQuery, StartConversationInput, TaskReport, TaskStatus } from '../../shared/types'
+import type { AgentTask, Evaluation, GuardResult, LobbyCandidate, LobbyQuery, ReasonType, StartConversationInput, TaskReport, TaskStatus } from '../../shared/types'
 import { CONFIG } from '../lib/config'
 import { writeLog } from '../lib/log'
 import type { AgentStore } from './agentStore'
@@ -26,6 +26,8 @@ export interface RunnerDeps {
   runTwinRounds: (conversationId: string, rounds: number) => Promise<{ roundCount: number; ended: boolean }>
   endConversation: (conversationId: string, reason: 'unsuitable' | 'done' | 'declined') => Promise<void>
   markWaitingHuman: (conversationId: string) => Promise<void>
+  /** C 的隱私守門：不合適原因寫進歷史前先過一次。 */
+  guardText: (text: string, ownerUserId: string) => Promise<GuardResult>
 }
 
 /** 這一步做了什麼（給 API 與 worker 顯示）。 */
@@ -210,10 +212,9 @@ async function decideNext(task: AgentTask, conversationId: string, ev: Evaluatio
   // 我方一定是發起方（side_a），對方就是這場代聊開始時加進 attempted 的最後一位
   const targetId = task.target_user_id ?? task.attempted_user_ids.at(-1) ?? ''
   const result = attemptResult(ev.a.verdict, ev.b.verdict)
-  const base = { user_id: task.user_id, target_user_id: targetId, conversation_id: conversationId, task_id: task.id, origin: 'auto' as const, outline: ev.a.outline }
 
   if (decision.action === 'notify_user') {
-    await deps.store.recordAttempt({ ...base, result, reason_type: null, reason_text: null })
+    await recordAttempts(task, conversationId, targetId, ev, { ended: false, forced: null }, deps)
     await deps.markWaitingHuman(conversationId)
     await deps.store.notifyMatch(task.user_id, { conversation_id: conversationId, task_id: task.id, mutual: result === 'mutual' })
     await deps.store.updateTask(task.id, { active_conversation_id: null, progress: { ...task.progress, suitable: task.progress.suitable + 1 } })
@@ -221,13 +222,53 @@ async function decideNext(task: AgentTask, conversationId: string, ev: Evaluatio
     return 'notified'
   }
 
-  const reasonType = decision.reason?.type ?? unsuitableReason(ev.a.verdict, ev.b.verdict, ev.a.reason_type)
-  const reasonText = decision.reason?.text ?? ev.a.reason_text ?? '聊下来不太合拍'
-  await deps.store.recordAttempt({ ...base, result: 'unsuitable', reason_type: reasonType, reason_text: reasonText })
+  const reasonText = await recordAttempts(task, conversationId, targetId, ev, { ended: true, forced: decision.reason }, deps)
   await deps.endConversation(conversationId, 'unsuitable')
   await deps.store.updateTask(task.id, { active_conversation_id: null })
-  await log(task, '不合适，结束这场代聊，记入历史', reasonText, { conversation_id: conversationId })
+  await log(task, '不合适，结束这场代聊，记入历史', reasonText ?? '聊下来不太合拍', { conversation_id: conversationId })
   return 'ended_chat'
+}
+
+/**
+ * 寫歷史嘗試（07B 的 B6）：我方一筆；對方不是種子用戶時也幫對方寫一筆（用對方視角的判定與大綱）。
+ * 不合適原因先過 C 的隱私守門（守的是被描述的那一方）。回傳我方的不合適原因（合適時為 null）。
+ */
+async function recordAttempts(
+  task: AgentTask,
+  conversationId: string,
+  targetId: string,
+  ev: Evaluation,
+  how: { ended: boolean; forced: { type: ReasonType; text: string } | null },
+  deps: RunnerDeps,
+): Promise<string | null> {
+  const sides = [
+    { owner: task.user_id, other: targetId, mine: ev.a, theirs: ev.b },
+    ...((await deps.store.isSeedUser(targetId)) ? [] : [{ owner: targetId, other: task.user_id, mine: ev.b, theirs: ev.a }]),
+  ]
+  let myReason: string | null = null
+  for (const side of sides) {
+    // 代聊結束時兩邊都記為不合適（只有一方覺得合適就是「匹配不雙向」）；通知本人時各記自己視角的結果
+    const result = how.ended ? 'unsuitable' : attemptResult(side.mine.verdict, side.theirs.verdict)
+    let reasonType: ReasonType | null = null
+    let reasonText: string | null = null
+    if (result === 'unsuitable') {
+      reasonType = how.forced?.type ?? unsuitableReason(side.mine.verdict, side.theirs.verdict, side.mine.reason_type)
+      reasonText = (await deps.guardText(how.forced?.text ?? side.mine.reason_text ?? '聊下来不太合拍', side.other)).text
+    }
+    await deps.store.recordAttempt({
+      user_id: side.owner,
+      target_user_id: side.other,
+      conversation_id: conversationId,
+      task_id: task.id,
+      origin: 'auto',
+      result,
+      reason_type: reasonType,
+      reason_text: reasonText,
+      outline: side.mine.outline,
+    })
+    if (side.owner === task.user_id) myReason = reasonText
+  }
+  return myReason
 }
 
 async function finishTask(task: AgentTask, status: Extract<TaskStatus, 'done' | 'paused'>, reason: string, deps: RunnerDeps): Promise<void> {
