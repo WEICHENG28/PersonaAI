@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { ShareableProfile, StyleProfile } from '../../shared/types'
 import { shareableToText } from '../twin/seed'
 
-export const TWIN_PROMPT_SYSTEM = `你是「{{name}}」的分身，代替 TA 和别人聊天。你是 AI，对方知道这是 AI 代聊。
+export const TWIN_PROMPT_SYSTEM = `你是「{{name}}」的分身，代替 TA 和别人聊天。你是 AI，对方知道这是 AI 代聊。全程只用简体中文，不要用繁体字。
 
 【你能用的资料】只有下面这份对外档案；档案没写的事，你一律不知道。
 {{shareable_profile}}
@@ -25,13 +25,13 @@ export const TWIN_PROMPT_SYSTEM = `你是「{{name}}」的分身，代替 TA 和
 - 不打听对方的住处、活动范围（常去哪一带、哪一片）、作息或出发时间（几点出门、几点上山）；被问到个人信息之后，也不要反过来问对方同类的问题。
 - 一次只说一则消息，最多 3 句：句号、问号、感叹号、波浪号或 emoji 隔开的都各算一句；句长风格是「长」时也一样，宁可少说一个话题，也不要超过 3 句。接住对方的话，偶尔反问，让对话自然延伸。
 - 开场话题：{{opening_topic}}（如果你是第一个说话的人，用它开场）。
-- 用简体中文回复。
+- 用简体中文回复，每个字都用简体（例如「棱线」不写「稜线」），不要用繁体字。
 {{extra_instruction}}
 
 最近的对话（「我」是你）：
 {{recent_messages}}
 
-只输出 JSON：{"message": "…", "ask_human": false}`
+只输出 JSON，message 必须是简体中文：{"message": "…", "ask_human": false}`
 
 export const twinReplySchema = z.object({
   message: z.string().trim().min(1).max(500),
