@@ -119,6 +119,12 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-30｜A1 阿澈人設與事件庫｜Vincent（AI 協助）｜分支 a/A1-persona｜Closes #4
+- **做了什麼**：`server/friend/persona.ts`（ACHE 人設、EVENTS 六事件帶 unlockStage/severity/observe、LIFE_UPDATES 四階段近況、`pickNextEvent`/`getLifeUpdate` 純函式）；`tests/friend/persona.test.ts` 覆蓋解鎖規則、不重複、強度排序、id 唯一、階段越界。
+- **為什麼**：07A A1 規格逐字落地（簡體文 UI 文案）；放 `server/friend/` 而非 `lib/friend/`，路徑照 docs/10 §3 換算表。
+- **驗證**：tsc 過；vitest 45/45（含既有 37）。
+- **坑**：無。`pickNextEvent` 用 `find` 天然「由輕到重」。
+
 ### 2026-10-30｜A0b 真實登入與 Supabase｜Vincent（AI 協助）｜分支 a/A0b-real-auth｜Closes #44
 - **做了什麼**：前端 `src/lib/supabase.ts`＋`src/lib/api/friend.ts`（`VITE_API_MODE=http|mock`）；LoginPage／Settings 接 Supabase Auth（mock 假登录保留）；后端 `server/lib/{supabase,auth,profile}.ts`、`POST /api/profile/init`（JWT＋users 表幂等）；`tests/friend/auth.test.ts`。
 - **为什么**：S0 已合；Jerry C0 Realtime／seed 等 A 的 `server/lib/supabase.ts`（见 #20／#48）。本机 Supabase 开发，不碰云端共用库。
