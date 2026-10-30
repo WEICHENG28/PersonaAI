@@ -1,7 +1,7 @@
 /* ── 落地页：Hum 构成（settled hero、卡纸 tile、梨黄 field、撕纸带） ── */
 
 .landing {
-  max-width: var(--container);
+  max-width: var(--container-wide, var(--container));
   margin-inline: auto;
   padding: 0 var(--gutter);
   display: grid;

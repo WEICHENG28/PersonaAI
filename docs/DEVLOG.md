@@ -26,6 +26,14 @@
 
 ## 共用與決策
 
+### 2026-10-30｜卡片內距修復＋寬屏展開＋雙欄｜Vincent（AI 協助）｜直接 commit main（骨架階段）
+- **做了什麼**：`.card` 統一 `padding: 24px`（此前無 padding，CardHead 標題貼容器邊緣）；桌機 `--container` 展開至近全窗（min(100vw-80px, 1600px)）、landing 用 1760px 寬版；AI 朋友／我的檔案／設置頁改桌機雙欄；設置頁右欄新增「賬號·登出」卡；設計規範 md 補 Hum 鐵則（第 0 節）與布局規則。
+- **為什麼**：使用者回報側欄卡內容貼邊（候選人卡因自帶 padding 無此問題）→ 根因是 `.card` 基類缺 padding；寬屏需求＝資訊頁展開、內容頁雙欄消化寬度。
+- **驗證**：tsc、vitest 4/4；CDP 1440/375px 實測 friend/profile/settings/lobby：雙欄生效、卡片 24px 內距、零溢出。
+- **坑**：pages.css 在 base.css 之後導入，`.cand-card` 等自帶 padding 的卡不受影響（選擇器同級後者勝）；`.friend-chat` 顯式 `padding: 0` 保留分區排版。
+
+---
+
 ### 2026-10-30｜全站統一頂欄＋設計規範文件｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：頂欄改為每頁都有（含 landing、登入）、sticky＋滾動加深陰影（drop-shadow，撕紙 clip-path 裁不掉）；登入後右端加 Profile 鈕（頭像圓片＋暱稱）、未登入顯示梨黃「開始使用」CTA；登入頁短內容垂直置中（`app-main.page-center`）；landing 移除自帶頂欄；手機底攔第 4 格加「我的檔案」。新增 `docs/08_前端設計規範.md`（Agent 改 UI 前必讀：頂欄結構、居中規則、Rive 語義鍵、驗證口徑）。
 - **為什麼**：對齊直覺與 Hum demo 參考——同一頂欄出現在所有頁面、滾動時貼頂有影子；短頁置中；登入前後都有明確入口。

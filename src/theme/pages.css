@@ -50,10 +50,17 @@
 /* ── 朋友页布局：桌机双栏、手机单栏 ── */
 .friend-layout { display: grid; gap: var(--space-md); }
 @media (min-width: 64rem) {
-  .friend-layout { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
+  .friend-layout { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start; }
 }
 
-.friend-chat { display: grid; grid-template-rows: auto minmax(200px, 52svh) auto; }
+/* Profile 页桌机双栏：档案+风格（左）／记忆（右） */
+.profile-layout { display: grid; gap: var(--space-md); }
+@media (min-width: 64rem) {
+  .profile-layout { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
+}
+
+.friend-chat { display: grid; grid-template-rows: auto minmax(240px, 52svh) auto; padding: 0; }
+.friend-chat__head { border-radius: var(--radius-card) var(--radius-card) 0 0; }
 
 .friend-chat__head {
   display: flex;

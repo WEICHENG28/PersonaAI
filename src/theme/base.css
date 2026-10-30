@@ -51,11 +51,12 @@ mark {
 button { font-family: inherit; }
 input, textarea, select { font-family: inherit; }
 
-/* ── 卡片：紙卡，光從左上 ── */
+/* ── 卡片：紙卡，光從左上（统一内距 24px，内容不贴边） ── */
 .card {
   background: var(--grain), var(--fibre), var(--color-card);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
+  padding: var(--space-lg);
 }
 
 /* ── 按鈕：厚卡紙，邊緣會壓下去（Hum 真規格） ── */

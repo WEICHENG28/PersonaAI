@@ -38,9 +38,11 @@ export function ProfilePage() {
         <p>{t('profile.shareableNote')}</p>
       </div>
 
-      <div className="stack">
-        {/* 对外档案 */}
-        <Card>
+      {/* 桌机双栏：档案+说话风格（左）／它记得的事（右） */}
+      <div className="profile-layout">
+        <div className="stack">
+          {/* 对外档案 */}
+          <Card>
           <CardHead
             title={t('profile.shareable')}
             right={
@@ -139,6 +141,7 @@ export function ProfilePage() {
             <li>emoji：少量使用</li>
           </ul>
         </Card>
+        </div>
 
         {/* 它记得的事 */}
         <Card>

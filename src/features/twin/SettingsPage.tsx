@@ -17,7 +17,10 @@ export function SettingsPage() {
       </div>
 
       <div className="stack">
-        {/* 社交 Agent */}
+        {/* 桌机双栏：左＝社交 Agent/档位/频率，右＝dev/时间/登出 */}
+        <div className="profile-layout">
+          <div className="stack">
+            {/* 社交 Agent */}
         <Card>
           <CardHead
             title={t('settings.socialAgent')}
@@ -83,42 +86,50 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        {/* 开发者模式 */}
-        <Card>
-          <CardHead
-            title={t('settings.devMode')}
-            sub={t('settings.devModeHint')}
-            right={<Chip tone={s.settings.devMode ? 'pear' : 'well'}>{s.settings.devMode ? '开' : '关'}</Chip>}
-          />
-          <Button
-            small
-            variant={s.settings.devMode ? 'danger' : 'primary'}
-            onClick={() => s.toggleSetting('devMode')}
-          >
-            {s.settings.devMode ? '关闭' : '开启'}
-          </Button>
-        </Card>
-
-        {/* 人工平均时间 */}
-        <Card>
-          <CardHead title={t('settings.avgManualTime')} sub={t('settings.avgManualTimeNote')} />
-          <input
-            className="input"
-            type="number"
-            min={5}
-            max={120}
-            value={s.settings.avgManualMin}
-            onChange={(e) => s.setSetting('avgManualMin', Number(e.target.value) || 20)}
-            style={{ maxWidth: 160 }}
-          />
-        </Card>
-
         {/* dev_mode 时直接看日志 */}
         {s.settings.devMode && <AgentLogPanel logs={s.taskLogs} />}
+          </div>
 
-        <Button variant="secondary" block onClick={s.logout}>
-          {t('settings.logout')}
-        </Button>
+          <div className="stack">
+            {/* 开发者模式 */}
+            <Card>
+              <CardHead
+                title={t('settings.devMode')}
+                sub={t('settings.devModeHint')}
+                right={<Chip tone={s.settings.devMode ? 'pear' : 'well'}>{s.settings.devMode ? '开' : '关'}</Chip>}
+              />
+              <Button
+                small
+                variant={s.settings.devMode ? 'danger' : 'primary'}
+                onClick={() => s.toggleSetting('devMode')}
+              >
+                {s.settings.devMode ? '关闭' : '开启'}
+              </Button>
+            </Card>
+
+            {/* 人工平均时间 */}
+            <Card>
+              <CardHead title={t('settings.avgManualTime')} sub={t('settings.avgManualTimeNote')} />
+              <input
+                className="input"
+                type="number"
+                min={5}
+                max={120}
+                value={s.settings.avgManualMin}
+                onChange={(e) => s.setSetting('avgManualMin', Number(e.target.value) || 20)}
+                style={{ maxWidth: 160 }}
+              />
+            </Card>
+
+            {/* 账号：登出 */}
+            <Card>
+              <CardHead title="账号" sub="登出后需重新登录" />
+              <Button small variant="danger" onClick={s.logout}>
+                {t('settings.logout')}
+              </Button>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )
