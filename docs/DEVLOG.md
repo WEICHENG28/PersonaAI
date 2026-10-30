@@ -218,6 +218,16 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B8 效率統計＋任務結果回報｜Peter（AI 協助）｜Closes #36
+- **做了什麼**：`server/social/stats.ts`（`computeStats`：省下時間＝代聊場數 × 人工平均分鐘，附計算依據；`formatDuration`：120 →「约 2 小时」）；`buildReport` 從這個任務的歷史嘗試取合適名單（雙向／單向）與不合適原因（抽象說法、已過隱私守門），不含任何分數，交給 A 的 `deliverReport`；`match` 通知的內容改成 07B 規定的 `{ conversationId, targetName, mutual, taskId }`；前端 `StatsCard`（沿用 A 回報卡的 `stats-row`／`stat` 樣式）與 `formatDuration`。
+- **給 A（Vincent）**：`deliverReport` 收到的 `TaskReport` 現在有 `suitable`（名字、是否雙向、對話 ID）與 `unsuitable_reasons`，阿澈回報時可以直接用。`StatsCard` 可以放進回報卡或任務頁。
+- **給 C（Jerry）**：`match` 通知的 payload 是 `{ conversationId, targetName, mutual, taskId }`，通知鈴鐺顯示「找到合适的人：{targetName}」，連到 `/chat/<conversationId>/result`。
+- **改了哪些檔案**：`server/social/{stats,report,runner}.ts`、`src/features/social/{formatDuration.ts,components/StatsCard.tsx}`、`tests/social/{report,runner}.test.ts`。
+- **踩到的坑**：vitest 沒有設定 `@components` 等路徑別名，測試 import 含別名的元件會失敗，所以 `formatDuration` 獨立成不 import 任何別名的小檔案。
+- **驗證**：`tsc -b`；vitest 341/341（computeStats、formatDuration 前後端一致、buildReport 只取本任務且不含分數、match 通知格式）；`npm run build`。
+
+---
+
 ### 2026-10-30｜B6 歷史嘗試＋重啟對話｜Peter（AI 協助）｜Closes #35
 - **做了什麼**：
   - 迴圈寫歷史改成 `recordAttempts`：我方一筆；對方不是種子用戶時也幫對方寫一筆（對方視角的判定與大綱）；不合適原因先過 C 的 `guardText`（守的是被描述的一方）。代聊結束時雙方都記「不合適」（只有一方覺得合適就是「匹配不雙向」）；通知本人時各記自己視角的結果。
