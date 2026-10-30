@@ -18,7 +18,8 @@ export interface RunnerDeps {
   searchLobby: (userId: string, q: LobbyQuery) => Promise<LobbyCandidate[]>
   pick: (task: AgentTask, candidates: LobbyCandidate[]) => Promise<PickResult>
   evaluate: (task: AgentTask, conversationId: string, round: number) => Promise<Evaluation>
-  decide: (task: AgentTask, evaluation: Evaluation) => Promise<DecideAction | null>
+  /** 規劃器的建議（B4）；回 null 代表只用程式規則。 */
+  decide: (task: AgentTask, evaluation: Evaluation) => Promise<{ action: DecideAction; reason: string } | null>
   buildReport: (task: AgentTask) => Promise<TaskReport>
   deliverReport: (userId: string, report: TaskReport) => Promise<void>
   startConversation: (input: StartConversationInput) => Promise<{ conversationId: string }>
@@ -190,11 +191,13 @@ async function advanceChat(task: AgentTask, conversationId: string, deps: Runner
 async function decideNext(task: AgentTask, conversationId: string, ev: Evaluation, deps: RunnerDeps): Promise<StepOutcome> {
   const settings = await deps.store.userSettings(task.user_id)
   const suggested = await deps.decide(task, ev)
-  const decision = decideGuard(suggested, { tier: settings.match_tier, mine: ev.a.verdict, theirs: ev.b.verdict, round: ev.round })
+  const decision = decideGuard(suggested?.action ?? null, { tier: settings.match_tier, mine: ev.a.verdict, theirs: ev.b.verdict, round: ev.round })
   if (decision.overridden) await log(task, '决策由程序规则修正', decision.overridden, { conversation_id: conversationId })
+  // 規劃器和程式規則一致時，日誌用規劃器寫的理由
+  const plannerReason = suggested && !decision.overridden ? suggested.reason : null
 
   if (decision.action === 'continue_chat') {
-    await log(task, '继续代聊', '还不确定合不合适，多聊几轮再判断', { conversation_id: conversationId })
+    await log(task, '继续代聊', plannerReason ?? '还不确定合不合适，多聊几轮再判断', { conversation_id: conversationId })
     return 'continue_chat'
   }
 
@@ -208,7 +211,7 @@ async function decideNext(task: AgentTask, conversationId: string, ev: Evaluatio
     await deps.markWaitingHuman(conversationId)
     await deps.store.notifyMatch(task.user_id, { conversation_id: conversationId, task_id: task.id, mutual: result === 'mutual' })
     await deps.store.updateTask(task.id, { active_conversation_id: null, progress: { ...task.progress, suitable: task.progress.suitable + 1 } })
-    await log(task, result === 'mutual' ? '双向合适，通知你' : '对你来说合适，通知你', `第 ${ev.round} 轮判定`, { conversation_id: conversationId })
+    await log(task, result === 'mutual' ? '双向合适，通知你' : '对你来说合适，通知你', plannerReason ?? `第 ${ev.round} 轮判定`, { conversation_id: conversationId })
     return 'notified'
   }
 
