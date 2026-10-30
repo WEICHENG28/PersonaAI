@@ -39,6 +39,15 @@
 
 ---
 
+### 2026-10-30｜A0 後架構調整｜Peter（AI 協助）
+- **做了什麼**：新增 `docs/10_A0後架構調整.md`：保留 A0 的 Vite SPA，另加 `server/`（Node＋Hono）放 LLM 與 Supabase 寫入；07 系列路徑換算表、新檔案歸屬、新 M1（S0 後端骨架→A0b 真實登入／B0／C0）。把 A0 放錯資料夾的頁面搬到擁有者資料夾（Profile/Settings→friend、History→social、ProxyChat/Result/Handoff→twin），只改 `src/routes.tsx` 的 import。07、07A/B/C 頂部加註以 10 為準；AGENTS、CONTRIBUTING、README 同步。
+- **為什麼這樣做**：A0 改成純前端 SPA，沒有地方安全放 LLM 金鑰和 service role key，Agent 賽道的核心（規劃、判定、worker）需要後端；改回 Next.js 會丟掉 A 已做好的全部畫面，所以加後端而不是重做。頁面依歸屬搬家，避免 AI 依資料夾名稱改錯別人的檔案。
+- **驗證**：`tsc -b` 通過、vitest 4/4、`npm run build` 成功。
+- **注意**：A0 是直接 commit 到 main，違反規則；`main` 分支保護需要 Peter 在 GitHub 設定。
+- **還沒做完／待辦**：介面語言（簡體 vs 繁體）待三人決定；S0 由 B 做。
+
+---
+
 ### 2026-10-30｜卡片內距修復＋寬屏展開＋雙欄｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：`.card` 統一 `padding: 24px`（此前無 padding，CardHead 標題貼容器邊緣）；桌機 `--container` 展開至近全窗（min(100vw-80px, 1600px)）、landing 用 1760px 寬版；AI 朋友／我的檔案／設置頁改桌機雙欄；設置頁右欄新增「賬號·登出」卡；設計規範 md 補 Hum 鐵則（第 0 節）與布局規則。
 - **為什麼**：使用者回報側欄卡內容貼邊（候選人卡因自帶 padding 無此問題）→ 根因是 `.card` 基類缺 padding；寬屏需求＝資訊頁展開、內容頁雙欄消化寬度。

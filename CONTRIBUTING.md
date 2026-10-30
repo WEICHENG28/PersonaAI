@@ -2,7 +2,7 @@
 
 > 給**團隊成員**與**每個人的 AI agent** 共同遵守。AI 的精簡硬規則在 [AGENTS.md](AGENTS.md)。
 > 黑客松時間短，規則的目標只有兩個：**不撞車、`main` 隨時能 demo**。
-> 技術規格（技術棧、資料夾、資料表、型別、跨線函式、時程）在 [docs/07_開發分工.md](docs/07_開發分工.md)。
+> 技術規格（資料表、型別、跨線函式）在 [docs/07_開發分工.md](docs/07_開發分工.md)；**技術棧、資料夾與檔案歸屬以 [docs/10_A0後架構調整.md](docs/10_A0後架構調整.md) 為準**。
 
 ## 1. 鐵則（違反會害到別人）
 
@@ -24,9 +24,9 @@
 | B：社交 Agent 線 | Peter | 接任務、挑人、判定、決策；LLM 封裝、日誌、常數 | [07B](docs/07B_社交Agent線.md) | `b/` |
 | C：分身與大廳線 | Jerry | 分身代聊、大廳、接手；Realtime、種子用戶 | [07C](docs/07C_分身與大廳線.md) | `c/` |
 
-- 每個檔案屬於哪條線，見 [07 第 3 節](docs/07_開發分工.md) 的專案結構。
-- 要用別條線的功能，**只能呼叫 `lib/contracts/`**，對方還沒好就用 stub。
-- **共用檔**（`lib/types.ts`、contracts 函式簽名、`supabase/migrations/`、`package.json`／lockfile、`.env.example`、`globals.css` token、本文件、`AGENTS.md`、`README.md`、`.github/`、`docs/`）照 [07 第 0.5 節](docs/07_開發分工.md) 改：群組提出 → 三人同意 → 提出的人改 → 請人看過再合併。
+- 每個檔案屬於哪條線，見 [10 第 4 節](docs/10_A0後架構調整.md)。
+- 要用別條線的功能，**只能呼叫 `server/contracts/`**，對方還沒好就用 stub。
+- **共用檔**（清單見 10 第 4 節）照 [07 第 0.5 節](docs/07_開發分工.md) 改：群組提出 → 三人同意 → 提出的人改 → 請人看過再合併。
 - 新增套件找 A；lockfile 衝突不要手動合併，以 `main` 為準重新 `npm install`。
 
 ## 3. 每個任務的流程

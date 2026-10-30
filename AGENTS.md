@@ -1,7 +1,7 @@
 # AGENTS.md — AI agent 工作規則（黑客松版）
 
 本檔案給所有在 PersonaAI repo 內工作的 AI agent（Claude Code、Codex、Cursor、Copilot 等）。
-**開始任何工作前先讀完。** 協作流程見 [CONTRIBUTING.md](CONTRIBUTING.md)；技術規格、檔案歸屬與跨線函式見 [docs/07_開發分工.md](docs/07_開發分工.md)，各線任務見 `docs/07A`、`07B`、`07C`。
+**開始任何工作前先讀完。** 協作流程見 [CONTRIBUTING.md](CONTRIBUTING.md)；技術規格與跨線函式見 [docs/07_開發分工.md](docs/07_開發分工.md)，各線任務見 `docs/07A`、`07B`、`07C`。**檔案路徑、技術棧與檔案歸屬以 [docs/10_A0後架構調整.md](docs/10_A0後架構調整.md) 為準**（前端 Vite SPA 在 `src/`、後端在 `server/`）；改 UI 前讀 [docs/08_前端設計規範.md](docs/08_前端設計規範.md)。
 
 你是替某一位成員（A、B 或 C 線）工作的。三個人、多個 AI 會同時在這個 repo 作業，並共用同一個雲端 Supabase 資料庫。以下規則是為了不互相覆蓋，並讓 `main` 隨時能 demo。
 
@@ -9,7 +9,7 @@
 
 1. 不可直接在 `main` 上 commit 或 push。
 2. 不可 `git push --force`、`git reset --hard`、`git clean -fd`、`git checkout -- .`、刪除他人分支或檔案。
-3. 不可修改使用者那條線以外的檔案（歸屬見 07 第 3 節），或共用檔：`lib/types.ts`、`lib/contracts/*.ts` 的函式簽名、`supabase/migrations/`、`package.json`／`package-lock.json`、`.env.example`、`app/globals.css` 的 token、`AGENTS.md`、`CONTRIBUTING.md`、`docs/`——除非使用者明確同意。
+3. 不可修改使用者那條線以外的檔案，或共用檔（兩者都見 10 第 4 節，例如 `shared/types.ts`、`server/contracts/*` 的簽名、`src/routes.tsx`、`src/store/useDemoStore.ts`、`src/theme/tokens.css`、`package.json`、`supabase/migrations/`、`docs/`）——除非使用者明確同意。**沒有「骨架階段」之類的例外。**
 4. 不可在別人的分支上 commit 或 push。
 5. 不可讀取、印出、複製或 commit `.env.local` 與任何金鑰。設定值一律透過 `lib/env.ts` 讀取。
 6. **不可對共用 Supabase 執行任何寫入性操作**：SQL、migration、`npm run db:reset`、`npm run seed`、清空資料表。需要時停下來請使用者處理（見 07 第 0.8 節）。
@@ -20,7 +20,7 @@
 ## 開工檢查（每個 session 都要做）
 
 1. 確認使用者是**哪條線**、**這次的任務 ID**、**分支名稱**（格式 `<線別>/<任務ID>-<簡述>`，例如 `b/B3-runner`）。不知道就先問。
-2. 讀 07 全部、該線的 07A／07B／07C，以及 07 第 0.1 節列的 `docs/02` 章節。`docs/` 裡缺少被引用的文件時告訴使用者。
+2. 讀 10 全部、07 全部、該線的 07A／07B／07C，以及 07 第 0.1 節列的 `docs/02` 章節；07 系列的路徑照 10 第 3 節換算。`docs/` 裡缺少被引用的文件時告訴使用者。
 3. `git status`：若有不是本任務的未提交改動，**不要動，先問使用者**——那可能是別的 AI 或人的工作。
 4. `git branch --show-current`：不可在 `main`。需要新分支時：
    ```bash
@@ -38,7 +38,7 @@
 - 遵守 07 第 7 節「給開發 Agent 的共通規則」（AI 標示、隱私分層、寫日誌、LLM 走 `lib/llm`、zod 驗證、檔案 ≤ 400 行等）。
 - 測試放 `tests/<friend|social|twin>/`，只放自己那條線的；LLM 一律 mock。
 - 所有檔案讀寫明確指定 `encoding="utf-8"`。
-- 做畫面時用 Hallmark skill 的 **Hum** 主題（07 第 8.1 節），但只用 `app/globals.css` 的 token，不新增顏色、字型或 `tokens.css`。
+- 做畫面時照 [docs/08](docs/08_前端設計規範.md)（Hallmark **Hum** 主題），只用 `src/theme/tokens.css` 的 token，不新增顏色或字型。A 已做好的頁面 UI 不要重做，只把資料從 mock 接到 `/api`（10 第 3 節）。
 - 每完成一個能跑的小段落就 commit（格式 `<type>: <任務ID> <描述>`）；commit 前看一次 `git diff --staged`，確認沒有金鑰、除錯碼、無關改動。
 - 以「1～2 小時內可以合併」為單位切工作；任務太大就先做出能跑的最小版本。
 - 卡住、改變做法、在等別條線時，用 `bash .github/scripts/task.sh note <issue編號> "說明"` 在 Issue 留言。
