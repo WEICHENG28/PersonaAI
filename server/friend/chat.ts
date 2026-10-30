@@ -12,6 +12,7 @@ import { createTaskFromText } from '../../server/social/task'
 import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend'
 import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona'
 import { extractMemories } from './memory'
+import { extractProfile, shouldExtractProfile } from './profile'
 
 export interface FriendRow {
   story_stage: number
@@ -181,10 +182,22 @@ export async function friendChat(userId: string, text: string) {
     detail: taskId ? { taskId } : undefined,
   })
 
-  // 6. 背景（不等待）：A3 记忆撷取。失败只记日志，不影响回复。
+  // 6. 背景（不等待）：A3 记忆撷取；A4 用户讯息数是 PROFILE_EXTRACT_EVERY 倍数时撷取档案。
+  //    失败只记日志，不影响回复。
   void extractMemories(userId, body.text).catch((err) => {
     console.error('[friend] extractMemories failed', err)
   })
+  try {
+    const userCount = recent.filter((m) => m.role === 'user').length
+    if (shouldExtractProfile(userCount)) {
+      void extractProfile(userId).catch((err) => {
+        console.error('[friend] extractProfile failed', err)
+        writeLog({ user_id: userId, agent: 'friend', action: '撷取用户档案', reason: `背景撷取失败：${String(err)}` }).catch(() => {})
+      })
+    }
+  } catch {
+    // 触发判断失败不影响主流程
+  }
 
   return { reply: reply.reply, taskId, sharedEventId: reply.shared_event_id }
 }

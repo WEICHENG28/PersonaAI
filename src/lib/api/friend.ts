@@ -70,6 +70,63 @@ export async function initProfile(): Promise<void> {
   }
 }
 
+// ── A4：对外档案（http 模式打 /api；mock 模式回 null，页面走 demo store） ──
+
+export interface ShareableView {
+  shareable: { intro: string; interests: string[]; chat_style: string; looking_for: string } | null
+  confirmed: boolean
+  exists: boolean
+}
+
+export interface ShareableInput {
+  intro: string
+  interests: string[]
+  chat_style: string
+  looking_for: string
+}
+
+async function apiCall<T>(path: string, init?: RequestInit): Promise<T> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  const res = await fetch(path, {
+    ...init,
+    headers: {
+      Authorization: token ? `Bearer ${token}` : '',
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+  })
+  const body = (await res.json().catch(() => null)) as { ok: boolean; data?: T; error?: string } | null
+  if (!res.ok || !body?.ok) throw new ProfileApiError(body?.error ?? '出了点问题，再试一次？')
+  return body.data as T
+}
+
+/** GET /api/profile：对外档案与确认状态（不含 Big Five）。mock 模式回 null（页面用 demo store）。 */
+export async function fetchProfile(): Promise<ShareableView | null> {
+  if (!isHttpMode) return null
+  return apiCall<ShareableView>('/api/profile')
+}
+
+/** PUT /api/profile/shareable：修改并确认。 */
+export async function saveShareable(input: ShareableInput): Promise<ShareableView> {
+  return apiCall<ShareableView>('/api/profile/shareable', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+/** POST /api/profile/extract：手动撷取（Prompt 3 重新生成）。 */
+export async function requestExtractProfile(): Promise<ShareableView> {
+  return apiCall<ShareableView>('/api/profile/extract', { method: 'POST' })
+}
+
+export class ProfileApiError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ProfileApiError'
+  }
+}
+
 function toUser(id: string, email: string, nickname: string): User {
   return { id, email, nickname }
 }
