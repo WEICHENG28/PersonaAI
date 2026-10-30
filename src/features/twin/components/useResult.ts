@@ -23,12 +23,16 @@ export function useResult(conversationId: string): ResultState {
   const [continuing, setContinuing] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const reload = useCallback(async () => {
+  /** 重新读取；失败时回错误讯息（成功回 null）。 */
+  const reload = useCallback(async (): Promise<string | null> => {
     try {
       setView(await getResult(conversationId))
       setLoadError(null)
+      return null
     } catch (err) {
-      setLoadError(messageOf(err))
+      const message = messageOf(err)
+      setLoadError(message)
+      return message
     }
   }, [conversationId])
 
@@ -43,8 +47,9 @@ export function useResult(conversationId: string): ResultState {
     setNotice(RESULT_TEXT.continuing)
     try {
       const out = await continueTwin(conversationId)
-      await reload()
-      setNotice(out.ended ? RESULT_TEXT.continuedEnded : RESULT_TEXT.continued)
+      // 聊完了但重新读取失败：显示读取失败的讯息，不要说「已经加进纪录」
+      const reloadError = await reload()
+      setNotice(reloadError ?? (out.ended ? RESULT_TEXT.continuedEnded : RESULT_TEXT.continued))
       return true
     } catch (err) {
       setNotice(messageOf(err))

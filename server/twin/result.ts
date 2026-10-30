@@ -66,6 +66,8 @@ export interface ResultStore extends Pick<ChatRoomStore, 'getConversation' | 'ge
   getMyLatestAttempt(conversationId: string, userId: string): Promise<AttemptRow | null>
   /** 等本人（waiting_human）的對話改回 active；其他狀態不動。 */
   resumeConversation(conversationId: string): Promise<void>
+  /** 繼續聊完後 active 改回 waiting_human；其他狀態不動。不寫日誌、不通知（不是 markWaitingHuman）。 */
+  pauseConversation(conversationId: string): Promise<void>
 }
 
 export interface ResultDeps {
@@ -121,6 +123,8 @@ export function continueBlock(conv: ConversationRow, me: Side, other: Side, maxR
   if (conv.status === 'ended') return '这段对话已经结束了'
   if (me.controller !== 'twin') return '你已经本人接手了，直接在聊天室里聊吧'
   if (other.controller !== 'twin') return '对方本人在聊，分身不会自己继续'
+  // active＝社交 Agent（worker）還在推進；同時跑會讓訊息順序和輪數亂掉
+  if (conv.status === 'active') return '分身正在代聊中，等这一段聊完再说'
   if (conv.round_count >= maxRounds) return `已经聊到上限（${maxRounds} 轮），可以本人接手继续聊`
   return null
 }
@@ -164,14 +168,20 @@ async function continueTwin(deps: ResultDeps, running: Set<string>, conversation
   running.add(conv.id)
   const log = { user_id: me.userId, agent: 'twin' as const, conversation_id: conv.id, task_id: conv.task_id ?? undefined }
   try {
-    // runTwinRounds 只推進 active 的對話；等本人的對話要先改回 active
-    if (conv.status === 'waiting_human') await deps.store.resumeConversation(conv.id)
+    // runTwinRounds 只推進 active 的對話：先改回 active，聊完再改回等本人（才能再按一次）。
+    // pauseConversation 只改 active：已經結束的對話不動；聊到 MAX_ROUNDS（ended = true 但狀態還是 active）會改回等本人。
+    await deps.store.resumeConversation(conv.id)
     await deps.writeLog({ ...log, action: '让分身继续聊', reason: `你在结果页选择让分身再聊 ${deps.roundsPerStep} 轮` })
-    return await deps.runTwinRounds(conv.id, deps.roundsPerStep)
+    const out = await deps.runTwinRounds(conv.id, deps.roundsPerStep)
+    await deps.store.pauseConversation(conv.id)
+    return out
   } catch (err) {
     if (err instanceof ChatRoomError) throw err
     console.error('[twin] 让分身继续聊失败', conv.id, err)
-    await deps.writeLog({ ...log, action: '分身继续聊时出错', reason: '分身回复时出错，已经聊到的内容会保留', detail: { error: errorText(err) } })
+    // 停在 active 的話之後會一直被當成「代聊中」而不能再按；改回等本人（失敗只記在日誌）
+    const detail: Record<string, unknown> = { error: errorText(err) }
+    await deps.store.pauseConversation(conv.id).catch((pauseErr: unknown) => (detail.pause_error = errorText(pauseErr)))
+    await deps.writeLog({ ...log, action: '分身继续聊时出错', reason: '分身回复时出错，已经聊到的内容会保留', detail })
     throw new ChatRoomError('分身暂时没有回应，已经聊到的内容会保留，稍后再试一次', 503)
   } finally {
     running.delete(conv.id)

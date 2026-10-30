@@ -157,8 +157,8 @@ function OutlineCard({ outline }: { outline: OutlineView | null }) {
             <h3>{t('result.outlineTopics')}</h3>
             <div className="chips">
               {outline.topics.length === 0 && <span>{RESULT_TEXT.outlineEmpty}</span>}
-              {outline.topics.map((x) => (
-                <Chip key={x} tone="well">
+              {outline.topics.map((x, i) => (
+                <Chip key={`${i}-${x}`} tone="well">
                   {x}
                 </Chip>
               ))}

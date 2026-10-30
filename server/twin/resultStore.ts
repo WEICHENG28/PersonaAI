@@ -34,5 +34,15 @@ export function supabaseResultStore(): ResultStore {
         .eq('status', 'waiting_human')
       if (error) throw new Error(`更新对话状态失败：${error.message}`)
     },
+
+    async pauseConversation(conversationId) {
+      // 只改 active；聊到一半被結束或改成別的狀態就不動
+      const { error } = await getServiceClient()
+        .from('conversations')
+        .update({ status: 'waiting_human' })
+        .eq('id', conversationId)
+        .eq('status', 'active')
+      if (error) throw new Error(`更新对话状态失败：${error.message}`)
+    },
   }
 }

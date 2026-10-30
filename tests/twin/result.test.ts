@@ -57,6 +57,8 @@ const AN_OUTLINE = {
 
 interface Harness {
   conv?: ConversationRow | null
+  /** runTwinRounds 跑完後把對話改成這個狀態（模擬聊到一半被結束）。 */
+  statusAfterRun?: ConversationRow['status']
   scores?: (ScoreRow & { perspective: string })[]
   attempts?: (AttemptRow & { user_id: string })[]
   run?: (id: string, rounds: number) => Promise<{ roundCount: number; ended: boolean }>
@@ -88,8 +90,15 @@ function harness(opts: Harness = {}) {
     resumeConversation: vi.fn(async () => {
       if (row?.status === 'waiting_human') row = { ...row, status: 'active' }
     }),
+    pauseConversation: vi.fn(async () => {
+      if (row?.status === 'active') row = { ...row, status: 'waiting_human' }
+    }),
   }
-  const runTwinRounds = vi.fn(opts.run ?? (async () => ({ roundCount: 12, ended: false })))
+  const defaultRun = async () => {
+    if (row && opts.statusAfterRun) row = { ...row, status: opts.statusAfterRun }
+    return { roundCount: 12, ended: opts.statusAfterRun === 'ended' }
+  }
+  const runTwinRounds = vi.fn(opts.run ?? defaultRun)
   const api = createResultApi({
     store,
     runTwinRounds,
@@ -214,9 +223,12 @@ describe('continueBlock', () => {
   })
   const check = (c: ConversationRow) => continueBlock(c, sides(c).me, sides(c).other, 16)
 
-  it('雙方都是分身、還沒到上限 → 可以', () => {
+  it('雙方都是分身、等本人、還沒到上限 → 可以', () => {
     expect(check(conv())).toBeNull()
-    expect(check(conv({ status: 'active' }))).toBeNull()
+  })
+
+  it('對話還是 active（社交 Agent 在推進）→ 不行，避免和 worker 同時跑', () => {
+    expect(check(conv({ status: 'active' }))).toBe('分身正在代聊中，等这一段聊完再说')
   })
 
   it('對話結束、我已接手、對方本人在聊、到達上限 → 各有原因', () => {
@@ -229,21 +241,48 @@ describe('continueBlock', () => {
 
 describe('continueTwin：讓分身繼續聊', () => {
   it('等本人（waiting_human）→ 先改回 active，再跑 ROUNDS_PER_STEP 輪一次，寫日誌', async () => {
-    const { api, store, runTwinRounds, logs, current } = harness()
+    const { api, store, runTwinRounds, logs } = harness()
+    let statusDuringRun: string | undefined
+    runTwinRounds.mockImplementationOnce(async () => {
+      statusDuringRun = (await store.getConversation('conv-1'))?.status
+      return { roundCount: 12, ended: false }
+    })
     const out = await api.continueTwin('conv-1', ME)
     expect(out).toEqual({ roundCount: 12, ended: false })
     expect(store.resumeConversation).toHaveBeenCalledWith('conv-1')
-    expect(current()?.status).toBe('active')
+    expect(statusDuringRun).toBe('active')
     expect(runTwinRounds).toHaveBeenCalledTimes(1)
     expect(runTwinRounds).toHaveBeenCalledWith('conv-1', 4)
     expect(logs[0]).toMatchObject({ user_id: ME, agent: 'twin', conversation_id: 'conv-1', task_id: 'task-1', action: '让分身继续聊' })
   })
 
-  it('已經是 active → 不用改狀態，直接跑', async () => {
-    const { api, store, runTwinRounds } = harness({ conv: conv({ status: 'active' }) })
-    await api.continueTwin('conv-1', ME)
+  it('對話是 active → 409，不跑代聊、不改狀態', async () => {
+    const { api, store, runTwinRounds, current } = harness({ conv: conv({ status: 'active' }) })
+    await expect(api.continueTwin('conv-1', ME)).rejects.toMatchObject({ status: 409, message: '分身正在代聊中，等这一段聊完再说' })
+    expect(runTwinRounds).not.toHaveBeenCalled()
     expect(store.resumeConversation).not.toHaveBeenCalled()
-    expect(runTwinRounds).toHaveBeenCalledWith('conv-1', 4)
+    expect(current()?.status).toBe('active')
+  })
+
+  it('繼續聊完沒結束 → 狀態改回 waiting_human，可以再按一次', async () => {
+    const { api, current, runTwinRounds } = harness()
+    await api.continueTwin('conv-1', ME)
+    expect(current()?.status).toBe('waiting_human')
+    await api.continueTwin('conv-1', ME)
+    expect(runTwinRounds).toHaveBeenCalledTimes(2)
+  })
+
+  it('聊的過程中對話結束了 → 狀態維持 ended，不改', async () => {
+    const { api, current } = harness({ statusAfterRun: 'ended' })
+    const out = await api.continueTwin('conv-1', ME)
+    expect(out.ended).toBe(true)
+    expect(current()?.status).toBe('ended')
+  })
+
+  it('聊到 MAX_ROUNDS（ended = true 但狀態還是 active）→ 改回 waiting_human，不會一直顯示代聊中', async () => {
+    const { api, current } = harness({ run: async () => ({ roundCount: 16, ended: true }) })
+    await api.continueTwin('conv-1', ME)
+    expect(current()?.status).toBe('waiting_human')
   })
 
   it('不能繼續的情況 → 409，不跑代聊', async () => {
@@ -277,11 +316,12 @@ describe('continueTwin：讓分身繼續聊', () => {
     await expect(api.continueTwin('conv-1', ME)).resolves.toBeDefined()
   })
 
-  it('分身出錯 → 503 簡體訊息，寫日誌，之後可以再試', async () => {
-    const { api, logs } = harness({ run: async () => Promise.reject(new Error('LLM timeout')) })
+  it('分身出錯 → 503 簡體訊息，寫日誌，狀態改回 waiting_human（之後可以再試）', async () => {
+    const { api, logs, current } = harness({ run: async () => Promise.reject(new Error('LLM timeout')) })
     const err = await api.continueTwin('conv-1', ME).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(ChatRoomError)
     expect(err).toMatchObject({ status: 503 })
     expect(logs.at(-1)).toMatchObject({ action: '分身继续聊时出错', detail: { error: 'LLM timeout' } })
+    expect(current()?.status).toBe('waiting_human')
   })
 })
