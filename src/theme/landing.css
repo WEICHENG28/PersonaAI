@@ -6,16 +6,8 @@
   padding: 0 var(--gutter);
   display: grid;
   gap: var(--space-2xl);
-  padding-block: var(--space-md) var(--space-3xl);
+  padding-block: var(--space-lg) var(--space-3xl);
 }
-
-/* ── 极简顶栏 ── */
-.landing-bar {
-  display: flex;
-  align-items: center;
-  min-height: var(--bar-h);
-}
-.landing-bar .knob { margin-left: auto; }
 
 /* ── Hero ── */
 .landing-hero {

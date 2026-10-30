@@ -14,13 +14,7 @@ export function LandingPage() {
 
   return (
     <div className="landing">
-      {/* ── 极简顶栏：wordmark + 登录入口 ── */}
-      <header className="landing-bar">
-        <span className="wordmark">PersonaAI</span>
-        <button className="knob" onClick={() => navigate(user ? '/friend' : '/')}>
-          {user ? '回到 App' : '登录'}
-        </button>
-      </header>
+      {/* 顶栏由 AppShell 统一提供（全站一致） */}
 
       {/* ── Hero：settled，产品卡放在撕纸地上 ── */}
       <section className="landing-hero">
@@ -114,10 +108,12 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ── CTA：撕纸带上的开始 ── */}
+      {/* ── CTA ── */}
       <section className="landing-cta">
         <h2>认识你的 AI 朋友</h2>
-        <Button onClick={() => navigate('/')}>现在开始</Button>
+        <Button onClick={() => navigate(user ? '/friend' : '/')}>
+          {user ? '回到阿澈身边' : '现在开始'}
+        </Button>
         <p className="landing-note">注册即代表同意 AI 会在画面上清楚标示，对话为虚构角色设定。</p>
       </section>
     </div>

@@ -26,6 +26,14 @@
 
 ## 共用與決策
 
+### 2026-10-30｜全站統一頂欄＋設計規範文件｜Vincent（AI 協助）｜直接 commit main（骨架階段）
+- **做了什麼**：頂欄改為每頁都有（含 landing、登入）、sticky＋滾動加深陰影（drop-shadow，撕紙 clip-path 裁不掉）；登入後右端加 Profile 鈕（頭像圓片＋暱稱）、未登入顯示梨黃「開始使用」CTA；登入頁短內容垂直置中（`app-main.page-center`）；landing 移除自帶頂欄；手機底攔第 4 格加「我的檔案」。新增 `docs/08_前端設計規範.md`（Agent 改 UI 前必讀：頂欄結構、居中規則、Rive 語義鍵、驗證口徑）。
+- **為什麼**：對齊直覺與 Hum demo 參考——同一頂欄出現在所有頁面、滾動時貼頂有影子；短頁置中；登入前後都有明確入口。
+- **驗證**：tsc 過；vitest 4/4；CDP 抽測 375/1280px × landing/login/friend/profile/lobby：topbar 全站存在、sticky、滾動陰影、CTA/Profile 按狀態切換、零橫向溢出、登入卡置中。
+- **待辦**：手機底攔 5→4 格（profile 併入），檢查 56px 觸控目標仍達標。
+
+---
+
 ### 2026-10-30｜Rive 檔名重接｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：使用者更名 `public/riv/`（robot→clover_bot、fish→fish_vase），`RiveAvatar.tsx` 的 SOURCES 重接新檔名。
 - **為什麼**：舊路徑被 Vite SPA fallback 吃掉回傳 HTML，頭像 404 掛掉；三個新檔內部都有 `State Machine 1`，runtime 設定不用改。

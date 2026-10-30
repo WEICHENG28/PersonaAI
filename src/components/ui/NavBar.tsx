@@ -7,14 +7,14 @@ const TABS = [
   { to: '/friend', key: 'nav.friend' as const, match: /^\/(friend|chat)/ },
   { to: '/lobby', key: 'nav.lobby' as const, match: /^\/lobby/ },
   { to: '/history', key: 'nav.history' as const, match: /^\/history/ },
-  { to: '/profile', key: 'nav.profile' as const, match: /^\/profile/ },
-  { to: '/settings', key: 'nav.settings' as const, match: /^\/settings/ },
 ]
 
 /**
- * 导航（CSS 按宽度切换，两套 DOM 都在但只显示一套）：
- * - 手机（<64rem）：底部 tab 拦（触控 ≥44px、safe-area）
- * - 桌机（≥64rem）：顶栏（撕纸 bar）＋卡纸 tab
+ * 全站统一顶栏（每页都有，sticky + 撕纸下缘阴影）：
+ * - wordmark → /landing
+ * - 桌机：nav knobs（朋友/大厅/历史）
+ * - 右端：已登录 → Profile 钮 + 阿澈（通知）；未登录 → 开始使用（梨黄按钮）
+ * - 手机：nav 收进底拦（.knobs 隐藏），顶栏保留 wordmark + 右端钮
  */
 export function NavBar() {
   const location = useLocation()
@@ -25,29 +25,35 @@ export function NavBar() {
 
   return (
     <>
-      {/* ── 桌机顶栏 ── */}
       <header className="topbar safe-top">
-        <div className="topbar__paper tear-bar">
-          <nav className="topbar__inner">
-            <NavLink to="/landing" className="wordmark">
-              PersonaAI
-            </NavLink>
-            {user && (
-              <div className="knobs">
-                {TABS.map((tab) => (
-                  <NavLink
-                    key={tab.to}
-                    to={tab.to}
-                    className={`knob ${isActive(tab) ? 'is-on' : ''}`}
-                  >
-                    {t(tab.key)}
-                  </NavLink>
-                ))}
-              </div>
-            )}
-            {user ? <FriendKnob unread={unread} /> : <AuthKnob />}
-          </nav>
-        </div>
+        <nav className="topbar__inner">
+          <NavLink to="/landing" className="wordmark">
+            PersonaAI
+          </NavLink>
+
+          {user && (
+            <div className="knobs">
+              {TABS.map((tab) => (
+                <NavLink
+                  key={tab.to}
+                  to={tab.to}
+                  className={`knob ${isActive(tab) ? 'is-on' : ''}`}
+                >
+                  {t(tab.key)}
+                </NavLink>
+              ))}
+            </div>
+          )}
+
+          {user ? (
+            <div className="topbar__right">
+              <FriendKnob unread={unread} />
+              <ProfileKnob />
+            </div>
+          ) : (
+            <StartNowKnob />
+          )}
+        </nav>
       </header>
 
       {/* ── 手机底部 tab 拦 ── */}
@@ -63,12 +69,42 @@ export function NavBar() {
               {tab.to === '/friend' && unread > 0 && <i className="tabbar__dot" />}
             </NavLink>
           ))}
+          {/* Profile 也进底拦（第 4 格） */}
+          <NavLink
+            to="/profile"
+            className={`tabbar__tab ${/^\/profile/.test(location.pathname) ? 'is-on' : ''}`}
+          >
+            <span className="tabbar__label">{t('nav.profile')}</span>
+          </NavLink>
         </nav>
       )}
     </>
   )
 }
 
+/** Profile 钮：头像圆片 + 名字，点去 /profile */
+function ProfileKnob() {
+  const navigate = useNavigate()
+  const nickname = useDemoStore((s) => s.user?.nickname ?? '我')
+  return (
+    <button className="knob knob--profile" onClick={() => navigate('/profile')} title="我的档案">
+      <span className="knob__avatar">{nickname.slice(0, 1)}</span>
+      <span className="knob__meta">{nickname}</span>
+    </button>
+  )
+}
+
+/** 未登录：梨黄开始使用（顶栏 CTA） */
+function StartNowKnob() {
+  const navigate = useNavigate()
+  return (
+    <button className="btn btn--primary btn--small topbar__cta" onClick={() => navigate('/')}>
+      开始使用
+    </button>
+  )
+}
+
+/** 阿澈：通知铃 + 报回报 */
 function FriendKnob({ unread }: { unread: number }) {
   const navigate = useNavigate()
   const reportReady = useDemoStore((s) => s.reportReady)
@@ -81,15 +117,6 @@ function FriendKnob({ unread }: { unread: number }) {
       <RiveAvatar name="robot" size={26} />
       <span className="knob__meta">{reportReady ? '有新回报' : '阿澈'}</span>
       {unread > 0 && <span className="notif-count">{unread}</span>}
-    </button>
-  )
-}
-
-function AuthKnob() {
-  const navigate = useNavigate()
-  return (
-    <button className="knob" onClick={() => navigate('/')}>
-      登录
     </button>
   )
 }

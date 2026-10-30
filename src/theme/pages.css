@@ -1,13 +1,13 @@
 /* ── 各画面专属样式 ── */
 
-/* 登录页 */
+/* 登录页（垂直居中由 .app-main.page-center 提供） */
 .login-page {
-  min-height: 100svh;
   display: grid;
-  place-content: center;
   gap: var(--space-lg);
   padding: var(--space-xl) var(--space-md);
   text-align: center;
+  width: min(460px, 100%);
+  margin-inline: auto;
 }
 
 .login-hero { display: grid; justify-items: center; gap: var(--space-sm); }

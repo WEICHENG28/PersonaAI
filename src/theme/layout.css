@@ -18,6 +18,14 @@
   padding: var(--space-md) var(--gutter) var(--space-2xl);
 }
 
+/* 短页（登录）：内容不足一屏时垂直置中 */
+.app-main.page-center {
+  display: grid;
+  place-content: center;
+  min-height: 100svh;
+  padding-top: calc(var(--bar-h) + var(--space-lg));
+}
+
 /* 有导航的页：手机让出底部 tab 拦高度 */
 .app-main.has-nav {
   padding-bottom: calc(84px + env(safe-area-inset-bottom, 0));
@@ -33,16 +41,36 @@
   .knobs { display: flex; gap: var(--space-sm); align-items: center; }
 }
 
-/* ── 顶栏（桌机）：撕纸 bar ── */
+/* ── 顶栏（全站统一，每页都有）：sticky + 撕纸下缘 ── */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 300;
+  background: var(--grain), var(--fibre), var(--color-card);
+  /* 阴影挂在元素自身（clip-path 会裁 box-shadow，故用 drop-shadow filter） */
+  filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--color-ink) 12%, transparent))
+    drop-shadow(0 6px 14px -6px color-mix(in oklab, var(--color-ink) 18%, transparent));
+  /* 撕纸下缘 */
+  clip-path: polygon(
+    0 0, 100% 0,
+    100% calc(100% - 8px), 97% calc(100% - 7px), 94% calc(100% - 8px),
+    91% calc(100% - 6px), 88% calc(100% - 8px), 85% calc(100% - 7px),
+    82% calc(100% - 9px), 79% calc(100% - 6px), 76% calc(100% - 8px),
+    73% calc(100% - 7px), 70% calc(100% - 9px), 67% calc(100% - 6px),
+    64% calc(100% - 8px), 61% calc(100% - 7px), 58% calc(100% - 8px),
+    55% calc(100% - 6px), 52% calc(100% - 9px), 49% calc(100% - 7px),
+    46% calc(100% - 8px), 43% calc(100% - 6px), 40% calc(100% - 8px),
+    37% calc(100% - 7px), 34% calc(100% - 9px), 31% calc(100% - 6px),
+    28% calc(100% - 8px), 25% calc(100% - 7px), 22% calc(100% - 8px),
+    19% calc(100% - 6px), 16% calc(100% - 9px), 13% calc(100% - 7px),
+    10% calc(100% - 8px), 7% calc(100% - 6px), 4% calc(100% - 8px), 0 calc(100% - 7px)
+  );
 }
 
-.topbar__paper {
-  filter: drop-shadow(0 0 0.6px color-mix(in oklab, var(--color-ink) 30%, transparent))
-    drop-shadow(1px 3px 3px color-mix(in oklab, var(--color-ink) 8%, transparent));
+/* 滚动后加强阴影（JS 在 .app-shell 加 .is-scrolled） */
+.app-shell.is-scrolled .topbar {
+  filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--color-ink) 14%, transparent))
+    drop-shadow(0 10px 20px -8px color-mix(in oklab, var(--color-ink) 26%, transparent));
 }
 
 .topbar__inner {
@@ -53,6 +81,22 @@
   max-width: var(--container);
   margin-inline: auto;
   padding-inline: var(--gutter);
+}
+
+/* 顶栏右端钮群 */
+.topbar__right { display: flex; align-items: center; gap: var(--space-sm); margin-left: auto; }
+.topbar__cta { margin-left: auto; }
+
+/* Profile 钮（头像圆片 + 名字） */
+.knob--profile .knob__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--color-mint);
+  color: var(--color-ink);
+  font: 600 13px/1 var(--font-body);
 }
 
 .wordmark {
