@@ -5,9 +5,64 @@ import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { isHttpMode, register, login as authLogin, initProfile } from '@lib/api/friend'
+import { randomName } from './randomName'
 
-/** 画面 1：登录/注册。http 模式走 Supabase Auth，mock 模式假登录。 */
+/** 画面 1：登录/注册。http 模式走 Supabase Auth；mock 模式只要用户名称（随机预填），什么都不打也能直接开始。 */
 export function LoginPage() {
+  return isHttpMode ? <AuthLogin /> : <DemoLogin />
+}
+
+/** mock 模式：只有用户名称，预填随机名字。 */
+function DemoLogin() {
+  const login = useDemoStore((s) => s.login)
+  const navigate = useNavigate()
+  const [name, setName] = useState(randomName)
+
+  const start = () => {
+    login('', name.trim() || randomName())
+    navigate('/friend', { replace: true })
+  }
+
+  return (
+    <div className="login-page">
+      <div className="login-hero">
+        <RiveAvatar name="birdie" size={140} className="login-bird" />
+        <h1>{t('login.title')}</h1>
+        <p className="login-sub">{t('login.subtitle')}</p>
+      </div>
+
+      <div className="login-card card">
+        <label className="field">
+          <span>
+            {t('login.username')} <em>{t('login.usernameHint')}</em>
+          </span>
+          <input
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && start()}
+            maxLength={20}
+          />
+        </label>
+
+        <Button variant="secondary" small style={{ justifySelf: 'start' }} onClick={() => setName(randomName())}>
+          {t('login.shuffle')}
+        </Button>
+
+        <Button block onClick={start}>
+          {t('login.start')}
+        </Button>
+
+        <p className="login-hint">{t('login.demoHintStart')}</p>
+      </div>
+
+      <p className="login-footer">{t('login.footer')}</p>
+    </div>
+  )
+}
+
+/** http 模式：Supabase Auth 邮箱登录/注册（A0b）。 */
+function AuthLogin() {
   const login = useDemoStore((s) => s.login)
   const navigate = useNavigate()
   const [tab, setTab] = useState<'login' | 'register'>('register')
