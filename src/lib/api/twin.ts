@@ -82,7 +82,24 @@ export interface MessageSubscription {
  * 注意：subscribe() 回 SUBSCRIBED 时还没开始监听表，要等 system 消息（C0 实测）。
  */
 export function subscribeChatMessages(conversationId: string, handlers: MessageSubscription): () => void {
-  const channel = supabase
+  let channel: ReturnType<typeof supabase.channel> | null = null
+  let cancelled = false
+  // 先把登录者的 JWT 交给 Realtime 再订阅；否则刚打开页面、session 还没还原时会以匿名身份订阅，RLS 会挡掉所有事件
+  void supabase.auth
+    .getSession()
+    .then(({ data }) => supabase.realtime.setAuth(data.session?.access_token ?? null))
+    .catch(() => handlers.onFailed())
+    .finally(() => {
+      if (!cancelled) channel = openChannel(conversationId, handlers)
+    })
+  return () => {
+    cancelled = true
+    if (channel) void supabase.removeChannel(channel)
+  }
+}
+
+function openChannel(conversationId: string, handlers: MessageSubscription) {
+  return supabase
     .channel(`messages:${conversationId}`)
     .on(
       'postgres_changes',
@@ -97,9 +114,6 @@ export function subscribeChatMessages(conversationId: string, handlers: MessageS
     .subscribe((status) => {
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') handlers.onFailed()
     })
-  return () => {
-    void supabase.removeChannel(channel)
-  }
 }
 
 /** 带上登录的 Supabase JWT，后端用它认出是谁。 */
