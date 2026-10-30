@@ -148,4 +148,14 @@
 
 ## C：分身與大廳線（Jerry）
 
-（還沒有紀錄）
+### 2026-10-30｜C0 種子用戶、seed 腳本、twin contracts stub｜Jerry（AI 協助）｜PR #48、Closes #20
+- **做了什麼**：10 位種子用戶資料（`server/fixtures/seed-users.ts`）；`npm run seed`（`server/twin/seed.ts` 流程＋`scripts/seed.ts` 連 Supabase）；`server/contracts/twin.ts` stub 改成記住輪數、依輪數產生假訊息。
+- **為什麼這樣做**：
+  - seed 先算好 10 筆向量才刪舊資料：LLM 失敗時不會留下「舊的刪了、新的沒寫」的空資料庫。
+  - 重跑時用 `is_seed = true` 找舊資料刪除（`user_profiles` 會 cascade）。舊種子用戶如果已被 `conversations`、`match_attempts` 等引用（這些外鍵沒有 cascade），刪除會失敗，腳本會停下並說明，不自動清掉隊友的對話資料。
+  - embedding 只用對外檔案（簡介、興趣、聊天風格、想找）組成的文字，不含 agent_profile（02 第 7 節）。B2 搜尋時若要比對，可以用 `shareableToText` 組同樣格式。
+  - seed 流程透過 `SeedDb` 介面寫入，測試用假資料庫，不碰共用 Supabase。
+  - stub 狀態只存在記憶體；沒用 `startConversation` 建過的 ID，`getTranscript` 回固定假紀錄（B 的 S0 測試依賴這點）。
+- **改了哪些檔案**：`server/fixtures/seed-users.ts`、`server/fixtures/twin.ts`、`server/contracts/twin.ts`（只改內部，簽名不變）、`server/twin/seed.ts`、`scripts/seed.ts`、`tests/twin/{seed-users,seed,contract-stub}.test.ts`。
+- **踩到的坑／注意事項**：種子用戶名字用簡體（07C 表格的「阿凱」在資料裡是「阿凯」）。`users` 沒有穩定 key 欄位，資料庫 id 每次 seed 都會變；`seed-an` 這類 key 只給 fixtures／stub 用。B 的 `server/fixtures/social.ts` 也用了 `seed-lin`（林小山），和這裡的 `seed-lin`（小林）是不同假資料，互不影響。
+- **還沒做完／待辦**：Realtime 測通等 A0b（#44）的 `src/lib/supabase.ts`；`npm run seed` 還沒對共用資料庫執行（要先在群組講）；`scripts/seed.ts` 暫時自建 Supabase client，A0b 後改用 `server/lib/supabase.ts`。
