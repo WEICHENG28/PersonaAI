@@ -366,7 +366,7 @@
 
 ## C：分身與大廳線（Jerry）
 
-### 2026-11-01｜C7 請求真人＋通知元件｜Jerry（AI 協助）｜PR #82｜Closes #27
+### 2026-10-31｜C7 請求真人＋通知元件｜Jerry（AI 協助）｜PR #82｜Closes #27
 - **做了什麼**：
   - 後端（`server/twin/requestHuman.ts`、`notifications.ts`、`notificationStore.ts`，路由在 `server/routes/twin.ts`）：
     - `POST /api/conversations/:id/request-human`：確認是對話一方、對方是分身、對話沒結束、對方還沒有一則未回應的請求 → 新增通知給對方（type `request_human`，payload `{ conversationId, fromName }`）→ 寫日誌。對方是種子用戶（`users.is_seed`）時 3 秒後自動用 `CONFIG.SEED_AUTO_RESPONSE`（`later`）回應。
