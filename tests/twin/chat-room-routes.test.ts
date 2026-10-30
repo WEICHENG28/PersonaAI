@@ -1,13 +1,28 @@
-// C4 聊天室、C5 結果頁路由：登入、對話 id 檢查、錯誤格式 { ok, error }、成員以外 403（chatRoom 用假的）。
+// C4 聊天室、C5 結果頁、C6 本人接手路由：登入、對話 id 檢查、錯誤格式 { ok, error }、成員以外 403（chatRoom 用假的）。
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from 'hono'
 import { ChatRoomError, type ChatRoomApi } from '../../server/twin/chatRoom'
 import { createTwinRoutes } from '../../server/routes/twin'
 import type { ResultApi } from '../../server/twin/result'
+import type { HandoffApi, TakeoverView } from '../../server/twin/handoff'
 
 const CONV_ID = '6f1c2a5e-7d1b-4c3a-9e2f-1a2b3c4d5e6f'
 
-function app(opts: { userId?: string | null; api?: Partial<ChatRoomApi>; result?: Partial<ResultApi> } = {}) {
+const TAKEOVER: TakeoverView = {
+  conversationId: CONV_ID,
+  verdict: { value: 'suitable', trend: 'up' },
+  summary: { key_points: [], other_highlights: [], twin_said: ['分身已经替你说过：喜欢登山'], open_topics: [], suggested_replies: [] },
+  summaryFailed: false,
+}
+
+interface AppOpts {
+  userId?: string | null
+  api?: Partial<ChatRoomApi>
+  result?: Partial<ResultApi>
+  handoff?: Partial<HandoffApi>
+}
+
+function app(opts: AppOpts = {}) {
   const api: ChatRoomApi = {
     getChatRoom: vi.fn(async () => {
       throw new ChatRoomError('你不是这段对话的成员，不能查看', 403)
@@ -25,7 +40,9 @@ function app(opts: { userId?: string | null; api?: Partial<ChatRoomApi>; result?
     continueTwin: vi.fn(async () => ({ roundCount: 12, ended: false })),
     ...opts.result,
   }
-  return { routes: createTwinRoutes({ chatRoom: () => api, result: () => result, resolveUserId }), api, result }
+  const handoff: HandoffApi = { takeOver: vi.fn(async () => TAKEOVER), ...opts.handoff }
+  const routes = createTwinRoutes({ chatRoom: () => api, result: () => result, handoff: () => handoff, resolveUserId })
+  return { routes, api, result, handoff }
 }
 
 describe('twin 路由', () => {
@@ -116,5 +133,41 @@ describe('twin 路由：C5 結果頁', () => {
     const res = await routes.request(`/conversations/${CONV_ID}/continue`, { method: 'POST' })
     expect(res.status).toBe(409)
     expect(await res.json()).toEqual({ ok: false, error: '这段对话已经结束了' })
+  })
+})
+
+describe('twin 路由：C6 本人接手', () => {
+  it('POST 成功回 { ok, data }（接手卡片），帶目前登入者', async () => {
+    const { routes, handoff } = app()
+    const res = await routes.request(`/conversations/${CONV_ID}/takeover`, { method: 'POST' })
+    expect(await res.json()).toEqual({ ok: true, data: TAKEOVER })
+    expect(handoff.takeOver).toHaveBeenCalledWith(CONV_ID, 'user-me')
+  })
+
+  it('沒登入 → 401；id 不是 uuid → 404；都不接手', async () => {
+    const noAuth = app({ userId: null })
+    expect((await noAuth.routes.request(`/conversations/${CONV_ID}/takeover`, { method: 'POST' })).status).toBe(401)
+    expect(noAuth.handoff.takeOver).not.toHaveBeenCalled()
+    const bad = app()
+    expect((await bad.routes.request('/conversations/lin/takeover', { method: 'POST' })).status).toBe(404)
+    expect(bad.handoff.takeOver).not.toHaveBeenCalled()
+  })
+
+  it('不是成員 → 403；已經接手 → 409，錯誤是簡體訊息', async () => {
+    for (const [message, status] of [
+      ['你不是这段对话的成员，不能查看', 403],
+      ['你已经本人接手了，直接在聊天室里聊吧', 409],
+    ] as const) {
+      const { routes } = app({
+        handoff: {
+          takeOver: vi.fn(async () => {
+            throw new ChatRoomError(message, status)
+          }),
+        },
+      })
+      const res = await routes.request(`/conversations/${CONV_ID}/takeover`, { method: 'POST' })
+      expect(res.status).toBe(status)
+      expect(await res.json()).toEqual({ ok: false, error: message })
+    }
   })
 })

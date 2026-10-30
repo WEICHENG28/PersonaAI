@@ -10,6 +10,9 @@ import { getServiceClient } from '../lib/supabase'
 import { runTwinRounds } from '../contracts/twin'
 import { ChatRoomError, createChatRoomApi, MESSAGE_MAX, messageBodySchema, type ChatRoomApi } from '../twin/chatRoom'
 import { supabaseChatRoomStore } from '../twin/chatRoomStore'
+import { createHandoffApi, type HandoffApi } from '../twin/handoff'
+import { supabaseHandoffStore } from '../twin/handoffStore'
+import { llmJson } from '../lib/llm'
 import { createResultApi, type ResultApi } from '../twin/result'
 import { supabaseResultStore } from '../twin/resultStore'
 import { twinReply } from '../twin/twin'
@@ -20,6 +23,7 @@ export type ResolveUserId = (c: Context) => Promise<string | Response>
 export interface TwinRouteDeps {
   chatRoom(): ChatRoomApi
   result(): ResultApi
+  handoff(): HandoffApi
   resolveUserId: ResolveUserId
 }
 
@@ -71,11 +75,15 @@ export function createTwinRoutes(deps: TwinRouteDeps): Hono {
   // C5 讓分身繼續聊：runTwinRounds(id, ROUNDS_PER_STEP) 一次，跑完才回應
   routes.post('/conversations/:id/continue', (c) => respond(c, deps, (id, userId) => deps.result().continueTwin(id, userId)))
 
+  // C6 本人接手：產生接手卡片（只用我方視角的判定）、我方改成本人、寫入 handoffs；接手後不再交回分身
+  routes.post('/conversations/:id/takeover', (c) => respond(c, deps, (id, userId) => deps.handoff().takeOver(id, userId)))
+
   return routes
 }
 
 let chatRoomApi: ChatRoomApi | null = null
 let resultApi: ResultApi | null = null
+let handoffApi: HandoffApi | null = null
 
 export const twinRoutes = createTwinRoutes({
   chatRoom: () => (chatRoomApi ??= createChatRoomApi({ store: supabaseChatRoomStore(), twinReply, writeLog })),
@@ -87,5 +95,6 @@ export const twinRoutes = createTwinRoutes({
       roundsPerStep: CONFIG.ROUNDS_PER_STEP,
       maxRounds: CONFIG.MAX_ROUNDS,
     })),
+  handoff: () => (handoffApi ??= createHandoffApi({ store: supabaseHandoffStore(), llmJson, writeLog })),
   resolveUserId: resolveAppUserId,
 })
