@@ -110,6 +110,14 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-30｜A0b 真實登入與 Supabase｜Vincent（AI 協助）｜分支 a/A0b-real-auth｜Closes #44
+- **做了什麼**：前端 `src/lib/supabase.ts`＋`src/lib/api/friend.ts`（`VITE_API_MODE=http|mock`）；LoginPage／Settings 接 Supabase Auth（mock 假登录保留）；后端 `server/lib/{supabase,auth,profile}.ts`、`POST /api/profile/init`（JWT＋users 表幂等）；`tests/friend/auth.test.ts`。
+- **为什么**：S0 已合；Jerry C0 Realtime／seed 等 A 的 `server/lib/supabase.ts`（见 #20／#48）。本机 Supabase 开发，不碰云端共用库。
+- **改了哪些文件**：`src/lib/supabase.ts`、`src/lib/api/friend.ts`、`LoginPage`、`SettingsPage`、`useDemoStore.login` 可选 id、`server/lib/*`、`server/routes/friend.ts`、`tests/friend/auth.test.ts`、`src/vite-env.d.ts`。
+- **验证**：tsc 过；vitest 16/16；本机注册→`profile/init` created:true→再调 created:false→users 有行；Vite `/api` 代理通。
+- **坑**：`supabase status -o env` 的值带引号，写进 `.env.local` 会导致 PostgREST「No suitable key」；service_role JWT 必须与 status 完全一致。`.env.local` 不 commit。
+- **待办**：云端 Supabase 专案（三人共用）仍需手动建；`gh auth login` 后开 Draft PR／跑 `task.sh`。
+
 ### 2026-10-30｜A0 專案骨架、登入、共用元件、設計 token｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：Next.js 14（App Router、TS strict、Tailwind）專案骨架：登入／註冊（Supabase Auth＋`/api/profile/init` 冪等初始化三張表）、`middleware.ts`（next-intl＋Supabase session＋未登入導向）、Hum 主題 token 寫入 `app/globals.css`（含深色模式）、`components/ui/`（Button、Card、Modal、Avatar、AiBadge、ChatBubble、RiveAvatar、LanguageSwitcher、NavBar、SubmitButton）、五個頁面骨架（friend／lobby／history／profile／settings）、`lib/env.ts`（zod 驗證，缺值即報明確錯誤）、`lib/types.ts`＋`lib/config.ts`（07 §5／§6 逐字）、`supabase/migrations/0001_init.sql`（07 §4 逐字）、A 線 contracts stub＋fixtures，另建 B／C 線最小 stub 讓三人可同時開工。
 - **為什麼這樣做**：走 M1「stub 先行」策略（07 §6）；登入用 server actions 回傳 `{ ok, error }`（錯誤即值）；初始化三張表集中在 `lib/profile/init.ts` 單一寫入者、重複呼叫安全。三語與 Rive 的決策見「共用與決策」。

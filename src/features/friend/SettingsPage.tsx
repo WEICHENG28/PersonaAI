@@ -4,11 +4,24 @@ import { Card, CardHead } from '@components/ui/Card'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
+import { isHttpMode, logout as authLogout } from '@lib/api/friend'
 
 /** 画面 12：设置（dev_mode、主动频率、社交 Agent 开关、档位） */
 export function SettingsPage() {
   const s = useDemoStore()
   const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    if (isHttpMode) {
+      try {
+        await authLogout()
+      } catch {
+        // session 已失效也清本地
+      }
+    }
+    s.logout()
+    navigate('/', { replace: true })
+  }
 
   return (
     <div className="page">
@@ -124,7 +137,7 @@ export function SettingsPage() {
             {/* 账号：登出 */}
             <Card>
               <CardHead title="账号" sub="登出后需重新登录" />
-              <Button small variant="danger" onClick={s.logout}>
+              <Button small variant="danger" onClick={handleLogout}>
                 {t('settings.logout')}
               </Button>
             </Card>

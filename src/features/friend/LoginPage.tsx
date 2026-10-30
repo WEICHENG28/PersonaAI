@@ -4,8 +4,9 @@ import { Button } from '@components/ui/Button'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
+import { isHttpMode, register, login as authLogin, initProfile } from '@lib/api/friend'
 
-/** 画面 1：登录/注册（假登录，任填即过） */
+/** 画面 1：登录/注册。http 模式走 Supabase Auth，mock 模式假登录。 */
 export function LoginPage() {
   const login = useDemoStore((s) => s.login)
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const submit = () => {
+  const submit = async () => {
     if (!email || !password || (tab === 'register' && !nickname)) {
       setError(t('login.errorMissingFields'))
       return
@@ -27,10 +28,27 @@ export function LoginPage() {
     }
     setBusy(true)
     setError(null)
-    setTimeout(() => {
-      login(email, tab === 'register' ? nickname : '小望')
+
+    try {
+      if (isHttpMode) {
+        // 真实 Auth：注册含昵称；登录态由 Supabase session 持有
+        const user =
+          tab === 'register'
+            ? await register(email, password, nickname)
+            : await authLogin(email, password)
+        await initProfile() // 确保 users 表有行（幂等）
+        login(user.email, user.nickname, user.id)
+      } else {
+        // mock：假登录（Demo 备案）
+        await new Promise((r) => setTimeout(r, 600))
+        login(email, tab === 'register' ? nickname : '小望')
+      }
       navigate('/friend', { replace: true })
-    }, 600)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('login.errorGeneric'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -88,6 +106,7 @@ export function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
             autoComplete="current-password"
           />
         </label>
@@ -98,7 +117,7 @@ export function LoginPage() {
           {busy ? t('login.loading') : tab === 'login' ? t('login.submitLogin') : t('login.submitRegister')}
         </Button>
 
-        <p className="login-hint">{t('login.demoHint')}</p>
+        <p className="login-hint">{isHttpMode ? '本机 Supabase 模式' : t('login.demoHint')}</p>
       </div>
 
       <p className="login-footer">{t('login.footer')}</p>
