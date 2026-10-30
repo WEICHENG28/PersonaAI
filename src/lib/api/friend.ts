@@ -157,4 +157,80 @@ export async function triggerNextMeet(): Promise<void> {
   await apiCall<null>('/api/friend/next-meet', { method: 'POST' })
 }
 
+// ── A7: Settings ──────────────────────────────────────────────────────────────
+
+export interface UserSettings {
+  dev_mode: boolean
+  proactive_frequency: 'off' | 'low' | 'normal'
+  social_agent_enabled: boolean
+  match_tier: 'one_way' | 'mutual'
+  daily_chat_limit: number
+  manual_minutes_per_chat: number
+  shareable_confirmed: boolean
+}
+
+export type SettingsPatch = Partial<Omit<UserSettings, 'shareable_confirmed'>>
+
+/** GET /api/settings：读取用户设定（含 shareable_confirmed）。mock 模式回 null。 */
+export async function fetchSettings(): Promise<UserSettings | null> {
+  if (!isHttpMode) return null
+  return apiCall<UserSettings>('/api/settings')
+}
+
+/** PUT /api/settings：更新设定（只传要改的字段）。mock 模式 no-op。 */
+export async function saveSettings(patch: SettingsPatch): Promise<UserSettings> {
+  return apiCall<UserSettings>('/api/settings', {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  })
+}
+
+// ── A8: Memory Edit ───────────────────────────────────────────────────────────
+
+export interface MemoryRow {
+  id: string
+  content: string
+  source: string
+  confidence: number
+  created_at: string
+  deleted_at: string | null
+}
+
+/** PATCH /api/memory/:id：编辑记忆内容（source→user_edited, confidence=1）。 */
+export async function editMemory(id: string, content: string): Promise<MemoryRow> {
+  return apiCall<MemoryRow>(`/api/memory/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ content }),
+  })
+}
+
+// ── A9: Fun Labels ────────────────────────────────────────────────────────────
+
+export interface FunLabels {
+  mbti_guess: string
+  reason: string
+  report: string
+  user_mbti: string | null
+  updated_at: string
+}
+
+/** GET /api/profile/fun：读取娱乐标签（无则 null）。mock 模式回 null。 */
+export async function fetchFunLabels(): Promise<FunLabels | null> {
+  if (!isHttpMode) return null
+  return apiCall<FunLabels | null>('/api/profile/fun')
+}
+
+/** POST /api/profile/fun：触发 Prompt 12 生成娱乐标签。 */
+export async function generateFunLabels(): Promise<FunLabels> {
+  return apiCall<FunLabels>('/api/profile/fun', { method: 'POST' })
+}
+
+/** PUT /api/profile/fun/mbti：用户自填 MBTI。 */
+export async function setUserMbti(user_mbti: string | null): Promise<FunLabels> {
+  return apiCall<FunLabels>('/api/profile/fun/mbti', {
+    method: 'PUT',
+    body: JSON.stringify({ user_mbti }),
+  })
+}
+
 export { isHttpMode }

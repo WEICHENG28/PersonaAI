@@ -7,8 +7,13 @@ import {
   fetchProfile,
   saveShareable,
   requestExtractProfile,
+  editMemory,
+  fetchFunLabels,
+  generateFunLabels,
+  setUserMbti,
   type ShareableView,
   type ShareableInput,
+  type FunLabels,
 } from '@lib/api/friend'
 
 /**
@@ -221,20 +226,80 @@ function HttpProfileSection({ memoriesSection }: { memoriesSection: React.ReactN
   )
 }
 
+/** A3+A8：记忆列表（mock 用 store；http 模式支持 PATCH 编辑）。 */
 function MemoriesSection() {
   const s = useDemoStore()
+  const httpMode = isHttpModeCached()
+
+  // http 模式下的编辑状态：{ [id]: draftContent }
+  const [editDrafts, setEditDrafts] = useState<Record<string, string>>({})
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
+
+  // mock 模式数据（兼容 http 模式也显示 store 里的演示数据）
+  const memories = s.memories
+
+  const startEdit = (id: string, content: string) => {
+    setEditDrafts((d) => ({ ...d, [id]: content }))
+    setEditingId(id)
+  }
+
+  const cancelEdit = () => setEditingId(null)
+
+  const saveEdit = async (id: string) => {
+    const content = editDrafts[id] ?? ''
+    if (!content.trim()) return
+    if (httpMode) {
+      setEditSaving(true)
+      try {
+        await editMemory(id, content)
+        // 更新本地 store（mock store 无 editMemory，直接更新展示用数据）
+        s.memories.find((m) => m.id === id) && Object.assign(s.memories.find((m) => m.id === id)!, { content })
+      } catch (e) {
+        console.error('[ProfilePage] editMemory', e)
+      } finally {
+        setEditSaving(false)
+      }
+    }
+    setEditingId(null)
+  }
+
   return (
     <Card>
       <CardHead title={t('profile.memories')} />
-      {s.memories.length === 0 ? (
+      {memories.length === 0 ? (
         <p className="empty">{t('profile.memoriesEmpty')}</p>
       ) : (
         <ul className="mem-list">
-          {s.memories.map((m) => (
+          {memories.map((m) => (
             <li key={m.id} className="mem">
-              <p>{m.content}</p>
+              {editingId === m.id ? (
+                <div className="stack" style={{ gap: '0.5rem' }}>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    maxLength={200}
+                    value={editDrafts[m.id] ?? m.content}
+                    onChange={(e) => setEditDrafts((d) => ({ ...d, [m.id]: e.target.value }))}
+                    style={{ resize: 'vertical', width: '100%' }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <Button small variant="primary" onClick={() => void saveEdit(m.id)} disabled={editSaving}>
+                      {editSaving ? '保存中…' : '保存'}
+                    </Button>
+                    <Button small variant="secondary" onClick={cancelEdit}>取消</Button>
+                  </div>
+                </div>
+              ) : (
+                <p>{m.content}</p>
+              )}
               <footer>
                 <Chip tone="well">{m.source}</Chip>
+                {httpMode && editingId !== m.id && (
+                  <button className="mem-del" onClick={() => startEdit(m.id, m.content)}>
+                    编辑
+                  </button>
+                )}
                 <button className="mem-del" onClick={() => s.deleteMemory(m.id)}>
                   {t('profile.deleteMemory')}
                 </button>
@@ -390,7 +455,124 @@ function MockProfileSection() {
 
         {/* 它记得的事 */}
         <MemoriesSection />
+
+        {/* A9：娱乐标签（P2） */}
+        <FunLabelsSection />
       </div>
     </div>
+  )
+}
+
+// ───────────────────────── A9：娱乐标签 ─────────────────────────
+
+/** 显示 AI 猜测的 MBTI 与用户自填 MBTI 的对照（仅供娱乐）。
+ *  http 模式：GET /api/profile/fun 加载；POST 生成；PUT 自填。
+ *  mock 模式：不显示（P2 占位符）。
+ */
+function FunLabelsSection() {
+  const httpMode = isHttpModeCached()
+  const [funLabels, setFunLabels] = useState<FunLabels | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [userMbtiDraft, setUserMbtiDraft] = useState('')
+  const [savingMbti, setSavingMbti] = useState(false)
+
+  useEffect(() => {
+    if (!httpMode) return
+    fetchFunLabels().then((d) => {
+      if (d) {
+        setFunLabels(d)
+        setUserMbtiDraft(d.user_mbti ?? '')
+      }
+    }).catch(console.error)
+  }, [httpMode])
+
+  if (!httpMode) return null  // mock 模式不显示（P2）
+
+  const handleGenerate = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await generateFunLabels()
+      setFunLabels(data)
+      setUserMbtiDraft(data.user_mbti ?? '')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '生成失败，请再试一次')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveMbti = async () => {
+    const val = userMbtiDraft.trim().toUpperCase()
+    const isValid = /^[EI][NS][TF][JP]$/.test(val)
+    const mbti = val && isValid ? val : null
+    setSavingMbti(true)
+    try {
+      const data = await setUserMbti(mbti)
+      setFunLabels(data)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '保存失败')
+    } finally {
+      setSavingMbti(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHead
+        title="性格小报告"
+        sub="仅供娱乐，不用于任何判定"
+        right={<Chip tone="pear">仅供娱乐</Chip>}
+      />
+
+      {!funLabels ? (
+        <div className="stack" style={{ gap: '0.75rem' }}>
+          <p className="hint-inline">AI 会根据你的对外档案猜测你的 MBTI，写一段轻松的性格小报告。</p>
+          {error && <p style={{ color: 'var(--c-err)' }}>{error}</p>}
+          <Button small variant="secondary" onClick={() => void handleGenerate()} disabled={loading}>
+            {loading ? '生成中…' : '生成性格小报告'}
+          </Button>
+        </div>
+      ) : (
+        <div className="stack" style={{ gap: '1rem' }}>
+          {/* AI 猜测 */}
+          <div>
+            <p style={{ fontWeight: 600 }}>AI 猜你是：<Chip tone="pear">{funLabels.mbti_guess}</Chip></p>
+            <p className="hint-inline">{funLabels.reason}</p>
+            <p style={{ marginTop: '0.5rem' }}>{funLabels.report}</p>
+          </div>
+
+          {/* 你以为的你 vs AI 猜的你 */}
+          <div>
+            <p style={{ fontWeight: 600 }}>你以为自己是：</p>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                className="input"
+                placeholder="输入 MBTI（如 INFP）"
+                value={userMbtiDraft}
+                onChange={(e) => setUserMbtiDraft(e.target.value.toUpperCase())}
+                maxLength={4}
+                style={{ maxWidth: 120 }}
+              />
+              <Button small variant="secondary" onClick={() => void handleSaveMbti()} disabled={savingMbti}>
+                {savingMbti ? '保存中…' : '确认'}
+              </Button>
+              {funLabels.user_mbti && funLabels.user_mbti !== funLabels.mbti_guess && (
+                <span className="hint-inline">你说 {funLabels.user_mbti}，AI 猜 {funLabels.mbti_guess}，有点不同 😄</span>
+              )}
+              {funLabels.user_mbti && funLabels.user_mbti === funLabels.mbti_guess && (
+                <span className="hint-inline">你说 {funLabels.user_mbti}，AI 也猜 {funLabels.mbti_guess}，想法一致！</span>
+              )}
+            </div>
+          </div>
+
+          {error && <p style={{ color: 'var(--c-err)' }}>{error}</p>}
+          <Button small variant="secondary" onClick={() => void handleGenerate()} disabled={loading}>
+            {loading ? '重新生成中…' : '重新生成'}
+          </Button>
+        </div>
+      )}
+    </Card>
   )
 }
