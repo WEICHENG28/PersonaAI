@@ -1,12 +1,13 @@
-// C4 聊天室路由：登入、對話 id 檢查、錯誤格式 { ok, error }、成員以外 403（chatRoom 用假的）。
+// C4 聊天室、C5 結果頁路由：登入、對話 id 檢查、錯誤格式 { ok, error }、成員以外 403（chatRoom 用假的）。
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from 'hono'
 import { ChatRoomError, type ChatRoomApi } from '../../server/twin/chatRoom'
 import { createTwinRoutes } from '../../server/routes/twin'
+import type { ResultApi } from '../../server/twin/result'
 
 const CONV_ID = '6f1c2a5e-7d1b-4c3a-9e2f-1a2b3c4d5e6f'
 
-function app(opts: { userId?: string | null; api?: Partial<ChatRoomApi> } = {}) {
+function app(opts: { userId?: string | null; api?: Partial<ChatRoomApi>; result?: Partial<ResultApi> } = {}) {
   const api: ChatRoomApi = {
     getChatRoom: vi.fn(async () => {
       throw new ChatRoomError('你不是这段对话的成员，不能查看', 403)
@@ -17,7 +18,14 @@ function app(opts: { userId?: string | null; api?: Partial<ChatRoomApi> } = {}) 
   }
   const resolveUserId = async (c: Context) =>
     opts.userId === null ? c.json({ ok: false, error: '请先登录' }, 401) : (opts.userId ?? 'user-me')
-  return { routes: createTwinRoutes({ chatRoom: () => api, resolveUserId }), api }
+  const result: ResultApi = {
+    getResult: vi.fn(async () => {
+      throw new ChatRoomError('你不是这段对话的成员，不能查看', 403)
+    }),
+    continueTwin: vi.fn(async () => ({ roundCount: 12, ended: false })),
+    ...opts.result,
+  }
+  return { routes: createTwinRoutes({ chatRoom: () => api, result: () => result, resolveUserId }), api, result }
 }
 
 describe('twin 路由', () => {
@@ -73,5 +81,40 @@ describe('twin 路由', () => {
     })
     expect(res.status).toBe(200)
     expect(send).toHaveBeenCalledWith(CONV_ID, 'user-me', '嗨')
+  })
+})
+
+describe('twin 路由：C5 結果頁', () => {
+  it('結果頁：不是成員 → 403；id 不是 uuid → 404', async () => {
+    const { routes, result } = app()
+    expect((await routes.request(`/conversations/${CONV_ID}/result`)).status).toBe(403)
+    expect((await routes.request('/conversations/lin/result')).status).toBe(404)
+    expect(result.getResult).toHaveBeenCalledTimes(1)
+  })
+
+  it('結果頁：沒登入 → 401，不查資料', async () => {
+    const { routes, result } = app({ userId: null })
+    expect((await routes.request(`/conversations/${CONV_ID}/result`)).status).toBe(401)
+    expect(result.getResult).not.toHaveBeenCalled()
+  })
+
+  it('讓分身繼續聊：POST 成功回 { ok, data }，帶目前登入者', async () => {
+    const { routes, result } = app()
+    const res = await routes.request(`/conversations/${CONV_ID}/continue`, { method: 'POST' })
+    expect(await res.json()).toEqual({ ok: true, data: { roundCount: 12, ended: false } })
+    expect(result.continueTwin).toHaveBeenCalledWith(CONV_ID, 'user-me')
+  })
+
+  it('讓分身繼續聊：不能繼續 → 409，錯誤是簡體訊息', async () => {
+    const { routes } = app({
+      result: {
+        continueTwin: vi.fn(async () => {
+          throw new ChatRoomError('这段对话已经结束了', 409)
+        }),
+      },
+    })
+    const res = await routes.request(`/conversations/${CONV_ID}/continue`, { method: 'POST' })
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ ok: false, error: '这段对话已经结束了' })
   })
 })
