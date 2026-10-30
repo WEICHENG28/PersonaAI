@@ -174,6 +174,19 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B4 規劃器（LLM 挑人與決策）｜Peter（AI 協助）｜Closes #15
+- **做了什麼**：Prompt 4（`server/prompts/04_planner.ts`，簡體）；`server/social/planner.ts`：`pick`（輸入任務、用戶偏好與後台檔案 Big Five、候選人對外檔案，回挑誰、理由、開場話題）、`decide`（輸入檔位、雙方判定、輪數，回下一步與理由）、`cleanReason`；`runnerDeps.ts` 換成真的規劃器；迴圈的 `decide` 改成回 `{ action, reason }`，程式規則和規劃器一致時，日誌用規劃器寫的理由；`UserSettings` 加上 `preferences`。
+- **為什麼這樣做**：
+  - `pick` 的 target 不在候選清單 → 重試一次，再無效就改用相似度最高者並在理由註明；LLM 沒回應也一樣退回，任務不會卡住。
+  - `decide` 失敗回 null，交給 `decideGuard`；兩者不一致時以程式為準並寫「决策由程序规则修正」。
+  - 給模型的候選人資料只給「接近程度：高／中／低」，不給數字；理由出現分數（例如「相似度 0.82」「85 分」）就換成通用說法（02 第 6.1 節不顯示分數）。decide 只給判定，不給對方視角分數。
+- **改了哪些檔案**：`server/prompts/04_planner.ts`、`server/social/{planner,runner,runnerDeps,agentStore}.ts`、`tests/social/{planner,runner}.test.ts`。
+- **驗證**：`tsc -b`；vitest 152/152（合格選人、清單外重試、兩次無效退回、LLM 沒回應退回、finish、decide 正常與失敗、理由去分數、規劃器與程式規則一致／不一致的日誌）；`npm run build`。真實模型＋雲端大廳（唯讀）：pick 選小安，理由「小安喜欢登山…与用户尊重节奏、温和的风格相近」，開場「周末去郊区慢慢爬山、顺便拍照的路线」；decide（mutual、我方合適、對方不合適）回 end_conversation，和程式規則一致。
+- **注意**：真實模型 **pick 約 16 秒、decide 約 4 秒**（MODEL_REASON）。worker 每步都會呼叫，Demo 前要預跑，或考慮 decide 改用 MODEL_FAST。後台檔案目前來自 A 的 `getAgentProfile` stub（假資料），A4 做好後自動換成真的。
+- **還沒做完／待辦**：B5 評審（目前暫代評審一律「不確定」）。
+
+---
+
 ### 2026-10-30｜B3 社交 Agent 迴圈 runTaskStep＋worker｜Peter（AI 協助）｜Closes #33
 - **做了什麼**：
   - `server/social/runner.ts`：`runTaskStep`（守門 → 規劃挑人開聊 → 讓分身聊 → 滿 8 輪判定 → 決策：繼續／通知本人／結束記歷史）、`runTaskStepSafely`（每步包 try/catch，連續失敗 `TASK_MAX_FAILS` 次暫停任務，成功一步歸零）。每一步都寫工作日誌並附理由。

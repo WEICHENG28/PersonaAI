@@ -1,38 +1,32 @@
 // runTaskStep 的預設依賴：跨線一律走 contracts。
-// 規劃器（B4）與評審（B5）還沒做，先用下面兩個暫代版本，讓整個迴圈能跑通；做完後把這裡換掉。
-import type { AgentTask, Evaluation, LobbyCandidate, Outline, Verdict } from '../../shared/types'
-import { deliverReport } from '../contracts/friend'
+// 評審（B5）還沒做，先用下面的暫代版本，讓整個迴圈能跑通；做完後把這裡換掉。
+import type { AgentTask, Evaluation, Outline, Verdict } from '../../shared/types'
+import { deliverReport, getAgentProfile } from '../contracts/friend'
 import { searchLobby } from '../contracts/social'
 import { endConversation, markWaitingHuman, runTwinRounds, startConversation } from '../contracts/twin'
 import { getAgentStore } from './agentStore'
+import { decide, pick } from './planner'
 import { buildReport } from './report'
-import type { PickResult, RunnerDeps } from './runner'
+import type { RunnerDeps } from './runner'
+
+export { pickMostSimilar } from './planner'
 
 export function defaultRunnerDeps(): RunnerDeps {
   const store = getAgentStore()
+  const planner = { store, getAgentProfile }
   return {
     store,
     now: () => new Date(),
     searchLobby,
-    pick: pickMostSimilar,
+    pick: (task, candidates) => pick(task, candidates, planner),
     evaluate: evaluatePlaceholder,
-    decide: async () => null, // B4：LLM 決策；目前只用程式規則（decideGuard）
+    decide: (task, ev) => decide(task, ev, planner),
     buildReport: (task) => buildReport(task, store),
     deliverReport,
     startConversation,
     runTwinRounds,
     endConversation,
     markWaitingHuman,
-  }
-}
-
-/** 暫代 B4 的 pick：選相似度最高的人。 */
-export async function pickMostSimilar(_task: AgentTask, candidates: LobbyCandidate[]): Promise<PickResult> {
-  const target = candidates[0] ?? null
-  return {
-    target,
-    reason: target ? `相似度最高（${target.similarity}）；规划器尚未接上，先按相似度选` : '没有候选人',
-    openingTopic: target?.shareable.interests[0],
   }
 }
 

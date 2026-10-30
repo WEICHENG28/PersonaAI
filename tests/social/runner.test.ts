@@ -207,6 +207,20 @@ describe('runTaskStep', () => {
     expect(await runTaskStep('t1', deps)).toBe('not_running')
   })
 
+  it('規劃器建議和程式規則不同 → 以程式為準，日誌註明', async () => {
+    put(chatting())
+    deps.decide = vi.fn(async () => ({ action: 'end_conversation' as const, reason: '我觉得不合适' }))
+    expect(await runTaskStep('t1', deps)).toBe('notified')
+    expect(logs.some((l) => l.action === '决策由程序规则修正' && l.reason?.includes('notify_user'))).toBe(true)
+  })
+
+  it('規劃器和程式規則一致 → 日誌用規劃器的理由', async () => {
+    put(chatting())
+    deps.decide = vi.fn(async () => ({ action: 'notify_user' as const, reason: '双方都觉得聊得来' }))
+    await runTaskStep('t1', deps)
+    expect(logs.at(-1)).toMatchObject({ action: '双向合适，通知你', reason: '双方都觉得聊得来' })
+  })
+
   it('暫代評審判「不確定」→ 繼續聊', async () => {
     put(chatting())
     deps.evaluate = (task, conv, round) => evaluatePlaceholder(task, conv, round)
