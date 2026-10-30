@@ -1,7 +1,7 @@
 /**
  * C 线前端 API（docs/10 §3）。拥有者：C。
  * http 模式：打 /api（带 Supabase JWT）＋订阅 messages 的 Realtime。
- * mock 模式：聊天室页面照旧用 demo store（useDemoStore），这里的函数只在 http 模式被调用。
+ * mock 模式：聊天室、结果页照旧用 demo store（useDemoStore），这里的函数只在 http 模式被调用。
  */
 import { supabase, isHttpMode } from '../supabase'
 
@@ -42,6 +42,44 @@ export interface SendResult {
   replyFailed: boolean
 }
 
+/** 为什么你们合的一点：你在意的、对方的表现、第几轮。 */
+export interface FitPointView {
+  concern: string
+  evidence: string
+  round: number
+}
+
+export interface OutlineView {
+  topics: string[]
+  fits: string[]
+  frictions: string[]
+  highlights: string[]
+}
+
+export interface ResultMessage extends ChatMessageView {
+  round: number
+}
+
+/** C5 结果页：只有我方视角，没有任何分数。 */
+export interface ResultView {
+  conversationId: string
+  status: ConversationStatus
+  me: { userId: string; controller: Controller }
+  other: { userId: string; name: string; controller: Controller }
+  verdict: { value: VerdictValue; trend: Trend } | null
+  mutual: boolean
+  fitPoints: FitPointView[]
+  outline: OutlineView | null
+  messages: ResultMessage[]
+  /** null = 可以让分身继续聊；否则是不行的原因。 */
+  continueBlock: string | null
+}
+
+export interface ContinueResult {
+  roundCount: number
+  ended: boolean
+}
+
 /** 失败时丢出的错误，message 是可以直接给用户看的简体中文；status 是 HTTP 状态码（连不上时为 0）。 */
 export class TwinApiError extends Error {
   constructor(
@@ -66,6 +104,15 @@ export function getChatStatus(conversationId: string): Promise<ChatStatusView> {
 
 export function sendChatMessage(conversationId: string, text: string): Promise<SendResult> {
   return request('POST', `/api/conversations/${encodeURIComponent(conversationId)}/messages`, { text })
+}
+
+export function getResult(conversationId: string): Promise<ResultView> {
+  return request('GET', `/api/conversations/${encodeURIComponent(conversationId)}/result`)
+}
+
+/** 让分身继续聊一段（后端跑完才回应，大约要一分钟）。 */
+export function continueTwin(conversationId: string): Promise<ContinueResult> {
+  return request('POST', `/api/conversations/${encodeURIComponent(conversationId)}/continue`)
 }
 
 export interface MessageSubscription {

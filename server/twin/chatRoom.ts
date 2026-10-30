@@ -84,7 +84,7 @@ export interface ChatRoomApi {
 export class ChatRoomError extends Error {
   constructor(
     message: string,
-    readonly status: 400 | 403 | 404 | 409,
+    readonly status: 400 | 403 | 404 | 409 | 503,
   ) {
     super(message)
     this.name = 'ChatRoomError'
@@ -93,15 +93,19 @@ export class ChatRoomError extends Error {
 
 export const messageBodySchema = z.object({ text: z.string().trim().min(1).max(MESSAGE_MAX) })
 
-interface Sides {
+export interface Sides {
   conv: ConversationRow
   me: { userId: string; controller: Controller }
   other: { userId: string; controller: Controller }
 }
 
 /** 讀對話並確認 userId 是其中一方；不是就 403。 */
-async function loadSides(deps: ChatRoomDeps, conversationId: string, userId: string): Promise<Sides> {
-  const conv = await deps.store.getConversation(conversationId)
+export async function loadSides(
+  store: Pick<ChatRoomStore, 'getConversation'>,
+  conversationId: string,
+  userId: string,
+): Promise<Sides> {
+  const conv = await store.getConversation(conversationId)
   if (!conv) throw new ChatRoomError('找不到这段对话', 404)
   const a = { userId: conv.side_a, controller: conv.side_a_controller }
   const b = { userId: conv.side_b, controller: conv.side_b_controller }
@@ -120,12 +124,12 @@ export function trendOf(scores: readonly ScoreRow[]): Trend {
   return 'flat'
 }
 
-function toVerdictValue(raw: string): VerdictValue {
+export function toVerdictValue(raw: string): VerdictValue {
   return (VERDICT_VALUES as readonly string[]).includes(raw) ? (raw as VerdictValue) : 'uncertain'
 }
 
 async function getChatRoom(deps: ChatRoomDeps, conversationId: string, userId: string): Promise<ChatRoomView> {
-  const { conv, me, other } = await loadSides(deps, conversationId, userId)
+  const { conv, me, other } = await loadSides(deps.store, conversationId, userId)
   const [name, messages] = await Promise.all([
     deps.store.getDisplayName(other.userId),
     deps.store.listMessages(conversationId),
@@ -134,7 +138,7 @@ async function getChatRoom(deps: ChatRoomDeps, conversationId: string, userId: s
 }
 
 async function getChatStatus(deps: ChatRoomDeps, conversationId: string, userId: string): Promise<ChatStatusView> {
-  const { conv, me, other } = await loadSides(deps, conversationId, userId)
+  const { conv, me, other } = await loadSides(deps.store, conversationId, userId)
   // 只讀「我」這個視角的判定；對方視角的分數與理由一律不讀
   const scores = await deps.store.listMyScores(conversationId, me.userId, TREND_SCORES)
   const latest = scores[0]
@@ -169,7 +173,7 @@ async function askOtherTwin(deps: ChatRoomDeps, conv: ConversationRow, otherUser
 async function sendHumanMessage(deps: ChatRoomDeps, conversationId: string, userId: string, text: string): Promise<SendResult> {
   const body = messageBodySchema.safeParse({ text })
   if (!body.success) throw new ChatRoomError(`消息要在 1–${MESSAGE_MAX} 字之间`, 400)
-  const { conv, me, other } = await loadSides(deps, conversationId, userId)
+  const { conv, me, other } = await loadSides(deps.store, conversationId, userId)
   if (conv.status === 'ended') throw new ChatRoomError('这段对话已经结束了', 409)
   if (me.controller !== 'human') throw new ChatRoomError('现在由你的分身在聊，接手后才能发言', 409)
 

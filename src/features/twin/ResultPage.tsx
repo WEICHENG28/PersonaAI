@@ -1,13 +1,22 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
 import { Card, CardHead } from '@components/ui/Card'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
+import { isLiveChat } from '@lib/api/twin'
+import { LiveResult } from './components/LiveResult'
 
-/** 画面 7：结果页（双向合适徽章、我方视角大纲、为什么你们合、完整纪录） */
+/** 画面 7：结果页。http 模式且网址有对话 id（/chat/:id/result）→ 真资料；其他情况照旧跑 demo。 */
 export function ResultPage() {
+  const { id } = useParams()
+  if (isLiveChat && id) return <LiveResult key={id} conversationId={id} />
+  return <DemoResult />
+}
+
+/** mock 模式的结果页（双向合适徽章、我方视角大纲、为什么你们合、完整纪录），demo store 资料。 */
+function DemoResult() {
   const s = useDemoStore()
   const navigate = useNavigate()
   const [showFull, setShowFull] = useState(false)

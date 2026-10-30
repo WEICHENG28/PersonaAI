@@ -118,8 +118,9 @@ function ChatRoomBody({ room, state }: ChatRoomBodyProps) {
   )
 }
 
-/** 「我来聊」（C6）、「请求真人」（C7）、「查看结果」（C5）：对应任务做好前先显示「即将上线」。 */
+/** 「我来聊」（C6）、「请求真人」（C7）：对应任务做好前先显示「即将上线」；「查看结果」连到 C5 结果页。 */
 function ChatActions({ room }: { room: ChatRoomView }) {
+  const navigate = useNavigate()
   return (
     <div className="friend-side stack">
       {room.me.controller === 'twin' && room.status !== 'ended' && (
@@ -132,8 +133,8 @@ function ChatActions({ room }: { room: ChatRoomView }) {
           {CHAT_TEXT.requestHuman} · {CHAT_TEXT.comingSoon}
         </Button>
       )}
-      <Button block disabled title={CHAT_TEXT.comingSoon}>
-        {CHAT_TEXT.viewResult} · {CHAT_TEXT.comingSoon}
+      <Button block onClick={() => navigate(`/chat/${encodeURIComponent(room.conversationId)}/result`)}>
+        {CHAT_TEXT.viewResult}
       </Button>
     </div>
   )
