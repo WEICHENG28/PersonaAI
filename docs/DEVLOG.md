@@ -225,6 +225,16 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B8 效率統計＋任務結果回報｜Peter（AI 協助）｜Closes #36
+- **做了什麼**：`server/social/stats.ts`（`computeStats`：省下時間＝代聊場數 × 人工平均分鐘，附計算依據；`formatDuration`：120 →「约 2 小时」）；`buildReport` 從這個任務的歷史嘗試取合適名單（雙向／單向）與不合適原因（抽象說法、已過隱私守門），不含任何分數，交給 A 的 `deliverReport`；`match` 通知的內容改成 07B 規定的 `{ conversationId, targetName, mutual, taskId }`；前端 `StatsCard`（沿用 A 回報卡的 `stats-row`／`stat` 樣式）與 `formatDuration`。
+- **給 A（Vincent）**：`deliverReport` 收到的 `TaskReport` 現在有 `suitable`（名字、是否雙向、對話 ID）與 `unsuitable_reasons`，阿澈回報時可以直接用。`StatsCard` 可以放進回報卡或任務頁。
+- **給 C（Jerry）**：`match` 通知的 payload 是 `{ conversationId, targetName, mutual, taskId }`，通知鈴鐺顯示「找到合适的人：{targetName}」，連到 `/chat/<conversationId>/result`。
+- **改了哪些檔案**：`server/social/{stats,report,runner}.ts`、`src/features/social/{formatDuration.ts,components/StatsCard.tsx}`、`tests/social/{report,runner}.test.ts`。
+- **踩到的坑**：vitest 沒有設定 `@components` 等路徑別名，測試 import 含別名的元件會失敗，所以 `formatDuration` 獨立成不 import 任何別名的小檔案。
+- **驗證**：`tsc -b`；vitest 341/341（computeStats、formatDuration 前後端一致、buildReport 只取本任務且不含分數、match 通知格式）；`npm run build`。
+
+---
+
 ### 2026-10-30｜B7 工作日誌面板｜Peter（AI 協助）｜Closes #16
 - **做了什麼**：`GET /api/logs`（自己的日誌、新的在前、可依 `task_id` 篩選、預設 50 筆）；`agentStore.listLogs`；前端 `getLogs`、`subscribeLogs`（Supabase Realtime 訂 `agent_logs` 的 INSERT）；`AgentLogPanel` 改版：http 模式自己載入＋即時加入新日誌（依 id 去重、最多保留 200 筆），不同 Agent 用不同顏色標籤（AI 朋友梨黃、社交 Agent 墨色、分身灰、評審薄荷、隱私守門珊瑚），多個任務時可篩選，有對話的日誌可以「看这场对话」跳到 `/chat/<id>`；mock 模式照舊顯示傳進來的 demo 日誌。
 - **為什麼這樣做**：面板被 A 的 `FriendPage`、`SettingsPage` 引用，`logs` 參數改成選填、mock 行為不變，A 不用改。Realtime 不加 user 篩選，靠資料表權限（`own` policy）只收到自己的日誌，前端不需要知道 `users.id`。
