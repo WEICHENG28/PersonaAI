@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   endConversation,
   getTranscript,
-  guardText,
   markWaitingHuman,
   runTwinRounds,
   startConversation,
@@ -61,8 +60,7 @@ describe('twin contracts stub', () => {
     await expect(runTwinRounds(conversationId, 1.5)).rejects.toThrow()
   })
 
-  it('guardText 原樣回傳；endConversation、markWaitingHuman 可以呼叫', async () => {
-    expect(await guardText('我住在山上很安静', 'seed-an')).toEqual({ ok: true, text: '我住在山上很安静', issues: [] })
+  it('endConversation、markWaitingHuman 可以呼叫', async () => {
     const { conversationId } = await start()
     await expect(endConversation(conversationId, 'done')).resolves.toBeUndefined()
     await expect(markWaitingHuman(conversationId)).resolves.toBeUndefined()
