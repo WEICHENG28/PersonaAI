@@ -80,6 +80,7 @@ beforeEach(() => {
     runTwinRounds: vi.fn(async () => ({ roundCount: CONFIG.MIN_ROUNDS_BEFORE_JUDGE, ended: false })),
     endConversation: vi.fn(async () => {}),
     markWaitingHuman: vi.fn(async () => {}),
+    guardText: vi.fn(async (text: string) => ({ ok: true, text, issues: [] })),
   }
 })
 
@@ -152,6 +153,35 @@ describe('runTaskStep', () => {
     expect(deps.markWaitingHuman).toHaveBeenCalledWith('conv-1')
     expect(store.notifications[0]?.payload).toMatchObject({ conversation_id: 'conv-1', mutual: true })
     expect(store.tasks.get('t1')).toMatchObject({ active_conversation_id: null, progress: { suitable: 1 } })
+  })
+
+  it('雙方都記一筆歷史（對方不是種子用戶時），各用自己視角的結果', async () => {
+    put(chatting())
+    deps.evaluate = vi.fn(async () => evaluation('suitable', 'suitable'))
+    await runTaskStep('t1', deps)
+    expect(store.attempts.map((a) => [a.user_id, a.target_user_id, a.result])).toEqual([
+      ['me', 'xiaoan', 'mutual'],
+      ['xiaoan', 'me', 'mutual'],
+    ])
+  })
+
+  it('對方是種子用戶 → 只記我方', async () => {
+    put(chatting())
+    store.seedUserIds.add('xiaoan')
+    await runTaskStep('t1', deps)
+    expect(store.attempts).toHaveLength(1)
+  })
+
+  it('只有我覺得合適、檔位雙向 → 結束，雙方都記不合適，我方原因是匹配不雙向；原因先過隱私守門', async () => {
+    put(chatting())
+    deps.evaluate = vi.fn(async () => evaluation('suitable', 'unsuitable'))
+    expect(await runTaskStep('t1', deps)).toBe('ended_chat')
+    expect(store.attempts.map((a) => [a.user_id, a.result, a.reason_type])).toEqual([
+      ['me', 'unsuitable', 'not_mutual'],
+      ['xiaoan', 'unsuitable', 'friction'],
+    ])
+    expect(deps.guardText).toHaveBeenCalledWith(expect.any(String), 'xiaoan')
+    expect(deps.guardText).toHaveBeenCalledWith('话题接不上', 'me')
   })
 
   it('不合適就結束並記錄原因', async () => {
