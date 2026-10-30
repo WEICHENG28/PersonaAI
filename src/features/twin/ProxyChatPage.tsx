@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
 import { Card } from '@components/ui/Card'
@@ -7,9 +7,18 @@ import { useDemoStore } from '@store/useDemoStore'
 import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
+import { isLiveChat } from '@lib/api/twin'
+import { LiveChatRoom } from './components/LiveChatRoom'
 
-/** 画面 5：分身 ↔ 分身代聊（直播面板） */
+/** 画面 5：聊天室。http 模式且网址有对话 id（/chat/:id）→ 真资料；其他情况照旧跑 demo。 */
 export function ProxyChatPage() {
+  const { id } = useParams()
+  if (isLiveChat && id) return <LiveChatRoom key={id} conversationId={id} />
+  return <DemoProxyChat />
+}
+
+/** mock 模式的分身 ↔ 分身代聊（直播面板，demo store 推进）。 */
+function DemoProxyChat() {
   const s = useDemoStore()
   const navigate = useNavigate()
   const [draft, setDraft] = useState('')
