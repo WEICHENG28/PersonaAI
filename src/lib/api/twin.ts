@@ -80,6 +80,24 @@ export interface ContinueResult {
   ended: boolean
 }
 
+/** C6 接手卡片（Prompt 7）：每项最多 3 点。 */
+export interface HandoffSummary {
+  key_points: string[]
+  other_highlights: string[]
+  twin_said: string[]
+  open_topics: string[]
+  suggested_replies: string[]
+}
+
+/** C6 本人接手的结果：我方视角的判定＋接手卡片，没有任何分数。 */
+export interface TakeoverView {
+  conversationId: string
+  verdict: { value: VerdictValue; trend: Trend } | null
+  summary: HandoffSummary
+  /** 接手卡片没整理出来（已经照常接手）。 */
+  summaryFailed: boolean
+}
+
 /** 失败时丢出的错误，message 是可以直接给用户看的简体中文；status 是 HTTP 状态码（连不上时为 0）。 */
 export class TwinApiError extends Error {
   constructor(
@@ -113,6 +131,11 @@ export function getResult(conversationId: string): Promise<ResultView> {
 /** 让分身继续聊一段（后端跑完才回应，大约要一分钟）。 */
 export function continueTwin(conversationId: string): Promise<ContinueResult> {
   return request('POST', `/api/conversations/${encodeURIComponent(conversationId)}/continue`)
+}
+
+/** 本人接手：产生接手卡片、我方改成本人（大约要十几秒）。接手后不能交回分身。 */
+export function takeOver(conversationId: string): Promise<TakeoverView> {
+  return request('POST', `/api/conversations/${encodeURIComponent(conversationId)}/takeover`)
 }
 
 export interface MessageSubscription {

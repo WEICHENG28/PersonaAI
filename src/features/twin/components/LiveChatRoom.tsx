@@ -1,12 +1,13 @@
 // C4 聊天室（http 模式，真资料）。版面沿用 A 做好的代聊页（friend-layout／friend-chat／verdict-live），只换资料来源。拥有者：C。
+// C6：按「我来聊」→ 本人接手 → 先显示接手卡片，按「开始由本人聊」关闭后就能输入。
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
 import { Card } from '@components/ui/Card'
 import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
-import type { ChatRoomView } from '@lib/api/twin'
+import type { ChatRoomView, TakeoverView } from '@lib/api/twin'
 import {
   CHAT_TEXT,
   canType,
@@ -16,6 +17,8 @@ import {
   statusChip,
   verdictText,
 } from './chatRoomView'
+import { HandoffCard } from './HandoffCard'
+import { HANDOFF_TEXT, readHandoffState, takeoverBlockOf } from './handoffView'
 import { useChatRoom, type ChatRoomState } from './useChatRoom'
 
 interface LiveChatRoomProps {
@@ -25,7 +28,21 @@ interface LiveChatRoomProps {
 export function LiveChatRoom({ conversationId }: LiveChatRoomProps) {
   const state = useChatRoom(conversationId)
   const navigate = useNavigate()
+  const location = useLocation()
+  // 从结果页接手过来时，接手卡片放在路由 state 里
+  const [handoff, setHandoff] = useState<TakeoverView | null>(() => readHandoffState(location.state, conversationId))
 
+  const closeHandoff = () => {
+    setHandoff(null)
+    // 清掉路由 state，重新整理时不会再跳出卡片
+    if (location.state) navigate(location.pathname, { replace: true, state: null })
+  }
+  const startTakeOver = async () => {
+    const view = await state.takeOver()
+    if (view) setHandoff(view)
+  }
+
+  if (handoff) return <HandoffCard view={handoff} onStart={closeHandoff} />
   if (!state.room) {
     return (
       <div className="page">
@@ -41,15 +58,16 @@ export function LiveChatRoom({ conversationId }: LiveChatRoomProps) {
       </div>
     )
   }
-  return <ChatRoomBody room={state.room} state={state} />
+  return <ChatRoomBody room={state.room} state={state} onTakeOver={() => void startTakeOver()} />
 }
 
 interface ChatRoomBodyProps {
   room: ChatRoomView
   state: ChatRoomState
+  onTakeOver(): void
 }
 
-function ChatRoomBody({ room, state }: ChatRoomBodyProps) {
+function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
   const [draft, setDraft] = useState('')
   const chatRef = useAutoScrollBottom<HTMLDivElement>(room.messages.length + (state.twinTyping ? 1 : 0))
   const typable = canType(room)
@@ -112,20 +130,26 @@ function ChatRoomBody({ room, state }: ChatRoomBodyProps) {
           </div>
         </Card>
 
-        <ChatActions room={room} />
+        <ChatActions room={room} takingOver={state.takingOver} onTakeOver={onTakeOver} />
       </div>
     </div>
   )
 }
 
-/** 「我来聊」（C6）、「请求真人」（C7）：对应任务做好前先显示「即将上线」；「查看结果」连到 C5 结果页。 */
-function ChatActions({ room }: { room: ChatRoomView }) {
+interface ChatActionsProps {
+  room: ChatRoomView
+  takingOver: boolean
+  onTakeOver(): void
+}
+
+/** 「我来聊」（C6，接手后就消失，不能交回分身）、「请求真人」（C7，做好前先显示「即将上线」）、「查看结果」（C5）。 */
+function ChatActions({ room, takingOver, onTakeOver }: ChatActionsProps) {
   const navigate = useNavigate()
   return (
     <div className="friend-side stack">
-      {room.me.controller === 'twin' && room.status !== 'ended' && (
-        <Button block variant="secondary" disabled title={CHAT_TEXT.comingSoon}>
-          {CHAT_TEXT.takeOver} · {CHAT_TEXT.comingSoon}
+      {takeoverBlockOf(room) === null && (
+        <Button block variant="secondary" onClick={onTakeOver} disabled={takingOver}>
+          {takingOver ? HANDOFF_TEXT.taking : CHAT_TEXT.takeOver}
         </Button>
       )}
       {room.other.controller === 'twin' && room.status !== 'ended' && (
