@@ -12,9 +12,14 @@ export const HANDOFF_PROMPT_SYSTEM = `用户要接手 TA 的分身正在进行�
 规则：
 - 不要包含对方视角的任何判定或分数，也不要猜对方觉得合不合适。
 - 每项最多 3 点，每点 25 字内。
+- key_points 写这段对话聊了哪些话题、聊到哪里（例如「聊了周末爬山，双方都去过郊区」），不要和 twin_said 重复。
 - twin_said 只写「你的分身」在纪录里真的说过的内容（自己的喜好、看法、提过的事），不要编，也不要写对方说的话；接手后用户要和这些说法保持一致。
 - other_highlights 写对方在意的事或亮点，只根据对方在纪录里说过的话。
-- suggested_replies 用用户本人的口吻写，能直接接在最后一则消息后面说。
+- open_topics 只写纪录里已经提到、但还没聊完的话题，每一项都要能在纪录里找到；不要自己加纪录里没有的新话题（例如约见面、一起去）。
+- suggested_replies 用用户本人的口吻写。先看清楚最后一则是谁说的：
+  - 最后一则是对方说的 → 写能直接回应这一则的话。
+  - 最后一则是「你的分身」说的（对方还没回）→ 不要回答你的分身自己刚问的问题，写对方回答之后能接上的话，或换个纪录里提过的话题。
+  - 以接话和提问为主；不要替用户说纪录里没有的新喜好、习惯或经历（例如纪录没说过用相机还是手机，就不要写「我更习惯用手机」），也不能和 twin_said 矛盾。
 - 纪录里没有可写的内容时，该项给空数组。
 - 用简体中文回复，每个字都用简体。
 
@@ -65,7 +70,7 @@ export function renderHandoffSystem(myVerdict: string): string {
   return HANDOFF_PROMPT_SYSTEM.replace('{{my_verdict}}', () => myVerdict)
 }
 
-/** 對話紀錄放進 user 訊息；標籤內只當資料。 */
-export function handoffUserMessage(transcript: string): string {
-  return `<transcript>\n${transcript}\n</transcript>\n只输出 JSON。`
+/** 對話紀錄放進 user 訊息；標籤內只當資料。lastNote 說明最後一則是誰說的（建議接話要看）。 */
+export function handoffUserMessage(transcript: string, lastNote: string): string {
+  return `<transcript>\n${transcript}\n</transcript>\n${lastNote}\n只输出 JSON。`
 }

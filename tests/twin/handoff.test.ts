@@ -9,6 +9,7 @@ import {
   createHandoffApi,
   formatHandoffTranscript,
   HANDOFF_TRANSCRIPT_LIMIT,
+  lastSpeakerNote,
   myVerdictText,
   takeoverBlock,
   type HandoffStore,
@@ -182,6 +183,8 @@ describe('takeOver 成功', () => {
     expect(all).not.toMatch(/不太合适|80|20/)
     expect(opts.messages[0].content).toContain('你的分身：第1则')
     expect(opts.messages[0].content).toContain('对方的分身：第2则')
+    // 最後一則是對方說的
+    expect(opts.messages[0].content).toContain('最后一则是「对方的分身」说的，轮到你回应。')
   })
 
   it('LLM 失敗 → 照常接手，卡片空白、summaryFailed，錯誤寫進日誌 detail', async () => {
@@ -228,6 +231,14 @@ describe('純函式', () => {
     const lines = formatHandoffTranscript(many, ME).split('\n')
     expect(lines).toHaveLength(HANDOFF_TRANSCRIPT_LIMIT)
     expect(lines[0]).toBe('你的分身：第6则')
+  })
+
+  it('lastSpeakerNote：最後是我方說的要提醒對方還沒回；沒有訊息時寫開場白', () => {
+    const mine = lastSpeakerNote([msg(1, AN), msg(2, ME)], ME)
+    expect(mine).toContain('最后一则是「你的分身」说的：「第2则」对方还没回。')
+    expect(mine).toContain('不要回答')
+    expect(lastSpeakerNote([msg(1, ME), msg(2, AN, false)], ME)).toBe('最后一则是「对方本人」说的，轮到你回应。')
+    expect(lastSpeakerNote([], ME)).toContain('开场白')
   })
 
   it('handoffSummarySchema：每項最多 3 點、每點截斷到 25 字，缺欄位或格式錯當成空的', () => {

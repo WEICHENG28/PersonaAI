@@ -90,6 +90,19 @@ export function formatHandoffTranscript(messages: readonly ChatMessageView[], my
     .join('\n')
 }
 
+/** 告訴 Prompt 7 最後一則是誰說的：最後是我方說的，建議接話就不要回答自己剛問的問題。 */
+export function lastSpeakerNote(messages: readonly ChatMessageView[], myUserId: string): string {
+  const last = messages.at(-1)
+  if (!last) return '还没有消息，建议接话写开场白。'
+  if (last.sender_id === myUserId) {
+    return (
+      `最后一则是「${speakerName(last, myUserId)}」说的：「${last.content}」对方还没回。` +
+      'suggested_replies 不要回答这一则里问对方的问题，也不要说自己的答案，写等对方回答后的追问，或换个纪录里提过的话题。'
+    )
+  }
+  return `最后一则是「${speakerName(last, myUserId)}」说的，轮到你回应。`
+}
+
 function speakerName(m: ChatMessageView, myUserId: string): string {
   if (m.sender_id === myUserId) return m.is_ai ? '你的分身' : '你本人'
   return m.is_ai ? '对方的分身' : '对方本人'
@@ -105,12 +118,16 @@ interface SummaryOutcome {
 }
 
 /** Prompt 7；失敗時照常接手，卡片給空的內容（錯誤記在日誌 detail）。 */
-async function summarize(deps: HandoffDeps, transcript: string, verdict: TakeoverView['verdict']): Promise<SummaryOutcome> {
+async function summarize(
+  deps: HandoffDeps,
+  input: { messages: readonly ChatMessageView[]; myUserId: string; verdict: TakeoverView['verdict'] },
+): Promise<SummaryOutcome> {
+  const transcript = formatHandoffTranscript(input.messages, input.myUserId)
   try {
     const summary = await deps.llmJson({
       role: 'fast',
-      system: renderHandoffSystem(myVerdictText(verdict)),
-      messages: [{ role: 'user', content: handoffUserMessage(transcript) }],
+      system: renderHandoffSystem(myVerdictText(input.verdict)),
+      messages: [{ role: 'user', content: handoffUserMessage(transcript, lastSpeakerNote(input.messages, input.myUserId)) }],
       temperature: HANDOFF_TEMPERATURE,
       schema: handoffSummarySchema,
     })
@@ -148,7 +165,7 @@ async function takeOver(deps: HandoffDeps, running: Set<string>, conversationId:
     ])
     const latest = scores[0]
     const verdict = latest ? { value: toVerdictValue(latest.verdict), trend: trendOf(scores) } : null
-    const { summary, error } = await summarize(deps, formatHandoffTranscript(messages, me.userId), verdict)
+    const { summary, error } = await summarize(deps, { messages, myUserId: me.userId, verdict })
 
     const switched = await deps.store.switchToHuman(conv.id, me.userId === conv.side_a ? 'a' : 'b')
     if (!switched) throw new ChatRoomError('对话状态刚刚有变化，重新打开聊天室看看', 409)
