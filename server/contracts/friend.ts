@@ -1,11 +1,14 @@
 // A 提供的跨線函式（docs/07 第 6 節）。擁有者：A。簽名是共用約定，改前三人同意。
-// A4 起改為真實作：讀 user_profiles（service role）。沒有 DB 設定（本機測試／mock 模式）時回退 fixtures，
+// A4 起改為真實作：讀 user_profiles（service role）。
+// 沒有 DB 設定（本機測試／mock 模式）時回退 fixtures，
 // 行為與 B 的 searchLobby 記憶體模式一致（server/social/db.ts 的做法）。
 import type { AgentProfile, ShareableProfile, StyleProfile, TaskReport } from '../../shared/types'
 import { getServiceClient } from '../lib/supabase'
 import { fakeAgentProfile, fakeShareable } from '../fixtures/friend'
 
-async function readProfileColumn<T>(userId: string, column: 'shareable_profile' | 'agent_profile'): Promise<T | null> {
+type ProfileCol = 'shareable_profile' | 'agent_profile'
+
+async function readProfileColumn<T>(userId: string, column: ProfileCol): Promise<T | null> {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null
   const db = getServiceClient()
   const { data, error } = await db
@@ -20,7 +23,7 @@ async function readProfileColumn<T>(userId: string, column: 'shareable_profile' 
   return (data as Record<string, T | null> | null)?.[column] ?? null
 }
 
-/** 對外檔案（給大廳／分身用）。無資料時回 null（真實行為）；無 DB 設定回 fixtures。 */
+/** 對外檔案（給大廳／分身用）。無資料時回 null；無 DB 設定回 fixtures。 */
 export async function getShareableProfile(userId: string): Promise<ShareableProfile | null> {
   const fallback = !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY
   const value = await readProfileColumn<ShareableProfile>(userId, 'shareable_profile')
@@ -42,4 +45,25 @@ export async function getStyleProfile(userId: string): Promise<StyleProfile | nu
   return agent ? { ...agent.style } : null
 }
 
-export async function deliverReport(_userId: string, _report: TaskReport): Promise<void> {}
+/**
+ * A6：deliverReport（07 第 6 節）。
+ * B 任務完成後呼叫：新增 notifications（type friend_report），
+ * 下次見面（POST /api/friend/next-meet）時由 Prompt 8 產生朋友口吻回報。
+ */
+export async function deliverReport(userId: string, report: TaskReport): Promise<void> {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // 無 DB 設定（測試／mock 模式）靜默跳過
+    return
+  }
+  const db = getServiceClient()
+  const { error } = await db.from('notifications').insert({
+    user_id: userId,
+    type: 'friend_report',
+    payload: report as unknown as Record<string, unknown>,
+  })
+  if (error) {
+    console.error('[deliverReport] 写入通知失败', error.message)
+    throw new Error(`写入回报通知失败：${error.message}`)
+  }
+}
+

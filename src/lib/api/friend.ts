@@ -149,4 +149,12 @@ function toZh(message: string): string {
   return '出了点问题，再试一次？'
 }
 
+/** POST /api/friend/next-meet：模拟时间经过，阿澈分享新近况并回报任务结果。
+ *  mock 模式不打 /api（caller 自己接 demo store）。
+ */
+export async function triggerNextMeet(): Promise<void> {
+  if (!isHttpMode) return
+  await apiCall<null>('/api/friend/next-meet', { method: 'POST' })
+}
+
 export { isHttpMode }
