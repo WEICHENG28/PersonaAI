@@ -155,6 +155,13 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-31｜A4 修正：getShareableProfile 只回確認過的檔案｜Vincent（AI 協助）｜分支 a/A4-confirmed-only
+- **做了什麼**：`server/contracts/friend.ts` 的 `getShareableProfile` 有 DB 時連 `shareable_confirmed` 一起讀，不是 `true` 一律回 null（簽名不變；`getAgentProfile`／`getStyleProfile` 照舊；無 DB 設定回 fixtures 照舊）。`tests/friend/profile.test.ts` 補三個 case：confirmed=false 回 null、confirmed 缺省（null）回 null、原本「有值」測試改為明確帶 `shareable_confirmed: true`。
+- **為什麼**：`extractProfile` 每次重整會覆蓋 `shareable_profile` 並把 `shareable_confirmed` 歸 false，但舊版 `getShareableProfile` 不看確認狀態照樣回傳草稿——C 的分身與隱私守門會拿到「本人還沒確認」的內容去跟別人聊，違反 docs/02 F3「分身只能使用你確認可對外分享的資料」。未確認回 null 後，分身停止發言（C 的錯誤訊息「这位用户还没有确认对外档案」已存在，C 不用改）；B 的大廳本來就只列 confirmed=true、且只用 `getAgentProfile`，不受影響。
+- **驗證**：tsc 過；vitest 340/340（profile 36 測，含新增 3 個確認狀態 case）。
+- **坑**：無。
+- **還沒做完／待辦**：無。
+
 ### 2026-10-30｜A7 设定页 + A8 记忆编辑 + A9 娱乐标签｜Vincent（AI 协助）｜分支 a/A7-settings｜Closes #10 #11 #12
 - **做了什么**：
   - **A7**：`server/friend/settings.ts`（`getSettings`/`updateSettings`/`settingsUpdateSchema`；开 social_agent 前检查 shareable_confirmed）；`GET /api/settings` + `PUT /api/settings`；`SettingsPage.tsx` http 模式接线（mount 时 fetchSettings，各按钮点击后 httpSave，禁用期间 disabled）。
