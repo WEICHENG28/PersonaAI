@@ -1,4 +1,4 @@
-// C 線 stub 假資料（server/contracts/twin.ts 用）。C3 換成真實作後可刪。
+// C 線假資料：沒設定 Supabase 時代聊函式的記憶體版（server/twin/conversationStub.ts）用。
 // sender_id 用 server/fixtures/seed-users.ts 的 key（seed-an＝小安、seed-zhe＝阿哲）。
 import type { ChatMessage } from '../../shared/types'
 
