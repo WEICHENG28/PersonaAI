@@ -16,8 +16,10 @@ interface HandoffCardProps {
 
 export function HandoffCard({ view, onStart }: HandoffCardProps) {
   const { summary } = view
-  // 从聊天室切过来时可能停在页面下方
-  useEffect(() => window.scrollTo({ top: 0 }), [])
+  // 从聊天室切过来时可能停在页面下方。要用大括号：新版 Chrome 的 scrollTo 会回 Promise，被 React 当成 cleanup 就会当掉
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [])
   return (
     <div className="page">
       <div className="page-head">
