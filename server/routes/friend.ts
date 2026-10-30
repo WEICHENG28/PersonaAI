@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { isAuthFailure, requireAuth } from '../lib/auth'
 import { initUserProfile } from '../lib/profile'
-import { friendChat, friendIntro, getFriendMessages, FriendChatError } from '../friend/chat'
+import { friendChat, friendIntro, getFriendMessages, nextMeet, FriendChatError, NextMeetError } from '../friend/chat'
 import { deleteMemory, listMemories, markNotLikeMe, memoryIdSchema, MemoryError } from '../friend/memory'
 import {
   extractProfile,
@@ -214,6 +214,24 @@ friendRoutes.post('/profile/extract', async (c) => {
   } catch (err) {
     console.error('[friend] profile extract', err)
     return c.json({ ok: false, error: err instanceof ProfileError ? err.message : '档案更新失败，稍后再试' }, 500)
+  }
+})
+
+/**
+ * POST /api/friend/next-meet
+ * A5：模拟下次见面（Demo 用按钮触发）。
+ */
+friendRoutes.post('/friend/next-meet', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+
+  try {
+    const userId = await appUserId(authed)
+    await nextMeet(userId)
+    return c.json({ ok: true, data: null })
+  } catch (err) {
+    console.error('[friend] next-meet', err)
+    return c.json({ ok: false, error: err instanceof NextMeetError ? err.message : '模拟下次见面失败，请再试一次' }, 500)
   }
 })
 

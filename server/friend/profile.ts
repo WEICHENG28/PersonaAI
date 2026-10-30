@@ -17,7 +17,7 @@ import {
   PROFILE_USER_LINES_LIMIT,
   type ProfileExtract,
 } from '../prompts/03_profile'
-import type { ShareableProfile } from '../../shared/types'
+import type { ShareableProfile, AgentProfile } from '../../shared/types'
 
 export class ProfileError extends Error {
   constructor(message = '档案更新失败，稍后再试') {
@@ -29,7 +29,7 @@ export class ProfileError extends Error {
 export interface ProfileRow {
   shareable_profile: ShareableProfile | null
   shareable_confirmed: boolean
-  agent_profile: unknown
+  agent_profile: AgentProfile | null
   embedding: number[] | null
 }
 
@@ -119,7 +119,7 @@ export async function extractProfile(userId: string): Promise<ShareableView> {
     shareable_profile: out.shareable_profile,
     agent_profile: out.agent_profile,
     shareable_confirmed: changed ? false : (previousRow?.shareable_confirmed ?? false),
-    card: null, // 4. 让 C 重新产生卡片
+    card: null,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id' })
   if (wErr) throw new ProfileError(`写入档案失败：${wErr.message}`)
@@ -171,7 +171,6 @@ export async function updateShareable(
     looking_for: input.looking_for,
   }
 
-  // 确认（true）＋写入；embedding 重算（卡片让 C 重产）
   const { error } = await db.from('user_profiles').upsert({
     user_id: userId,
     shareable_profile: next,

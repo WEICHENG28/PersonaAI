@@ -9,6 +9,7 @@ import { useDemoStore } from '@store/useDemoStore'
 import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
+import { triggerNextMeet, isHttpMode } from '@lib/api/friend'
 
 /** 画面 2-4：AI 朋友聊天 + 记忆侧栏 + 任务确认 + 回报 */
 export function FriendPage() {
@@ -17,6 +18,7 @@ export function FriendPage() {
   const [draft, setDraft] = useState('')
   const [taskDraftOpen, setTaskDraftOpen] = useState(false)
   const [taskText, setTaskText] = useState('帮我找 3 个喜欢登山的人聊聊')
+  const [nextMeetLoading, setNextMeetLoading] = useState(false)
   const chatRef = useAutoScrollBottom<HTMLDivElement>(s.friendMessages.length)
 
   const send = () => {
@@ -30,6 +32,26 @@ export function FriendPage() {
   const openReport = () => {
     s.dismissReport()
     navigate('/chat/lin/result')
+  }
+
+  const handleNextMeet = async () => {
+    setNextMeetLoading(true)
+    try {
+      if (isHttpMode) {
+        await triggerNextMeet()
+        // HTTP 模式：後端已寫入 DB，前端可以透過 Realtime 或重新 fetch 拿到新訊息
+        // 暫時用 alert 提示（A5 完整實現需要前端訂閱 Realtime 或輪詢）
+        alert('模擬下次見面成功！新訊息已送達（重新整理頁面查看）')
+      } else {
+        // Mock 模式：用 demo store
+        s.nextMeet()
+      }
+    } catch (err) {
+      console.error('[nextMeet] 失敗', err)
+      alert(err instanceof Error ? err.message : '模擬下次見面失敗，請再試一次')
+    } finally {
+      setNextMeetLoading(false)
+    }
   }
 
   return (
@@ -114,13 +136,12 @@ export function FriendPage() {
             <CardHead
               title={
                 s.task
-                  ? `${t('friend.taskCard')} · ${
-                      s.task.status === 'running'
-                        ? t('task.statusRunning')
-                        : s.task.status === 'done'
-                          ? t('task.statusDone')
-                          : t('task.statusPaused')
-                    }`
+                  ? `${t('friend.taskCard')} · ${s.task.status === 'running'
+                    ? t('task.statusRunning')
+                    : s.task.status === 'done'
+                      ? t('task.statusDone')
+                      : t('task.statusPaused')
+                  }`
                   : t('friend.taskCard')
               }
             />
@@ -168,8 +189,8 @@ export function FriendPage() {
 
           {/* 模拟下次见面 */}
           {canAssignTask && !s.reportReady && !s.task && (
-            <Button small variant="secondary" block onClick={s.nextMeet}>
-              {t('friend.nextMeet')}
+            <Button small variant="secondary" block onClick={handleNextMeet} disabled={nextMeetLoading}>
+              {nextMeetLoading ? '处理中…' : t('friend.nextMeet')}
               <em className="hint-inline">{t('friend.nextMeetHint')}</em>
             </Button>
           )}
