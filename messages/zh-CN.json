@@ -1,0 +1,89 @@
+{
+  "nav": {
+    "friend": "AI 朋友",
+    "lobby": "大廳",
+    "history": "历史",
+    "profile": "我的档案",
+    "settings": "设置",
+    "menuOpen": "打开菜单"
+  },
+  "login": {
+    "title": "PersonaAI",
+    "subtitle": "AI 朋友认识你，社交 Agent 替你找到合得来的人。",
+    "tabLogin": "登录",
+    "tabRegister": "注册",
+    "email": "邮箱",
+    "password": "密码",
+    "nickname": "昵称",
+    "nicknameHint": "其他人会看到的名字",
+    "submitLogin": "登录",
+    "submitRegister": "注册并开始",
+    "loading": "处理中…",
+    "errorMissingFields": "请填写所有字段",
+    "errorInvalidCredentials": "邮箱或密码不正确",
+    "errorEmailTaken": "这个邮箱已经注册过了",
+    "errorWeakPassword": "密码至少要 6 个字符",
+    "errorGeneric": "出了点问题，再试一次？",
+    "birdCaption": "小鸟正在帮你把信送给 AI 朋友",
+    "footer": "注册即代表同意 AI 会在画面上清楚标示，对话为虚构角色设定。"
+  },
+  "friend": {
+    "title": "阿澈",
+    "subtitle": "AI 朋友 · 生活是虚构的角色设定",
+    "empty": "和阿澈打个招呼吧",
+    "inputPlaceholder": "跟阿澈说点什么…",
+    "send": "发送",
+    "sendDisabled": "阿澈还在准备中…",
+    "typing": "阿澈输入中…",
+    "nextMeet": "模拟下次见面",
+    "nextMeetHint": "Demo：模拟时间经过",
+    "taskCard": "任务确认卡"
+  },
+  "lobby": {
+    "title": "大廳",
+    "subtitle": "看看有谁在，或者让社交 Agent 帮你找",
+    "empty": "大廳还在布置中，社交 Agent 即将上线",
+    "twinHelper": "大廳 AI 助手"
+  },
+  "history": {
+    "title": "历史尝试",
+    "subtitle": "每一次代聊都会留下一笔记录",
+    "empty": "还没有记录。开启社交 Agent 后，结果会出现在这里。"
+  },
+  "profile": {
+    "title": "我的档案",
+    "shareable": "对外档案",
+    "shareableNote": "分身和大廳只会使用这份资料，可以随时修改。",
+    "memories": "它记得的事",
+    "memoriesEmpty": "还没有记忆。跟 AI 朋友聊几句吧。",
+    "comingSoon": "档案草稿会在你和阿澈聊过几句后生成。"
+  },
+  "settings": {
+    "title": "设置",
+    "devMode": "开发者模式",
+    "devModeHint": "打开后显示 Agent 工作日志面板",
+    "proactive": "主动联系频率",
+    "proactiveOff": "关闭",
+    "proactiveLow": "低",
+    "proactiveNormal": "普通",
+    "socialAgent": "开启社交 Agent",
+    "socialAgentNote": "分身和大廳会使用你的对外档案，可随时关闭。需要先确认对外档案。",
+    "comingSoon": "设置项即将上线"
+  },
+  "common": {
+    "loading": "加载中…",
+    "aiBadge": "AI",
+    "aiChatting": "AI 代聊中",
+    "language": "语言",
+    "cancel": "取消",
+    "confirm": "确认",
+    "save": "保存",
+    "comingSoonBadge": "即将上线",
+    "logout": "登出"
+  },
+  "notFound": {
+    "title": "这一页不存在",
+    "description": "可能链接打错了，或者页面还在准备中。",
+    "back": "回到 AI 朋友"
+  }
+}

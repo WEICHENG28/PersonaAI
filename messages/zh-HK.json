@@ -1,0 +1,89 @@
+{
+  "nav": {
+    "friend": "AI 朋友",
+    "lobby": "大堂",
+    "history": "歷史",
+    "profile": "我嘅檔案",
+    "settings": "設定",
+    "menuOpen": "打開選單"
+  },
+  "login": {
+    "title": "PersonaAI",
+    "subtitle": "AI 朋友認識你，社交 Agent 幫你搵啱傾嘅人。",
+    "tabLogin": "登入",
+    "tabRegister": "註冊",
+    "email": "電郵",
+    "password": "密碼",
+    "nickname": "花名",
+    "nicknameHint": "其他人會見到嘅名",
+    "submitLogin": "登入",
+    "submitRegister": "註冊同開始",
+    "loading": "處理中…",
+    "errorMissingFields": "請填晒所有欄位",
+    "errorInvalidCredentials": "電郵或者密碼唔啱",
+    "errorEmailTaken": "呢個電郵已經註冊咗",
+    "errorWeakPassword": "密碼至少要 6 個字",
+    "errorGeneric": "有啲問題，試多次好嗎？",
+    "birdCaption": "雀仔幫你帶信俾 AI 朋友",
+    "footer": "註冊即代表同意 AI 會喺畫面清楚標示，對話屬虛構角色設定。"
+  },
+  "friend": {
+    "title": "阿澈",
+    "subtitle": "AI 朋友 · 生活係虛構角色設定",
+    "empty": "同阿澈打個招呼啦",
+    "inputPlaceholder": "同阿澈講兩句…",
+    "send": "傳送",
+    "sendDisabled": "阿澈仲準備緊…",
+    "typing": "阿澈打緊字…",
+    "nextMeet": "模擬下次見面",
+    "nextMeetHint": "Demo：模擬時間經過",
+    "taskCard": "任務確認卡"
+  },
+  "lobby": {
+    "title": "大堂",
+    "subtitle": "睇下有咩人喺度，或者叫社交 Agent 幫你搵",
+    "empty": "大堂仲佈置緊，社交 Agent 就嚟上線",
+    "twinHelper": "大堂 AI 助手"
+  },
+  "history": {
+    "title": "歷史嘗試",
+    "subtitle": "每次代聊都會留低一筆紀錄",
+    "empty": "仲未有紀錄。開咗社交 Agent 之後，結果會喺呢度出現。"
+  },
+  "profile": {
+    "title": "我嘅檔案",
+    "shareable": "對外檔案",
+    "shareableNote": "分身同大堂只會用呢份資料，可以隨時改。",
+    "memories": "佢記得嘅事",
+    "memoriesEmpty": "仲未有記憶。同 AI 朋友傾幾句啦。",
+    "comingSoon": "同阿澈傾咗幾句之後，就會生成檔案草稿。"
+  },
+  "settings": {
+    "title": "設定",
+    "devMode": "開發者模式",
+    "devModeHint": "開咗會顯示 Agent 工作日誌面板",
+    "proactive": "主動聯絡頻率",
+    "proactiveOff": "關閉",
+    "proactiveLow": "低",
+    "proactiveNormal": "普通",
+    "socialAgent": "開啟社交 Agent",
+    "socialAgentNote": "分身同大堂會用你嘅對外檔案，可以隨時閂。要先確認對外檔案。",
+    "comingSoon": "設定項就嚟上線"
+  },
+  "common": {
+    "loading": "載入中…",
+    "aiBadge": "AI",
+    "aiChatting": "AI 代聊中",
+    "language": "語言",
+    "cancel": "取消",
+    "confirm": "確認",
+    "save": "儲存",
+    "comingSoonBadge": "就嚟上線",
+    "logout": "登出"
+  },
+  "notFound": {
+    "title": "呢一頁唔存在",
+    "description": "可能條 link 打錯咗，或者個頁面仲準備緊。",
+    "back": "返去 AI 朋友"
+  }
+}
