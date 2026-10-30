@@ -66,9 +66,17 @@ export const judgeSchema = z.preprocess(liftFitPoints, judgeObject)
 
 export type JudgeRun = z.infer<typeof judgeObject>
 
+/** 02 F13：不同目的要多看什麼。 */
+const PURPOSE_FOCUS: Record<string, string> = {
+  交友: '多看性格、价值观、聊天契合度',
+  读书伙伴: '多看作息、目标、读书习惯是否合得来',
+  运动伙伴: '多看运动项目、时间、强度是否合得来',
+  兴趣同好: '多看兴趣的深度与类型是否一致',
+}
+
 export function judgeUser(input: { purpose: string; preferences: unknown; otherShareable: unknown; transcript: string }): string {
   return `输入：
-- 找人目的：${input.purpose}
+- 找人目的：${input.purpose}（${PURPOSE_FOCUS[input.purpose] ?? '性格、价值观、聊天契合度'}）
 - 偏好与条件：${JSON.stringify(input.preferences)}
 - 对方的对外档案：${JSON.stringify(input.otherShareable)}
 - 对话纪录（双方都是分身，代表各自的说话风格与对外资料）：

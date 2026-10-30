@@ -45,6 +45,26 @@ describe('directionScore／toScoredRun', () => {
   })
 })
 
+describe('B11 找人目的加權', () => {
+  const scores = { topic_fit: 4, engagement: 4, values: 4, humor: 1, smoothness: 4, condition_fit: 2 }
+  it('交友等權重；讀書加重條件、降低幽默', () => {
+    expect(directionScore(scores, 'friend')).toBe(63)
+    // study：(4+4+4+0.5×1+4+2×2)/(1+1+1+0.5+1+2) × 20 = 20.5/6.5 × 20
+    expect(directionScore(scores, 'study')).toBe(63)
+    expect(directionScore({ ...scores, condition_fit: 5, humor: 1 }, 'study')).toBe(82)
+    expect(directionScore({ ...scores, condition_fit: 5, humor: 1 }, 'friend')).toBe(73)
+  })
+  it('同一段對話，目的不同可能判定不同', () => {
+    const run = { scores: { topic_fit: 4, engagement: 4, values: 3, humor: 2, smoothness: 4, condition_fit: 2 }, enough_info: true, reason_type: null, reason_text: null, outline: outline() }
+    expect(toScoredRun(run, 'friend').verdict).toBe('unsuitable')
+    expect(toScoredRun({ ...run, scores: { ...run.scores, condition_fit: 5 } }, 'study').verdict).toBe('suitable')
+  })
+  it('評審輸入帶上這個目的要多看什麼', async () => {
+    const { judgeUser } = await import('../../server/prompts/06_judge')
+    expect(judgeUser({ purpose: '读书伙伴', preferences: {}, otherShareable: {}, transcript: '' })).toContain('作息、目标、读书习惯')
+  })
+})
+
 describe('aggregateRuns', () => {
   it('3 次一致', () => {
     expect(aggregateRuns([run('suitable', 80), run('suitable', 76), run('suitable', 90)])).toMatchObject({ verdict: 'suitable', direction_score: 82 })
