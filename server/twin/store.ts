@@ -11,7 +11,7 @@ export function supabaseTwinStore(): TwinStore {
     async getConversation(id) {
       const { data, error } = await getServiceClient()
         .from('conversations')
-        .select('id, side_a, side_b, side_a_controller, side_b_controller, opening_topic, task_id')
+        .select('id, status, side_a, side_b, side_a_controller, side_b_controller, opening_topic, task_id')
         .eq('id', id)
         .maybeSingle()
       if (error) throw new Error(`读取对话失败：${error.message}`)

@@ -32,8 +32,12 @@ export class TwinError extends Error {
   }
 }
 
+/** conversations.status（docs/07 第 4 節）。 */
+export type ConversationStatus = 'active' | 'waiting_human' | 'ended'
+
 export interface TwinConversation {
   id: string
+  status: ConversationStatus
   side_a: string
   side_b: string
   side_a_controller: Controller
@@ -99,6 +103,8 @@ function controllerOf(conv: TwinConversation, userId: string): Controller | null
 async function loadConversation(store: TwinStore, conversationId: string, speakerUserId: string): Promise<TwinConversation> {
   const conv = await store.getConversation(conversationId)
   if (!conv) throw new TwinError('找不到这段对话')
+  // waiting_human 不擋：C3 收尾、C7「本人晚点会上线」都要在等待本人時讓分身說話
+  if (conv.status === 'ended') throw new TwinError('这段对话已经结束')
   const controller = controllerOf(conv, speakerUserId)
   if (!controller) throw new TwinError('发言者不是这段对话的成员')
   if (controller !== 'twin') throw new TwinError('这一方由本人在聊，分身不发言')

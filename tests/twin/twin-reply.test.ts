@@ -26,6 +26,7 @@ const anStyle: StyleProfile = { sentence_length: 'short', tone: '温和、平静
 function conversation(overrides: Partial<TwinConversation> = {}): TwinConversation {
   return {
     id: 'conv-1',
+    status: 'active',
     side_a: AN,
     side_b: ZHE,
     side_a_controller: 'twin',
@@ -46,6 +47,7 @@ interface Harness {
   logs: AgentLogInput[]
   llm: ReturnType<typeof vi.fn>
   guard: ReturnType<typeof vi.fn>
+  getRecent: ReturnType<typeof vi.fn>
 }
 
 function harness(opts: {
@@ -60,10 +62,11 @@ function harness(opts: {
   const logs: AgentLogInput[] = []
   const llm = vi.fn(async () => opts.llmOut ?? { message: '我也喜欢爬山。', ask_human: false })
   const guard = vi.fn(async (text: string) => opts.guardOut ?? { ok: true, text, issues: [] })
+  const getRecent = vi.fn(async (_id: string, limit: number) => (opts.recent ?? []).slice(-limit))
   const store: TwinStore = {
     getConversation: async () => (opts.conv === undefined ? conversation() : opts.conv),
     getDisplayName: async (id) => (id === AN ? '小安' : '阿哲'),
-    getRecentMessages: async (_id, limit) => (opts.recent ?? []).slice(-limit),
+    getRecentMessages: getRecent,
     insertMessage: async (row) => {
       inserted.push(row)
       return { id: 'msg-new', created_at: '2026-10-30T10:01:00Z', ...row }
@@ -79,7 +82,7 @@ function harness(opts: {
       logs.push(entry)
     },
   }
-  return { deps, inserted, logs, llm, guard }
+  return { deps, inserted, logs, llm, guard, getRecent }
 }
 
 describe('renderTwinSystem（Prompt 5）', () => {
@@ -149,6 +152,7 @@ describe('twinReply', () => {
     const recent = Array.from({ length: 15 }, (_, i) => message(i + 1, i % 2 === 0 ? ZHE : AN))
     h = harness({ recent })
     await createTwinReply(h.deps)('conv-1', AN)
+    expect(h.getRecent).toHaveBeenCalledWith('conv-1', 12)
     const system = (h.llm.mock.calls[0]![0] as { system: string }).system
     expect(system).not.toContain('第3则')
     expect(system).toContain('我：第4则')
@@ -229,13 +233,31 @@ describe('twinReply', () => {
     expect((h.llm.mock.calls[0]![0] as { system: string }).system).toContain('句长：中等')
   })
 
-  it('對話不存在、說話者不是對話的一方、或該方由本人在聊時丟錯，不寫入', async () => {
-    await expect(createTwinReply(harness({ conv: null }).deps)('conv-x', AN)).rejects.toBeInstanceOf(TwinError)
+  it('對話不存在、說話者不是對話的一方、或該方由本人在聊時丟錯，不呼叫 LLM、不寫入', async () => {
+    const missing = harness({ conv: null })
+    await expect(createTwinReply(missing.deps)('conv-x', AN)).rejects.toBeInstanceOf(TwinError)
     await expect(createTwinReply(h.deps)('conv-1', 'user-other')).rejects.toBeInstanceOf(TwinError)
     const human = harness({ conv: conversation({ side_a_controller: 'human' }) })
     await expect(createTwinReply(human.deps)('conv-1', AN)).rejects.toBeInstanceOf(TwinError)
+    for (const x of [missing, h, human]) {
+      expect(x.llm).not.toHaveBeenCalled()
+      expect(x.inserted).toHaveLength(0)
+    }
+  })
+
+  it('對話已結束時丟錯，不呼叫 LLM、不寫入', async () => {
+    h = harness({ conv: conversation({ status: 'ended' }) })
+    await expect(createTwinReply(h.deps)('conv-1', AN)).rejects.toThrow('这段对话已经结束')
+    expect(h.llm).not.toHaveBeenCalled()
     expect(h.inserted).toHaveLength(0)
-    expect(human.llm).not.toHaveBeenCalled()
+  })
+
+  it('等待本人（waiting_human）時分身照常發言', async () => {
+    h = harness({ conv: conversation({ status: 'waiting_human' }) })
+    const msg = await createTwinReply(h.deps)('conv-1', AN)
+    expect(h.llm).toHaveBeenCalledTimes(1)
+    expect(h.inserted).toHaveLength(1)
+    expect(msg.content).toBe('我也喜欢爬山。')
   })
 
   it('LLM 失敗時錯誤往外丟，不寫入訊息', async () => {
