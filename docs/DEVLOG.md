@@ -281,8 +281,8 @@
   - 向量和同名檢查都在寫入前做完，有問題就整批不寫；寫到一半失敗時重跑是安全的（已寫的會被更新，不會重複新增）。
 - **影響其他線**：無。種子用戶 id 之後不會再變。
 - **改了哪些檔案**：`server/twin/seed.ts`、`scripts/seed.ts`、`tests/twin/seed.test.ts`（4 → 7 項，刪除相關的測試改成更新／不刪的版本）。
-- **驗證**：vitest 全部 262 項通過、`tsc --noEmit -p tsconfig.server.json` 無錯誤。沒有執行 `npm run seed`、沒有寫入資料庫。
-- **還沒做完／待辦**：在資料庫實測 `npm run seed`（要 Jerry 在群組講過再跑）：預期「更新 10 位、新增 0 位」，10 位 id 和跑之前一樣，`user_profiles.card` 變成 null。
+- **驗證**：vitest 全部 262 項通過、`tsc --noEmit -p tsconfig.server.json` 無錯誤。PR #63 合併後在雲端 Supabase 實跑 `npm run seed`（Jerry 同意）：輸出「更新 10 位、新增 0 位」，沒有清單外的舊種子用戶；10 位 id 和跑之前逐一比對全部相同；`social_agent_enabled`、`shareable_confirmed` 都是 true，`card` 都是 null，`updated_at` 換成這次的時間；C3 測試對話（`e3ea687e-…`）和 10 則訊息還在，外鍵沒有擋到。
+- **還沒做完／待辦**：無。
 
 ### 2026-10-30｜C3 代聊函式（開始、跑輪數、結束、等待本人）｜Jerry（AI 協助）｜Closes #23
 - **做了什麼**：
