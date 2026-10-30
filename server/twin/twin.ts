@@ -11,7 +11,7 @@ import type {
   StyleProfile,
 } from '../../shared/types'
 import { getShareableProfile, getStyleProfile } from '../contracts/friend'
-import { guardText } from '../contracts/twin'
+import { guardText } from './guard'
 import { llmJson, type LlmJsonOptions } from '../lib/llm'
 import { writeLog } from '../lib/log'
 import { renderTwinSystem, twinReplySchema } from '../prompts/05_twin'
@@ -182,7 +182,7 @@ export function createTwinReply(deps: TwinDeps): TwinReplyFn {
   }
 }
 
-/** 預設依賴：Supabase、A 的 contracts、C 的 guardText（C2 前是 stub）、B 的 llm／log。 */
+/** 預設依賴：Supabase、A 的 contracts、C 的 guardText（C2）、B 的 llm／log。 */
 export function defaultTwinDeps(): TwinDeps {
   return { store: supabaseTwinStore(), getShareableProfile, getStyleProfile, guardText, llmJson, writeLog }
 }
