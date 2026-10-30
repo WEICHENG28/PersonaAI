@@ -233,6 +233,17 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜B10 任務頁｜Peter（AI 協助）｜Closes #18
+- **做了什麼**：
+  - 後端：`GET /api/tasks`（我最近 20 個任務）、`GET /api/tasks/:id/stats`（效率統計，用我的人工平均分鐘）；`TaskStore.listByUser`。
+  - 前端：新頁面 `/tasks`（任務列表）與 `/tasks/:id`（複述、狀態、目的／條件／完成條件、合適進度條、`StatsCard`、「看正在进行的代聊」連到 C4 的 `/chat/:id`、確認／暫停／繼續／取消、只看這個任務的工作日誌）；Realtime 訂閱 `agent_tasks`，worker 推進時進度即時更新；`AgentLogPanel` 加選填的 `taskId`。路由加在 `src/routes.tsx`（共用檔，只加兩行）。mock 模式顯示說明文字。
+- **沒有做 `SocialSettings` 元件**：A 的設定頁（A7）已經有檔位、人工平均時間；只缺**每日代聊上限（1–20）**，建議 A 在同一張卡片加一個欄位（`PUT /api/settings` 已支援 `daily_chat_limit`），就不用再多一個元件。找人目的是 B11（P1）。
+- **給 A**：導覽列還沒有「我的任务」的入口；阿澈聊天頁建立任務後也可以連到 `/tasks/<id>`。要不要加由 A 決定。
+- **改了哪些檔案**：`server/social/taskStore.ts`、`server/routes/social.ts`、`src/lib/api/social.ts`、`src/components/AgentLogPanel.tsx`、`src/features/social/TaskPage.tsx`、`src/routes.tsx`、`tests/social/task-page.test.ts`。
+- **驗證**：`tsc -b`；vitest 381/381（只列自己的任務、新的在前、統計用用戶設定、別人的任務 404）；`npm run build`；雲端唯讀 `listByUser` 查到 Peter 的實跑任務。畫面要 Peter 用瀏覽器看。
+
+---
+
 ### 2026-10-31｜B9 異常處理＋篩選人數修正｜Peter（AI 協助）｜Closes #17
 - **做了什麼**：對照 07B 的 B9 表格補齊：C 的 `runTwinRounds` 失敗會重試 `TOOL_MAX_RETRIES` 次，仍失敗就禮貌收尾、放掉這位、換下一位（日誌「跳过 X：代聊失败」，不記成不合適）；發起對話失敗的日誌改成「跳过 X：发起对话失败」；判定不確定時日誌寫「判定不一致，多聊几轮」。其他列（LLM 重試、每日上限／完成條件停止、連續失敗暫停）B0／B3 已做。
 - **修正**：進度裡的「篩」原本每挑一次人就把搜尋到的人數再加一次（實跑時 5 → 10）。改成「已聊過的人＋這次搜尋到的人」取最大值，搜尋會排除聊過的人，所以同一批人不會重複計算。

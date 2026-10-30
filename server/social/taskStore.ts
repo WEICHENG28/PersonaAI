@@ -25,6 +25,8 @@ export interface TaskStore {
   insert(task: NewTask): Promise<AgentTask>
   get(id: string): Promise<AgentTask | null>
   setStatus(id: string, status: TaskStatus): Promise<AgentTask>
+  /** 這位用戶最近的任務，新的在前。 */
+  listByUser(userId: string, limit: number): Promise<AgentTask[]>
   readiness(userId: string): Promise<UserReadiness>
 }
 
@@ -76,6 +78,9 @@ export function createMemoryTaskStore(
       tasks.set(id, next)
       return { ...next }
     },
+    async listByUser(userId, limit) {
+      return [...tasks.values()].filter((t) => t.user_id === userId).reverse().slice(0, limit).map((t) => ({ ...t }))
+    },
     async readiness() {
       return { ...readiness }
     },
@@ -108,6 +113,11 @@ function supabaseStore(db: Db): TaskStore {
         .single()
       if (error) throw error
       return data as AgentTask
+    },
+    async listByUser(userId, limit) {
+      const { data, error } = await db.from('agent_tasks').select(TASK_COLUMNS).eq('user_id', userId).order('created_at', { ascending: false }).limit(limit)
+      if (error) throw error
+      return (data ?? []) as unknown as AgentTask[]
     },
     async readiness(userId) {
       const [user, profile] = await Promise.all([

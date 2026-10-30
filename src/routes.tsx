@@ -12,6 +12,7 @@ import { ResultPage } from '@features/twin/ResultPage'
 import { HandoffPage } from '@features/twin/HandoffPage'
 import { LobbyPage } from '@features/twin/LobbyPage'
 import { HistoryPage } from '@features/social/HistoryPage'
+import { TaskPage } from '@features/social/TaskPage'
 import { ProfilePage } from '@features/friend/ProfilePage'
 import { SettingsPage } from '@features/friend/SettingsPage'
 import { isHttpMode, currentUser } from '@lib/api/friend'
@@ -92,6 +93,8 @@ export const routes = [
           { path: 'chat/:id', element: <ProxyChatPage /> },
           { path: 'lobby', element: <LobbyPage /> },
           { path: 'history', element: <HistoryPage /> },
+          { path: 'tasks', element: <TaskPage /> },
+          { path: 'tasks/:id', element: <TaskPage /> },
           { path: 'profile', element: <ProfilePage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
