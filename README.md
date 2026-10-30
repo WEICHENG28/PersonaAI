@@ -49,8 +49,11 @@
 | [05 評分導向功能補強](docs/05_評分導向功能補強.md) | 依評分維度新增的功能 |
 | [06 終極精簡版](docs/06_終極精簡版.md) | 一頁看完所有功能 |
 | [07 開發分工](docs/07_開發分工.md) | **怎麼做**：技術棧、資料夾歸屬、資料表、型別、跨線函式、時程 |
+| [08 前端設計規範](docs/08_前端設計規範.md) | 改 UI 前必讀：頂欄、版面、Hum 規則 |
+| [09 Agent 數據結構](docs/09_Agent數據結構.md) | 五個 Agent 的 JSON 狀態結構藍圖（Vincent 提案） |
+| [10 A0 後架構調整](docs/10_A0後架構調整.md) | **目前的架構與檔案歸屬**（與 07 衝突時以 10 為準）、接下來的任務 |
 | [DEVLOG](docs/DEVLOG.md) | 開發紀錄 |
 
 ## 技術棧
 
-Next.js 14（App Router）＋ TypeScript ＋ Tailwind（Hallmark Hum 主題）、Supabase（Postgres、Auth、Realtime、pgvector）、zod、OpenAI 相容 LLM API、vitest。
+前端 Vite 6＋React 19 SPA＋Tailwind v4（Hallmark Hum 主題）；後端 Node＋Hono（`server/`）；Supabase（Postgres、Auth、Realtime、pgvector）、zod、OpenAI 相容 LLM API、vitest。
