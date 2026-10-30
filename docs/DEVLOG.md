@@ -26,6 +26,12 @@
 
 ## 共用與決策
 
+### 2026-10-30｜落地頁大改版：Hero 留白＋Rive 三角＋細節區擴充｜Vincent（AI 協助）｜直接 commit main（骨架階段）
+- **做了什麼**：`LandingPage.tsx` 全面擴寫 — hero 副標新增；三角色卡各配 Rive（robot/fish/birdie，96px）取代 emoji；每張角色卡加 3 條清單式細節；新增三個 detail section（判定檔位、記憶掌控、大廳導覽，各 3 張小卡）；flow/stats/CTA 補副標。`landing.css`：hero `line-height: 1.06→1.35`、`margin-block: var(--space-xl)`、`padding-block: 2xl/3xl`（上下大留白）；新增 `.landing-sec__sub`、`.role-card__list`（accent 圓點）、`.detail-card`（radius-stock）樣式。
+- **為什麼**：使用者要求標題垂直間距加大、首區上下留白、內容大幅擴充但每格保持精簡（1-2 短句）、禁 emoji 改用三個 Rive。
+- **驗證**：tsc 通過；headless 1440px 截圖確認三 Rive 卡、留白與新 detail 區正常。
+- **坑**：無。
+
 ### 2026-10-30｜新增 09 Agent 數據結構文件｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：新增 `docs/09_Agent數據結構.md`：5 個無狀態 Agent 的 JSON 狀態結構藍圖 — user_memory（興趣＋信心＋權重＋證據指標）、user_memory_view（它記得的事·只讀視圖）、shareable_profile（信封式衍生的大廳卡片）、agent_profile/task/chat_session/match_result/agent_log，附信心值五規則、權重規則、每 Agent 的讀寫契約表。
 - **為什麼**：使用者要的後端記憶形態（JSON 檔、信心度＋權重、可視結構、AI 衍生對外檔案）需要一份單一文檔讓後端與各線 AI 直接抄結構；兩個方案經 MC 確認：信封式對外更新、AI 自動推導權重、每 5 則整合。

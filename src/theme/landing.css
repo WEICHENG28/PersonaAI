@@ -5,27 +5,50 @@
   margin-inline: auto;
   padding: 0 var(--gutter);
   display: grid;
-  gap: var(--space-2xl);
+  gap: var(--space-3xl);
   padding-block: var(--space-lg) var(--space-3xl);
 }
 
-/* ── Hero ── */
+/* 每个 section 的主标与副标 */
+.landing h2 {
+  font-size: var(--text-title);
+  margin-bottom: var(--space-xs);
+}
+
+.landing-sec__sub {
+  color: var(--color-muted);
+  font-size: var(--text-md);
+  margin-bottom: var(--space-lg);
+  max-width: 46ch;
+}
+
+/* ── Hero：标题上下大留白 ── */
 .landing-hero {
   display: grid;
   gap: var(--space-2xl);
   align-items: center;
+  padding-block: var(--space-2xl);
 }
 
 @media (min-width: 64rem) {
   .landing-hero {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    padding-block: var(--space-3xl);
   }
 }
 
 .landing-hero h1 {
   font-size: clamp(2.1rem, 5.5vw, 4rem);
-  line-height: 1.06;
-  max-width: 14ch;
+  line-height: 1.35;
+  max-width: 16ch;
+  margin-block: var(--space-xl);
+}
+
+.landing-hero__sub {
+  margin-top: var(--space-md);
+  font-size: var(--text-lead);
+  color: var(--color-ink-2);
+  max-width: 34ch;
 }
 
 .landing-hero mark {
@@ -110,13 +133,7 @@
 
 .landing-card__msg--meta b { color: var(--color-mint-deep); }
 
-/* ── 三个角色卡 ── */
-.landing-roles h2,
-.landing-cta h2 {
-  font-size: var(--text-title);
-  margin-bottom: var(--space-lg);
-}
-
+/* ── 三个角色卡（各配 Rive） ── */
 .landing-roles__grid {
   display: grid;
   gap: var(--space-md);
@@ -128,7 +145,7 @@
 
 .role-card {
   display: grid;
-  gap: var(--space-2xs);
+  gap: var(--space-xs);
   justify-items: start;
   padding: var(--space-lg);
   border-radius: var(--radius-card);
@@ -137,12 +154,40 @@
   box-sizing: border-box;
 }
 
-.role-card h3 { font-size: var(--text-lg); }
-.role-card p { font-size: var(--text-sm); color: var(--color-ink-2); line-height: 1.45; }
-.role-emoji { font-size: var(--text-2xl); }
+.role-card h3 { font-size: var(--text-lg); margin-top: var(--space-2xs); }
+.role-card > p { font-size: var(--text-sm); color: var(--color-ink-2); line-height: 1.45; }
+
+.role-card__list {
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.role-card__list li {
+  position: relative;
+  padding-left: var(--space-md);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+.role-card__list li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent-deep);
+}
 
 /* ── 流程：卡纸 tile 排在撕纸色带上 ── */
 .landing-flow { display: grid; gap: var(--space-sm); justify-items: center; }
+.landing-flow h2 { justify-self: start; }
+.landing-flow .landing-sec__sub { margin-bottom: var(--space-md); }
 
 .landing-flow__strip {
   --strip-c: var(--color-kraft);
@@ -217,6 +262,31 @@
   text-align: center;
 }
 
+/* ── 细节区（档位/记忆/大厅）：小卡三联 ── */
+.landing-detail__grid {
+  display: grid;
+  gap: var(--space-md);
+}
+
+@media (min-width: 40rem) {
+  .landing-detail__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.detail-card {
+  display: grid;
+  gap: var(--space-2xs);
+  align-content: start;
+  padding: var(--space-lg);
+  border-radius: var(--radius-stock);
+  background: var(--grain), var(--fibre), var(--color-card);
+  box-shadow: var(--shadow-card);
+  box-sizing: border-box;
+}
+
+.detail-card h3 { font-size: var(--text-md); }
+.detail-card p { font-size: var(--text-sm); color: var(--color-ink-2); line-height: 1.45; }
+.detail-card__hint { color: var(--color-muted); }
+
 /* ── 数字：梨黄 field ── */
 .landing-stats {
   padding: var(--space-xs);
@@ -264,16 +334,22 @@
   justify-items: center;
   gap: var(--space-md);
   text-align: center;
-  padding: var(--space-xl) var(--space-md);
+  padding: var(--space-2xl) var(--space-md);
   border-radius: var(--radius-card);
   background: var(--grain), var(--fibre), var(--color-paper-2);
 }
 
 .landing-cta h2 { margin: 0; }
+.landing-cta .landing-sec__sub { margin-bottom: 0; }
 
 /* 手机微调 */
 @media (max-width: 40rem) {
-  .landing { gap: var(--space-xl); }
-  .landing-hero h1 { font-size: clamp(1.9rem, 8.5vw, 2.6rem); }
+  .landing { gap: var(--space-2xl); }
+  .landing-hero h1 {
+    font-size: clamp(1.9rem, 8.5vw, 2.6rem);
+    line-height: 1.4;
+    margin-block: var(--space-lg);
+  }
+  .landing-hero { padding-block: var(--space-xl); }
   .landing-card { rotate: -1deg; padding: var(--space-md); }
 }
