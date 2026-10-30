@@ -90,6 +90,7 @@ export const routes = [
           { path: 'chat/lin/result', element: <ResultPage /> },
           { path: 'chat/lin/handoff', element: <HandoffPage /> },
           { path: 'chat/:id', element: <ProxyChatPage /> },
+          { path: 'chat/:id/result', element: <ResultPage /> },
           { path: 'lobby', element: <LobbyPage /> },
           { path: 'history', element: <HistoryPage /> },
           { path: 'profile', element: <ProfilePage /> },
