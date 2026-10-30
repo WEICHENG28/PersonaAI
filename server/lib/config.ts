@@ -11,6 +11,7 @@ export const CONFIG = {
   TOOL_MAX_RETRIES: 1,
   TASK_MAX_FAILS: 3,               // 連續失敗幾次就暫停任務
   FRIEND_HISTORY_LIMIT: 20,        // AI 朋友聊天帶入幾則歷史訊息
+  MEMORY_LIMIT: 50,               // 「它記得的事」最多列幾筆（A3）
   PROFILE_EXTRACT_EVERY: 6,        // 用戶每說幾則話更新一次檔案
   ANOMALY_MIN_MESSAGES: 15,
   ANOMALY_CHECK_EVERY: 5,
