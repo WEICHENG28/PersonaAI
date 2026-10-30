@@ -1,9 +1,9 @@
 import { useRive, type UseRiveOptions } from '@rive-app/react-canvas'
 
 const SOURCES = {
-  robot: '/riv/clover_bot.riv',
-  fish: '/riv/fish_vase.riv',
-  birdie: '/riv/red_birdie.riv',
+  robot: import.meta.env.BASE_URL + 'riv/clover_bot.riv',
+  fish: import.meta.env.BASE_URL + 'riv/fish_vase.riv',
+  birdie: import.meta.env.BASE_URL + 'riv/red_birdie.riv',
 } as const
 
 export type RiveName = keyof typeof SOURCES
