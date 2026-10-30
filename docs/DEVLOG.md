@@ -26,6 +26,15 @@
 
 ## 共用與決策
 
+### 2026-10-30｜真實登入也改成只要用戶名稱（Supabase 匿名登入）｜Peter（AI 協助）
+- **做了什麼**：登入頁不分模式都只剩「用户名称」（隨機預填、可換、不填也能開始）。http 模式按「直接开始」→ `supabase.auth.signInAnonymously`（名稱存在 `display_name`）→ `POST /api/profile/init` 建 `users` 列；mock 模式照舊假登入。新增 `loginAnonymously()`（`src/lib/api/friend.ts`），信箱密碼表單移除，但 `register`／`login` 函式保留。
+- **為什麼這樣做**：Peter 決定產品先免註冊、什麼都不打就能開始；Demo 版和真實版登入頁一致。
+- **Supabase 設定**：已由 Peter 開啟 Authentication → Sign In / Providers → **Allow anonymous sign-ins**（雲端共用專案）。Vincent 本機的 Supabase 也要在 `supabase/config.toml` 的 `[auth]` 設 `enable_anonymous_sign_ins = true` 才能測。
+- **給 A**：改了 A 的 `LoginPage.tsx`、`src/lib/api/friend.ts`（新增函式＋一條錯誤翻譯）。A 的後端不用改：`resolveAuthUser` 在沒有 email 時會用 metadata 的 `display_name`。匿名帳號換電腦或清瀏覽器資料就找不回來；之後若要保留帳號，可以加「綁定邮箱」（Supabase `updateUser({ email })`）。
+- **驗證**：`tsc -b`、vitest 73/73、`npm run build` 成功。匿名登入實際寫入雲端資料庫的流程由 Peter 在瀏覽器測（AI 不寫共用資料庫）。
+
+---
+
 ### 2026-10-30｜Demo 登入簡化成只要用戶名稱｜Peter（AI 協助）
 - **做了什麼**：mock 模式（GitHub Pages demo）的登入頁只剩「用户名称」一欄，預填隨機名字（例如「爱看展的小鹿」），有「换一个」按鈕；什麼都不打按「直接开始」就能進入。新增 `src/features/friend/randomName.ts`、5 個 `login.*` 文字。http 模式（真實 Supabase 登入）的信箱／密碼表單**完全沒動**，改名為 `AuthLogin`。
 - **為什麼這樣做**：產品規劃的成員看 demo 時不用想帳號密碼；真實登入仍需要信箱密碼，所以只改 mock 模式。
