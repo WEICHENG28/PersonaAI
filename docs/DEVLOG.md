@@ -258,6 +258,25 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-30｜C0 後續修正：seed 改成更新種子用戶、不刪除｜Jerry（AI 協助）｜分支 c/C0-seed-upsert
+- **做了什麼**：
+  - `runSeed` 不再先刪後建：先算完 10 位的向量，再依 `display_name` 找現有種子用戶（`is_seed = true`）。
+    - 有一位：更新 `users`（`purposes`、`preferences`、`social_agent_enabled = true`），id 不變；upsert `user_profiles`（`shareable_profile`、`shareable_confirmed = true`、`agent_profile`、`embedding`、`card = null`、`updated_at`）。
+    - 沒有：新增 `users`＋`user_profiles`。
+    - 同名兩位以上：丟錯並列出名字和 id，不寫任何資料，不自己挑。
+  - 不在 `SEED_USERS` 清單裡的舊種子用戶不刪，只列在輸出。
+  - `SeedDb` 改成 `listSeedUsers`／`updateUser`／`insertUser`／`upsertProfile`，拿掉 `deleteSeedUsers`。輸出改成「更新 N 位、新增 N 位」＋每位的名字和 id。
+- **為什麼這樣做**：
+  - 外鍵：`conversations.side_a`／`side_b`、`messages.sender_id` 指向 `users`，沒有 on delete cascade。C3 開始寫真的對話後，「先刪舊種子用戶」那一步會失敗，worker 跑越多這種紀錄越多。
+  - ID 要穩定：每次刪掉重建會讓種子用戶 id 全換，B 記下的已嘗試名單（`attempted_user_ids`）、指定對象（`target_user_id`）會失效。
+  - `card = null`：檔案改了，舊的大廳卡片就過期了，讓 C9 重新產生。
+  - `social_agent_enabled`、`shareable_confirmed` 一定寫 true：B 的大廳（`server/social/lobby.ts`）只列這兩個都是 true 的人。
+  - 向量和同名檢查都在寫入前做完，有問題就整批不寫；寫到一半失敗時重跑是安全的（已寫的會被更新，不會重複新增）。
+- **影響其他線**：無。種子用戶 id 之後不會再變。
+- **改了哪些檔案**：`server/twin/seed.ts`、`scripts/seed.ts`、`tests/twin/seed.test.ts`（4 → 7 項，刪除相關的測試改成更新／不刪的版本）。
+- **驗證**：vitest 全部 262 項通過、`tsc --noEmit -p tsconfig.server.json` 無錯誤。沒有執行 `npm run seed`、沒有寫入資料庫。
+- **還沒做完／待辦**：在資料庫實測 `npm run seed`（要 Jerry 在群組講過再跑）：預期「更新 10 位、新增 0 位」，10 位 id 和跑之前一樣，`user_profiles.card` 變成 null。
+
 ### 2026-10-30｜C3 代聊函式（開始、跑輪數、結束、等待本人）｜Jerry（AI 協助）｜Closes #23
 - **做了什麼**：
   - `server/contracts/twin.ts` 的 `startConversation`、`runTwinRounds`、`getTranscript`、`endConversation`、`markWaitingHuman` 換成真實作（`server/twin/conversation.ts`，資料庫在 `server/twin/store.ts` 的 `supabaseConversationStore`），簽名不變。
@@ -283,7 +302,7 @@
 - **還沒做完／待辦**：
   - C5「第 n 輪＝第 2n−1、2n 則」要改成扣掉開場那一則（第 n 輪＝第 2n、2n+1 則），本人插話時也會錯開，C5 做的時候再處理。
   - C5「讓分身繼續聊」：對話是 `waiting_human` 時 `runTwinRounds` 會直接回 ended，要先把狀態改回 active。
-  - **seed 不能重跑**：`conversations.side_a`／`side_b`、`messages.sender_id` 指向 `users`，沒有 on delete cascade。C3 開始寫入真的對話後，`npm run seed`「先刪舊種子用戶」那一步會失敗（目前資料庫已有 1 段對話、10 則訊息指向種子用戶）。C3 合併後另開 `c/C0-seed-upsert`：改成依名字更新種子用戶、不刪除，ID 保持不變（B 記錄的已嘗試名單、指定對象才不會失效）。修好前先不要跑 seed。
+  - ~~**seed 不能重跑**~~ **已處理（`c/C0-seed-upsert`）**：`conversations.side_a`／`side_b`、`messages.sender_id` 指向 `users`，沒有 on delete cascade。C3 開始寫入真的對話後，`npm run seed`「先刪舊種子用戶」那一步會失敗（目前資料庫已有 1 段對話、10 則訊息指向種子用戶）。C3 合併後另開 `c/C0-seed-upsert`：改成依名字更新種子用戶、不刪除，ID 保持不變（B 記錄的已嘗試名單、指定對象才不會失效）。修好前先不要跑 seed。
   - **對方（b 方）本人接手時分身會連發**：`runTwinRounds` 照規格跳過本人那方，但 B 的 runner 只在 a 方接手時放手，b 方接手後 a 方分身每一步會連發 `ROUNDS_PER_STEP` 則。修法在 B 的 runner（任一方是本人就放手），交給 Peter 處理；C 這邊不改，只改 C 會讓 worker 空轉。
 
 ### 2026-10-30｜C2 守門小瑕疵：改寫不加料、注入規則不誤擋、改寫版再檢查｜Jerry（AI 協助）
