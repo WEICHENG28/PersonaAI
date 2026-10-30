@@ -366,6 +366,34 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-31｜C6 本人接手＋接手卡片｜Jerry（AI 協助）｜PR #80｜Closes #26
+- **做了什麼**：
+  - 後端（`server/twin/handoff.ts`、`handoffStore.ts`，Prompt 7 在 `server/prompts/07_handoff.ts`，路由在 `server/routes/twin.ts`）：`POST /api/conversations/:id/takeover`：確認是對話一方、我方還是分身、對話沒結束 → Prompt 7（`fast`，temperature 0.3）產生接手摘要 → 我方 controller 改 human、狀態改 active → 寫入 `handoffs` → 寫日誌「本人接手，分身停止代聊」→ 回傳 `{ verdict, summary, summaryFailed }`。
+  - 錯誤：不是成員 403、id 不是 uuid 404、沒登入 401；已接手／已結束／同一人同時接手兩次 409。
+  - 前端：`src/lib/api/twin.ts` 加 `takeOver`；新元件 `src/features/twin/components/HandoffCard.tsx`（版面照 A 的畫面 8 `HandoffPage`：目前判定與走勢、前面重點、對方在意的事與亮點、還沒聊完的話題、分身已替你說過的話、建議接話、「开始由本人聊」）、`handoffView.ts`（文字與純函式）。
+  - 聊天室「我来聊」可以按：接手中顯示「正在整理接手卡片…」，成功後整頁換成接手卡片，按「开始由本人聊」回到聊天室、輸入框打開、「我来聊」消失。
+  - 結果頁「本人接手」可以按：成功後到聊天室並先顯示接手卡片（卡片放在路由 state，關閉時清掉，重新整理不會再跳出）；已經本人接手時按鈕改成「回到聊天室」。
+- **為什麼這樣做**：
+  - **一次 POST 就接手，沒有「先看卡片再決定」**：07C 規定卡片在 takeover 時產生並寫入 `handoffs`，而且接手後不能交回，所以 A 的 demo 頁上的「先不接手」不放。卡片不另外開路由（不用改共用的 `src/routes.tsx`）。
+  - 隱私：Prompt 7 只放對話紀錄和**我方視角**的判定文字（例「合适，走势上升」），不讀對方的 `match_scores`，也不放任何數字；卡片畫面也沒有數字。
+  - 「分身已經替你說過」Prompt 特別寫「只寫你的分身在紀錄裡真的說過的內容，不要編」（C1 待辦：接手後不要和分身的說法矛盾）。對話紀錄放在 user 訊息的 `<transcript>` 標籤，標明只是資料。
+  - LLM 的輸出太長、太多點就截斷（每項 3 點、每點 25 字），不要讓 schema 判失敗。**Prompt 7 失敗時照常接手**，卡片空白並提示「接手卡片暂时没整理出来」，錯誤寫在日誌 detail：用戶要的是自己聊，不該因為摘要失敗就接不了手。
+  - 先產生摘要、再改成本人：改成本人用條件更新（這一方還是 twin、對話沒結束），兩個請求同時接手時只有一個成功，另一個回 409。改成本人後 `handoffs` 寫入失敗只寫日誌、仍回傳卡片（已經接手了，不能回滾）。
+  - 接手後對話改回 active：C4 的本人發言只在 active 時讓對方分身回覆；B 的 runner 看到任一方是本人就放手，C5 的「讓分身繼續聊」也會擋。
+- **改了哪些檔案**：`server/prompts/07_handoff.ts`（新）、`server/twin/handoff.ts`（新）、`server/twin/handoffStore.ts`（新）、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/components/{HandoffCard.tsx,handoffView.ts}`（新）、`src/features/twin/components/{LiveChatRoom.tsx,useChatRoom.ts,LiveResult.tsx,useResult.ts,resultView.ts}`、`tests/twin/{handoff,handoff-view}.test.ts`（新）、`tests/twin/chat-room-routes.test.ts`。沒有動共用檔。
+- **驗證**：vitest 全部 437 項通過、`tsc -b`、`npm run build` 通過；和最新 main 試合併（暫時的 worktree）後 446 項也全過。
+  - 瀏覽器（本機 Chrome headless＋CDP，`.local/c6-cdp.ts`，`/api` 在瀏覽器裡攔截回假資料，不登入、不碰資料庫）21 項通過：接手前輸入框停用；按「我来聊」顯示整理中並停用；卡片六區內容都在、沒有任何數字、沒有「先不接手」或「交回」；只打一次 `/takeover`；開始聊後輸入框能打字、「我来聊」消失、頂部顯示「你本人」；送出訊息後對方分身的回覆出現；結果頁接手 → 到聊天室先看卡片；關閉卡片後路由 state 清掉；已接手後結果頁變「回到聊天室」；375px 沒有橫向溢出。
+  - **真資料端到端**（Jerry 同意寫入，`.local/c6-e2e.ts`）：匿名登入新的 c-test1（`da8dd23b-…`），和小安開對話 `dbeff68d-…` 跑 4 輪，用 c-test1 的 JWT 打 API，12 項通過：接手前 `/status` 我方是分身；`/takeover` 200（5.5 秒），摘要有產生，回應沒有分數、理由或數字；`conversations` 我方 human、小安 twin、active；`handoffs` 多一筆；日誌有「本人接手，分身停止代聊」；再接手、讓分身繼續聊都 409；送出「嗨，我本人来了」後小安的分身回覆；等 15 秒我方分身沒有再發言。卡片的「分身已經替你說過」3 點都真的說過。
+- **踩到的坑／注意事項**：
+  - `useEffect(() => window.scrollTo(...), [])` 會讓整頁當掉：新版 Chrome 的 `scrollTo` 回傳 Promise，React 把它當 cleanup 呼叫，錯誤「destroy is not a function」。effect 要用大括號寫。
+  - 這個分支疊在 C5（PR #76）上面，PR 的目標先設成 `c/C5-result-page`；C5 合併後要把 PR 目標改成 main（刪掉 C5 分支時 GitHub 會自動改）。
+  - **Prompt 7 第一版的建議接話會回答分身自己剛問的問題**：最後一則是我方分身問小安「用相机还是手机？」，建議接話卻寫「我一般用相机」；也會替本人編新喜好（和分身說過的矛盾），還沒聊完的話題會自己加「下次一起去拍照」。光在規則裡寫「看清楚最後一則是誰說的」模型不太遵守；改成程式算出最後一則是誰說的（`lastSpeakerNote`），最後是我方時把那句原文放進 user 訊息並直接說「不要回答这一则里问对方的问题」，加上「不要替用户说纪录里没有的新喜好」「open_topics 每一项都要能在纪录里找到」後，同一段對話跑 8 次（最後是我方／最後是小安各 4 次）都沒再出現（`.local/try-handoff.ts`，只讀）。
+  - 「讓分身繼續聊」跑到一半時本人接手：`runTwinRounds` 下一輪會跳過我方，對方分身會自己再說幾則才停（最多到這次的 `ROUNDS_PER_STEP` 輪）。很少發生，先不處理。
+- **還沒做完／待辦**：
+  - Jerry 用瀏覽器帳號自己按一次「我来聊」看真的卡片（後端已用真資料驗過，畫面用假資料驗過，兩者還沒一起在瀏覽器裡跑）。
+  - 這次實測留下的資料：c-test1 `da8dd23b-…`、對話 `dbeff68d-…`（11 則訊息）、`handoffs` 1 筆、日誌數筆。
+  - 畫面文字先放在 `handoffView.ts` 的 `HANDOFF_TEXT`，之後和 C4、C5 的一起搬到 `messages/strings.json`（A 的檔案）。
+
 ### 2026-10-31｜C5 代聊結果頁｜Jerry（AI 協助）｜PR #76｜Closes #25
 - **做了什麼**：
   - 後端（`server/twin/result.ts`、`resultStore.ts`，路由在 `server/routes/twin.ts`）：
