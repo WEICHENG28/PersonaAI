@@ -233,6 +233,16 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜B11 找人目的：評審依目的加權｜Peter（AI 協助）｜Closes #19
+- **做了什麼**：`CONFIG.JUDGE_WEIGHTS`（交友等權重；讀書伙伴 `condition_fit ×2`、`humor ×0.5`；運動伙伴 `condition_fit ×2`、`engagement ×1.2`；興趣同好 `topic_fit`、`condition_fit ×1.5`）；`directionScore` 改成依任務目的的加權平均；評審 Prompt 的輸入加上「這個目的要多看什麼」（照 02 F13 的表）。
+- **其他 B11 項目原本就有**：大廳只配對開啟該目的的人（B2 的篩選）、規劃器的開場話題依目的（Prompt 4 已帶入目的）。
+- **為什麼這樣做**：同一段聊得普通、但條件很符合的對話，找讀書伙伴時應該算合適，交友時不一定（測試有這個例子）。權重先用合理的初值，Demo 前可以依實測調整。
+- **還沒有的**：用戶自己要「開啟哪些目的」的設定（`users.purposes`）目前沒有畫面；種子用戶已經有目的。若要做，屬於 A 的設定頁。
+- **改了哪些檔案**：`server/lib/config.ts`、`server/social/judge.ts`、`server/prompts/06_judge.ts`、`tests/social/judge.test.ts`。
+- **驗證**：`tsc -b`；vitest 388/388（加權分數手算對照、目的不同判定不同、Prompt 帶入目的重點）；`npm run build`。
+
+---
+
 ### 2026-10-31｜B10 任務頁｜Peter（AI 協助）｜Closes #18
 - **做了什麼**：
   - 後端：`GET /api/tasks`（我最近 20 個任務）、`GET /api/tasks/:id/stats`（效率統計，用我的人工平均分鐘）；`TaskStore.listByUser`。

@@ -1,6 +1,6 @@
 // B5｜評審：雙方視角各判 JUDGE_RUNS 次取多數（docs/07B 的 B5、02 第 6.2 節）。擁有者：B。
 // 每個視角各自保存大綱與「為什麼你們合」（fit_points），只給該視角的用戶看。
-import type { AgentTask, ChatMessage, Evaluation, GuardResult, Outline, ReasonType, ShareableProfile, Verdict, VerdictValue } from '../../shared/types'
+import type { AgentTask, ChatMessage, Purpose, Evaluation, GuardResult, Outline, ReasonType, ShareableProfile, Verdict, VerdictValue } from '../../shared/types'
 import { CONFIG } from '../lib/config'
 import { LlmError, llmJson } from '../lib/llm'
 import { writeLog } from '../lib/log'
@@ -27,14 +27,20 @@ export interface ScoredRun {
 const EMPTY_OUTLINE: Outline = { topics: [], fits: [], frictions: [], highlights: [], fit_points: [] }
 const VERDICT_LABEL: Record<VerdictValue, string> = { suitable: '合适', unsuitable: '不合适', uncertain: '不确定' }
 
-/** 方向分數 = 六項平均 × 20（MVP 等權重）。 */
-export function directionScore(scores: JudgeRun['scores']): number {
-  const values = Object.values(scores)
-  return Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 20)
+/** 方向分數 = 六項加權平均 × 20；權重依找人目的（B11，CONFIG.JUDGE_WEIGHTS），交友為等權重。 */
+export function directionScore(scores: JudgeRun['scores'], purpose: Purpose = 'friend'): number {
+  const weights = CONFIG.JUDGE_WEIGHTS[purpose]
+  let sum = 0
+  let total = 0
+  for (const key of Object.keys(scores) as (keyof JudgeRun['scores'])[]) {
+    sum += scores[key] * weights[key]
+    total += weights[key]
+  }
+  return Math.round((sum / total) * 20)
 }
 
-export function toScoredRun(run: JudgeRun): ScoredRun {
-  const score = directionScore(run.scores)
+export function toScoredRun(run: JudgeRun, purpose: Purpose = 'friend'): ScoredRun {
+  const score = directionScore(run.scores, purpose)
   const verdict: VerdictValue = !run.enough_info ? 'uncertain' : score >= CONFIG.JUDGE_THRESHOLD ? 'suitable' : 'unsuitable'
   return {
     direction_score: score,
@@ -93,7 +99,7 @@ async function judgeSide(task: AgentTask, who: string, whoName: string, other: s
   const results = await Promise.all(
     Array.from({ length: CONFIG.JUDGE_RUNS }, () =>
       llmJson({ role: 'reason', system: judgeSystem(whoName), messages: [{ role: 'user', content: user }], schema: judgeSchema, temperature: 0.7 })
-        .then(toScoredRun)
+        .then((run) => toScoredRun(run, task.purpose))
         .catch((err: unknown) => {
           if (!(err instanceof LlmError)) throw err
           console.error('[judge]', err)
