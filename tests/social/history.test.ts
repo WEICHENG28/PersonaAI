@@ -3,7 +3,7 @@ import { app } from '../../server/app'
 import { setLogWriter } from '../../server/lib/log'
 import { MemoryAgentStore, setAgentStore } from '../../server/social/agentStore'
 import { buildInsight, reopenAttempt } from '../../server/social/history'
-import { createMemoryTaskStore, setTaskStore } from '../../server/social/taskStore'
+import { setTaskStore } from '../../server/social/taskStore'
 
 beforeAll(() => {
   delete process.env.SUPABASE_URL
@@ -67,14 +67,13 @@ describe('GET /api/history', () => {
 })
 
 describe('重啟對話', () => {
-  it('twin → 建立 running 的單人任務並記下 reopened_at', async () => {
+  it('request_human → 本人開聊，並通知對方本人（格式同 C7），記下 reopened_at', async () => {
     await seed('unsuitable', 'friction')
-    setTaskStore(createMemoryTaskStore())
-    const startConversation = vi.fn()
-    const r = await reopenAttempt('dev-user', 'attempt-1', 'twin', { store, startConversation })
-    expect(r.mode).toBe('twin')
-    expect(r.taskId).toBeTruthy()
-    expect(startConversation).not.toHaveBeenCalled()
+    const startConversation = vi.fn(async () => ({ conversationId: 'conv-7' }))
+    const r = await reopenAttempt('dev-user', 'attempt-1', 'request_human', { store, startConversation })
+    expect(r).toEqual({ mode: 'request_human', conversationId: 'conv-7' })
+    expect(startConversation).toHaveBeenCalledWith(expect.objectContaining({ aController: 'human', origin: 'manual' }))
+    expect(store.notifications).toEqual([{ userId: 'xiaoan', type: 'request_human', payload: { conversationId: 'conv-7', fromName: 'dev-user' } }])
     expect(store.attempts[0]?.reopened_at).not.toBeNull()
   })
 
@@ -84,18 +83,13 @@ describe('重啟對話', () => {
     const r = await reopenAttempt('dev-user', 'attempt-1', 'human', { store, startConversation })
     expect(r).toEqual({ mode: 'human', conversationId: 'conv-9' })
     expect(startConversation).toHaveBeenCalledWith({ aUserId: 'dev-user', bUserId: 'xiaoan', aController: 'human', origin: 'manual' })
-  })
-
-  it('沒確認對外檔案時讓分身再試會被擋', async () => {
-    await seed('unsuitable', 'friction')
-    setTaskStore(createMemoryTaskStore({ socialAgentEnabled: false, shareableConfirmed: false }))
-    await expect(reopenAttempt('dev-user', 'attempt-1', 'twin', { store, startConversation: vi.fn() })).rejects.toThrow('先到「我的档案」')
+    expect(store.notifications).toEqual([])
   })
 
   it('API：別人的紀錄回 404；mode 不對回 400', async () => {
     await seed('unsuitable', 'friction', 'someone-else')
     const post = (body: unknown) => app.request('/api/history/attempt-1/reopen', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })
     expect((await post({ mode: 'human' })).status).toBe(404)
-    expect((await post({ mode: 'x' })).status).toBe(400)
+    expect((await post({ mode: 'twin' })).status).toBe(400)
   })
 })

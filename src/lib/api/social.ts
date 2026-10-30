@@ -67,8 +67,8 @@ export function getHistory(): Promise<{ items: HistoryEntry[]; insight: string |
   return request('GET', '/api/history')
 }
 
-/** twin：讓分身再試一次（回 taskId）；human：本人去聊（回 conversationId）。 */
-export function reopenHistory(id: string, mode: 'twin' | 'human'): Promise<{ mode: 'twin' | 'human'; taskId?: string; conversationId?: string }> {
+/** human：本人去聊；request_human：本人去聊並通知對方本人。都回 conversationId。 */
+export function reopenHistory(id: string, mode: 'human' | 'request_human'): Promise<{ mode: 'human' | 'request_human'; conversationId: string }> {
   return request('POST', `/api/history/${id}/reopen`, { mode })
 }
 

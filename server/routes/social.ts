@@ -42,12 +42,12 @@ socialRoutes.post('/tasks/:id/step', (c) =>
 /** B6：歷史嘗試（不含分數）＋阿澈的觀察。 */
 socialRoutes.get('/history', (c) => respond(c, (userId) => listHistory(userId, getAgentStore())))
 
-const reopenBody = z.object({ mode: z.enum(['twin', 'human']) })
+const reopenBody = z.object({ mode: z.enum(['human', 'request_human']) })
 
-/** B6：重啟對話。twin → 新的單人任務；human → 本人直接開聊，前端導向 /chat/:conversationId。 */
+/** B6：重啟對話。human → 本人去聊；request_human → 本人去聊並通知對方本人。前端導向 /chat/:conversationId。 */
 socialRoutes.post('/history/:id/reopen', async (c) => {
   const body = reopenBody.safeParse(await c.req.json().catch(() => null))
-  if (!body.success) return c.json({ ok: false, error: '请选择本人去聊或让分身再试一次' }, 400)
+  if (!body.success) return c.json({ ok: false, error: '请选择本人去聊或直接请求真人' }, 400)
   return respond(c, (userId) => reopenAttempt(userId, c.req.param('id'), body.data.mode, { store: getAgentStore(), startConversation }))
 })
 

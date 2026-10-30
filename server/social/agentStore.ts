@@ -72,6 +72,8 @@ export interface AgentStore {
   getAttempt(id: string): Promise<HistoryItem | null>
   markReopened(id: string, at: Date): Promise<void>
   notifyMatch(userId: string, payload: Record<string, unknown>): Promise<void>
+  /** 請求對方本人上線（格式同 C7：{ conversationId, fromName }）。 */
+  notifyRequestHuman(userId: string, payload: { conversationId: string; fromName: string }): Promise<void>
 }
 
 let override: AgentStore | null = null
@@ -98,7 +100,7 @@ export class MemoryAgentStore implements AgentStore {
   conversations = new Map<string, ConversationState>()
   attempts: HistoryItem[] = []
   scores: ScoreRow[] = []
-  notifications: { userId: string; payload: Record<string, unknown> }[] = []
+  notifications: { userId: string; type?: string; payload: Record<string, unknown> }[] = []
   autoChatsToday = 0
   settings: UserSettings = { match_tier: 'mutual', preferences: { personality: 'similar', conditions: [] }, daily_chat_limit: 10, manual_minutes_per_chat: 20 }
 
@@ -159,7 +161,10 @@ export class MemoryAgentStore implements AgentStore {
     this.scores.push(...structuredClone(rows))
   }
   async notifyMatch(userId: string, payload: Record<string, unknown>) {
-    this.notifications.push({ userId, payload })
+    this.notifications.push({ userId, type: 'match', payload })
+  }
+  async notifyRequestHuman(userId: string, payload: { conversationId: string; fromName: string }) {
+    this.notifications.push({ userId, type: 'request_human', payload })
   }
 }
 
@@ -246,6 +251,9 @@ function supabaseStore(db: Db): AgentStore {
     },
     async notifyMatch(userId, payload) {
       await one(db.from('notifications').insert({ user_id: userId, type: 'match', payload }))
+    },
+    async notifyRequestHuman(userId, payload) {
+      await one(db.from('notifications').insert({ user_id: userId, type: 'request_human', payload }))
     },
   }
 }

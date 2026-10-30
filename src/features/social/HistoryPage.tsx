@@ -107,7 +107,7 @@ export function HistoryPage() {
                   {t('history.restartSelf')}
                 </Button>
                 <Button block onClick={() => setRestartOpen(false)}>
-                  {t('history.restartTwin')}
+                  {t('history.restartRequestHuman')}
                 </Button>
               </div>
             </div>

@@ -32,14 +32,13 @@ export function HistoryList() {
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : t('login.errorGeneric')))
   }, [])
 
-  async function restart(mode: 'twin' | 'human') {
+  async function restart(mode: 'human' | 'request_human') {
     if (!restartId) return
     setBusy(true)
     try {
       const r = await reopenHistory(restartId, mode)
       setRestartId(null)
-      if (r.conversationId) navigate(`/chat/${r.conversationId}`)
-      else navigate('/friend')
+      navigate(`/chat/${r.conversationId}`)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t('login.errorGeneric'))
       setRestartId(null)
@@ -110,8 +109,8 @@ export function HistoryList() {
                 <Button block variant="secondary" disabled={busy} onClick={() => restart('human')}>
                   {t('history.restartSelf')}
                 </Button>
-                <Button block disabled={busy} onClick={() => restart('twin')}>
-                  {t('history.restartTwin')}
+                <Button block disabled={busy} onClick={() => restart('request_human')}>
+                  {t('history.restartRequestHuman')}
                 </Button>
               </div>
             </div>
