@@ -245,6 +245,32 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-30｜C1 分身回覆 twinReply｜Jerry（AI 協助）｜Closes #21
+- **做了什麼**：`twinReply(conversationId, speakerUserId)`（`server/twin/twin.ts`）：取說話者的對外檔案＋說話風格 → Prompt 5（`MODEL_CHAT`、0.8）→ `guardText` → 寫入 `messages`（`is_ai = true`、`guard_rewritten`）→ 寫日誌（`代聊发言`；第一則 reason 是「开场话题：…」；`ask_human` 時另寫一筆 `需要问本人`）。Prompt 5 在 `server/prompts/05_twin.ts`，Supabase 讀寫在 `server/twin/store.ts`。
+- **為什麼這樣做**：
+  - 外部依賴（資料庫、A 的檔案、守門、LLM、日誌）集中在 `TwinDeps`，用 `createTwinReply(deps)` 組出來；測試和開發腳本換成假的，不用碰共用 Supabase。對外用的 `twinReply` 用預設依賴。
+  - 檔案與風格只透過 `server/contracts/friend.ts` 拿（不碰 `user_profiles`、不拿 `agent_profile`）。A 的 stub 目前對每個人都回同一份假檔案，**A4 換成真的之前，真實對話裡兩個分身風格會一樣**；開發腳本改用 `server/fixtures/seed-users.ts` 驗風格。
+  - `guardText` 先接 `server/contracts/twin.ts`（C2 前是原樣回傳的 stub），C2 完成後自動生效。
+  - 多加了四個檢查：說話者不是對話成員、該方 controller 是 human、說話者沒有對外檔案、對話已經 `ended` → 丟 `TwinError`，不呼叫 LLM、不寫入。**`waiting_human` 不擋**：C3 的 `endConversation` 收尾、C7「本人晚点会上线」都要在等待本人時讓分身說話。沒有風格設定時用預設風格（中等句長、emoji 1）。
+  - 第三個參數 `options.extraInstruction` 給 C3 收尾用（Prompt 5 的 `{{extra_instruction}}`）。
+  - Prompt 5 照 07C 翻成簡體，另外實測後調整：句長與 emoji 程度加上文字說明（只寫「1/3」時，emoji 1 的小安幾乎每句都帶 emoji）；被問到個資時也說「要问一下本人」並設 `ask_human`（原本只會婉拒，不符合驗收「會說要問本人」）。
+  - 「檔案沒寫的一律不知道」照字面執行時，分身幾乎每輪都說要問本人（小安 4 輪有 3 輪），對方分身還吐槽「你把我的话术学走了」。改成：**具體事實**（去過哪、路線、行程、拍過什麼、裝備、經歷、感情、住址、學校、工作）才問本人；**感受、喜好、看法**只要和檔案一致可以回答；說要問本人時也要先接住話題。（Jerry 同意後改）
+  - 再加（Jerry 指定）：一律用第一人稱「我」、不用名字或第三人稱稱呼本人；用「我」說興趣喜好經歷只能用對外檔案有的；不說「不能瞎编」；每則最多 3 句。只依據對外檔案，不為此去拿 agent_profile 或記憶（07 第 7 節第 3 條）。
+  - **「要問本人」只留兩種情況（和 07C 原文不同，Jerry 同意）**：對方問到個資（住址、學校、工作、聯絡方式、社群帳號、感情狀態），或要約定具體時間、地點、路線、見面 → 說要問本人、`ask_human = true`。其他檔案沒寫的小細節（裝備、補給、幾個人去、去過哪座山）不編、不提本人，自然帶過再接回檔案裡的興趣，`ask_human = false`；沒被問到不主動說要問本人。
+    - 原因：逐則看情境，小安、子晴說要問本人都合理；不合理的全是阿哲在沒人問時主動補一句「具體…我得問一下本人」。網路上的做法（Delphi 分身、分身防護設計指南、角色扮演研究）也是：個資和替本人承諾才交給本人，其他不知道的事簡單帶過，而且只在被問到時才拒答；防護太嚴分身會像機器人。
+    - 一開始用的「不要連續兩則都說要問本人」模型不遵守，而且用次數判斷會逼分身回答不知道的事，已拿掉。
+    - Prompt 裡不要寫帶過用的例句：寫了「这个说不太准」，阿哲 8 輪講了 5 次；改成「每次換個自然的說法」後 0 次。
+  - 再加（Jerry 指定）：不替本人答應或提出任何約定（一起去、組隊、見面、誰帶什麼、什麼時候有空），也不暗示想一起做什麼，對方提議就說要問本人；不打聽對方的住處、活動範圍、作息、出發時間，被問個資後也不反問對方同類問題。「最多 3 句」寫明句號、問號、驚嘆號、波浪號、emoji 隔開的都算一句。
+- **改了哪些檔案**：`server/twin/twin.ts`、`server/twin/store.ts`、`server/prompts/05_twin.ts`、`tests/twin/twin-reply.test.ts`。
+- **踩到的坑／注意事項**：Prompt 填值用 `replace` 的函式寫法，避免內容裡的 `$` 被當成替換語法。最近 12 則用 `created_at` 由新到舊取再反轉。
+  - 「最多 3 句」光靠 Prompt 壓不住：寫明斷句規則後，子晴 × 阿哲仍有 4 則超過 3 句（最多 5 句）。模型偶爾會冒出繁體字（子晴一則整句繁體、「稜线」），Prompt 已寫「用简体中文回复」仍會發生。
+  - 帶過小細節時，模型偶爾會補一句檔案沒寫的模糊習慣（例：小安「我一般走半天就差不多了」、阿哲「手机随手咔嚓两张」），這是放寬後的代價；說具體地點、時間等仍由 C2 守門把關。
+- **驗證**：vitest 全過、`npm run build` 成功。開發腳本（只存在本機、記憶體模式、真的 LLM）讓小安和阿哲聊 8 輪：小安短句、幾乎不用 emoji、語氣溫和；阿哲長句、每則多個 emoji、一次丟好幾個話題。插入「你住哪里？」「你读哪所学校？」，都回「要问一下本人」，沒有編造（各版共跑 8 次，含小安 × 子晴、子晴 × 阿哲）。最終版：小安 × 阿哲 8 輪「要問本人」只出現在兩題隱私提問；前一版約見面時（「排日期」）也正確轉問本人。
+- **還沒做完／待辦**：寫入真的 `messages` 表要等 C3 建立對話後一起驗（`is_ai` 寫死為 true，有單元測試）。風格要等 A4 的 `getShareableProfile`／`getStyleProfile` 真實作才會在正式流程生效。
+  - C3 收尾的 `extraInstruction` 要加「不要再提问」。
+  - C6 接手卡片要確認分身講的看法和本人不會矛盾。
+  - C2 完成後，`twin.ts` 的 `guardText` 改從 `../twin/guard` 引入（避免和 `contracts/twin` 互相引用）。
+
 ### 2026-10-30｜C0 種子用戶、seed 腳本、twin contracts stub｜Jerry（AI 協助）｜PR #48、Closes #20
 - **做了什麼**：10 位種子用戶資料（`server/fixtures/seed-users.ts`）；`npm run seed`（`server/twin/seed.ts` 流程＋`scripts/seed.ts` 用 A0b 的 `server/lib/supabase.ts` 連 Supabase）；`server/contracts/twin.ts` stub 改成記住輪數、依輪數產生假訊息。
 - **為什麼這樣做**：
