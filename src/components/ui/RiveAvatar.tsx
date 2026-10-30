@@ -1,8 +1,8 @@
 import { useRive, type UseRiveOptions } from '@rive-app/react-canvas'
 
 const SOURCES = {
-  robot: '/riv/robot.riv',
-  fish: '/riv/fish.riv',
+  robot: '/riv/clover_bot.riv',
+  fish: '/riv/fish_vase.riv',
   birdie: '/riv/red_birdie.riv',
 } as const
 
