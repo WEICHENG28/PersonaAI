@@ -1,6 +1,6 @@
 // C6 本人接手（docs/07C C6）。擁有者：C。
-// POST /api/conversations/:id/takeover：確認是對話一方且我方還是分身 → Prompt 7 產生接手摘要（只放我方視角的判定）
-// → 我方 controller 改成本人、對話改回 active → 寫入 handoffs → 寫日誌。接手後不再交回分身。
+// POST /api/conversations/:id/takeover：確認是對話一方且我方還是分身 → 我方 controller 改成本人、對話改回 active
+// → Prompt 7 產生接手摘要（只放我方視角的判定）→ 寫入 handoffs → 寫日誌。接手後不再交回分身。
 // 外部依賴（資料庫、LLM、日誌）都放在 HandoffDeps，測試可以換成假的。
 import type { AgentLogInput, VerdictValue } from '../../shared/types'
 import type { LlmJsonOptions } from '../lib/llm'
@@ -138,6 +138,27 @@ async function summarize(
   }
 }
 
+interface CardOutcome extends SummaryOutcome {
+  verdict: TakeoverView['verdict']
+}
+
+/** 讀訊息與我方判定，再產生摘要。已經改成本人了，讀取失敗也照常回傳（空白卡片，錯誤給日誌）。 */
+async function buildCard(deps: HandoffDeps, conversationId: string, myUserId: string): Promise<CardOutcome> {
+  try {
+    // 只讀「我」這個視角的判定；對方視角的分數與理由一律不讀
+    const [messages, scores] = await Promise.all([
+      deps.store.listMessages(conversationId),
+      deps.store.listMyScores(conversationId, myUserId, TREND_SCORES),
+    ])
+    const latest = scores[0]
+    const verdict = latest ? { value: toVerdictValue(latest.verdict), trend: trendOf(scores) } : null
+    return { verdict, ...(await summarize(deps, { messages, myUserId, verdict })) }
+  } catch (err) {
+    console.error('[twin] 读取接手卡片资料失败', conversationId, err)
+    return { verdict: null, summary: EMPTY_HANDOFF_SUMMARY, error: errorText(err) }
+  }
+}
+
 /** 寫入 handoffs；失敗不擋接手（已經改成本人了），錯誤回傳給日誌。 */
 async function saveHandoff(deps: HandoffDeps, row: NewHandoff): Promise<string | null> {
   try {
@@ -158,17 +179,12 @@ async function takeOver(deps: HandoffDeps, running: Set<string>, conversationId:
 
   running.add(key)
   try {
-    // 只讀「我」這個視角的判定；對方視角的分數與理由一律不讀
-    const [messages, scores] = await Promise.all([
-      deps.store.listMessages(conv.id),
-      deps.store.listMyScores(conv.id, me.userId, TREND_SCORES),
-    ])
-    const latest = scores[0]
-    const verdict = latest ? { value: toVerdictValue(latest.verdict), trend: trendOf(scores) } : null
-    const { summary, error } = await summarize(deps, { messages, myUserId: me.userId, verdict })
-
+    // 先改成本人讓分身停下，再讀訊息產生摘要：Prompt 7 要跑好幾秒，先摘要的話分身這段時間說的話會漏掉，
+    // 「最後一則是誰說的」也會判斷錯。摘要失敗本來就照常接手，所以先改不會有問題。
     const switched = await deps.store.switchToHuman(conv.id, me.userId === conv.side_a ? 'a' : 'b')
     if (!switched) throw new ChatRoomError('对话状态刚刚有变化，重新打开聊天室看看', 409)
+
+    const { verdict, summary, error } = await buildCard(deps, conv.id, me.userId)
 
     const handoffError = await saveHandoff(deps, { conversation_id: conv.id, user_id: me.userId, summary })
     const detail: Record<string, unknown> = {}

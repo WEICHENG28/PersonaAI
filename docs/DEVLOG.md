@@ -378,7 +378,7 @@
   - 隱私：Prompt 7 只放對話紀錄和**我方視角**的判定文字（例「合适，走势上升」），不讀對方的 `match_scores`，也不放任何數字；卡片畫面也沒有數字。
   - 「分身已經替你說過」Prompt 特別寫「只寫你的分身在紀錄裡真的說過的內容，不要編」（C1 待辦：接手後不要和分身的說法矛盾）。對話紀錄放在 user 訊息的 `<transcript>` 標籤，標明只是資料。
   - LLM 的輸出太長、太多點就截斷（每項 3 點、每點 25 字），不要讓 schema 判失敗。**Prompt 7 失敗時照常接手**，卡片空白並提示「接手卡片暂时没整理出来」，錯誤寫在日誌 detail：用戶要的是自己聊，不該因為摘要失敗就接不了手。
-  - 先產生摘要、再改成本人：改成本人用條件更新（這一方還是 twin、對話沒結束），兩個請求同時接手時只有一個成功，另一個回 409。改成本人後 `handoffs` 寫入失敗只寫日誌、仍回傳卡片（已經接手了，不能回滾）。
+  - **先改成本人、再讀訊息產生摘要**（檢查後修正，原本是先摘要）：Prompt 7 要跑約 5 秒，對話是 active 時分身這段時間還會說話，先摘要會讓「分身已經替你說過」漏掉這幾則、「最後一則是誰說的」判斷錯。改成本人用條件更新（這一方還是 twin、對話沒結束），兩個請求同時接手時只有一個成功，另一個回 409，也不會呼叫 LLM。改成本人後讀訊息、Prompt 7、`handoffs` 寫入任一個失敗都只寫日誌、仍回傳卡片（已經接手了，不能回滾）。
   - 接手後對話改回 active：C4 的本人發言只在 active 時讓對方分身回覆；B 的 runner 看到任一方是本人就放手，C5 的「讓分身繼續聊」也會擋。
 - **改了哪些檔案**：`server/prompts/07_handoff.ts`（新）、`server/twin/handoff.ts`（新）、`server/twin/handoffStore.ts`（新）、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/components/{HandoffCard.tsx,handoffView.ts}`（新）、`src/features/twin/components/{LiveChatRoom.tsx,useChatRoom.ts,LiveResult.tsx,useResult.ts,resultView.ts}`、`tests/twin/{handoff,handoff-view}.test.ts`（新）、`tests/twin/chat-room-routes.test.ts`。沒有動共用檔。
 - **驗證**：vitest 全部 437 項通過、`tsc -b`、`npm run build` 通過；和最新 main 試合併（暫時的 worktree）後 446 項也全過。

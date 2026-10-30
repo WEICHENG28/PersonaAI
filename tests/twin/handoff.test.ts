@@ -56,6 +56,7 @@ interface Harness {
   llm?: (opts: LlmJsonOptions<unknown>) => Promise<unknown>
   switched?: boolean
   insertFails?: boolean
+  readFails?: boolean
 }
 
 function harness(opts: Harness = {}) {
@@ -69,13 +70,20 @@ function harness(opts: Harness = {}) {
   const logs: AgentLogInput[] = []
   const handoffs: NewHandoff[] = []
   const switches: { id: string; side: Side }[] = []
+  /** 依序記下讀訊息、改成本人、呼叫 LLM 的時間點。 */
+  const events: string[] = []
   const store: HandoffStore = {
     getConversation: async (id) => (row && row.id === id ? { ...row } : null),
-    listMessages: async () => [...messages],
+    listMessages: async () => {
+      events.push('listMessages')
+      if (opts.readFails) throw new Error('read down')
+      return [...messages]
+    },
     listMyScores: vi.fn(async (_c: string, perspective: string, limit: number) =>
       scores.filter((s) => s.perspective === perspective).slice(0, limit),
     ),
     switchToHuman: vi.fn(async (id: string, side: Side) => {
+      events.push('switchToHuman')
       switches.push({ id, side })
       return opts.switched ?? true
     }),
@@ -84,7 +92,11 @@ function harness(opts: Harness = {}) {
       handoffs.push(h)
     }),
   }
-  const llmJson = vi.fn(opts.llm ?? (async () => SUMMARY))
+  const llm = opts.llm ?? (async () => SUMMARY)
+  const llmJson = vi.fn((o: LlmJsonOptions<unknown>) => {
+    events.push('llmJson')
+    return llm(o)
+  })
   const api = createHandoffApi({
     store,
     llmJson: llmJson as unknown as <T>(o: LlmJsonOptions<T>) => Promise<T>,
@@ -92,7 +104,7 @@ function harness(opts: Harness = {}) {
       logs.push(e)
     },
   })
-  return { api, store, llmJson, logs, handoffs, switches }
+  return { api, store, llmJson, logs, handoffs, switches, events }
 }
 
 async function expectError(p: Promise<unknown>, status: number, text?: string) {
@@ -124,9 +136,10 @@ describe('takeOver 檢查', () => {
     await expectError(harness({ conv: conv({ status: 'ended' }) }).api.takeOver('conv-1', ME), 409, '这段对话已经结束了')
   })
 
-  it('條件更新沒改到（同時被結束或接手）→ 409，不寫 handoffs', async () => {
+  it('條件更新沒改到（同時被結束或接手）→ 409，不呼叫 LLM、不寫 handoffs', async () => {
     const h = harness({ switched: false })
     await expectError(h.api.takeOver('conv-1', ME), 409)
+    expect(h.llmJson).not.toHaveBeenCalled()
     expect(h.handoffs).toEqual([])
     expect(h.logs).toEqual([])
   })
@@ -159,6 +172,24 @@ describe('takeOver 成功', () => {
       expect.objectContaining({ user_id: ME, agent: 'twin', conversation_id: 'conv-1', task_id: 'task-1', action: '本人接手，分身停止代聊' }),
     ])
     expect(h.logs[0]).not.toHaveProperty('detail')
+  })
+
+  it('先改成本人再讀訊息、產生摘要：分身在摘要期間說的話不會漏掉', async () => {
+    const h = harness()
+    await h.api.takeOver('conv-1', ME)
+    expect(h.events).toEqual(['switchToHuman', 'listMessages', 'llmJson'])
+  })
+
+  it('改成本人後讀訊息失敗 → 照常接手，卡片空白、summaryFailed，錯誤寫進日誌', async () => {
+    const h = harness({ readFails: true })
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const out = await h.api.takeOver('conv-1', ME)
+    spy.mockRestore()
+    expect(out).toEqual(expect.objectContaining({ verdict: null, summaryFailed: true }))
+    expect(out.summary.key_points).toEqual([])
+    expect(h.llmJson).not.toHaveBeenCalled()
+    expect(h.handoffs).toHaveLength(1)
+    expect(h.logs[0].detail).toEqual({ summary_error: 'read down' })
   })
 
   it('b 方接手：改的是 b 方', async () => {

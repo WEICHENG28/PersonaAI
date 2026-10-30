@@ -111,7 +111,7 @@ function ResultBody({ view, state, onSkip }: ResultBodyProps) {
         <Card>
           <CardHead title={t('result.nextTitle')} />
           <div className="next-actions">
-<TakeOverButton
+            <TakeOverButton
               view={view}
               takingOver={state.takingOver}
               disabled={busy}
