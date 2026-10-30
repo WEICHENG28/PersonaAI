@@ -40,6 +40,7 @@ export type StepOutcome =
   | 'start_failed'
   | 'chat_cleared'
   | 'chatting'
+  | 'chat_failed'
   | 'continue_chat'
   | 'notified'
   | 'ended_chat'
@@ -107,7 +108,7 @@ async function planNext(task: AgentTask, deps: RunnerDeps): Promise<StepOutcome>
   const conversationId = await startWithRetry(task, target, deps)
   if (!conversationId) {
     await deps.store.updateTask(task.id, { attempted_user_ids: attempted })
-    await log(task, `无法和 ${target.candidate.display_name} 开始代聊，换下一位`, '发起对话失败，已重试')
+    await log(task, `跳过 ${target.candidate.display_name}：发起对话失败`, `已重试 ${CONFIG.TOOL_MAX_RETRIES} 次，换下一位`)
     return 'start_failed'
   }
 
@@ -141,8 +142,10 @@ async function chooseTarget(task: AgentTask, deps: RunnerDeps): Promise<{ candid
     conditions: task.conditions,
     excludeIds: task.attempted_user_ids,
   })
-  await deps.store.updateTask(task.id, { progress: { ...task.progress, screened: task.progress.screened + candidates.length } })
-  task.progress = { ...task.progress, screened: task.progress.screened + candidates.length }
+  // 篩過的人數 = 已經聊過的人 ＋ 這次搜尋到的人（搜尋會排除聊過的，所以不會重複計算同一批人）
+  const screened = Math.max(task.progress.screened, task.attempted_user_ids.length + candidates.length)
+  task.progress = { ...task.progress, screened }
+  await deps.store.updateTask(task.id, { progress: task.progress })
   if (candidates.length === 0) return null
 
   const picked = await deps.pick(task, candidates)
@@ -186,7 +189,9 @@ async function advanceChat(task: AgentTask, conversationId: string, deps: Runner
     return 'chat_cleared'
   }
 
-  const { roundCount } = await deps.runTwinRounds(conversationId, CONFIG.ROUNDS_PER_STEP)
+  const rounds = await runRoundsWithRetry(conversationId, deps)
+  if (!rounds) return skipFailedChat(task, conversationId, deps)
+  const { roundCount } = rounds
   if (roundCount < CONFIG.MIN_ROUNDS_BEFORE_JUDGE) {
     await log(task, `代聊进行中（第 ${roundCount} 轮）`, `至少聊 ${CONFIG.MIN_ROUNDS_BEFORE_JUDGE} 轮才判断`, { conversation_id: conversationId })
     return 'chatting'
@@ -194,6 +199,28 @@ async function advanceChat(task: AgentTask, conversationId: string, deps: Runner
 
   const evaluation = await deps.evaluate(task, conversationId, roundCount)
   return decideNext(task, conversationId, evaluation, deps)
+}
+
+/** C 的代聊函式失敗時重試 TOOL_MAX_RETRIES 次（07B 的 B9）；仍失敗回 null。 */
+async function runRoundsWithRetry(conversationId: string, deps: RunnerDeps): Promise<{ roundCount: number; ended: boolean } | null> {
+  for (let attempt = 0; attempt <= CONFIG.TOOL_MAX_RETRIES; attempt++) {
+    try {
+      return await deps.runTwinRounds(conversationId, CONFIG.ROUNDS_PER_STEP)
+    } catch (err) {
+      console.error('[runner] runTwinRounds', err)
+    }
+  }
+  return null
+}
+
+/** 代聊一直失敗：盡量禮貌收尾，放掉這位、換下一位；這是技術問題，不記成「不合適」。 */
+async function skipFailedChat(task: AgentTask, conversationId: string, deps: RunnerDeps): Promise<StepOutcome> {
+  const targetId = task.target_user_id ?? task.attempted_user_ids.at(-1) ?? ''
+  await deps.endConversation(conversationId, 'done').catch((err: unknown) => console.error('[runner] endConversation', err))
+  await deps.store.updateTask(task.id, { active_conversation_id: null })
+  const name = await deps.store.displayName(targetId)
+  await log(task, `跳过 ${name}：代聊失败`, `已重试 ${CONFIG.TOOL_MAX_RETRIES} 次，换下一位`, { conversation_id: conversationId })
+  return 'chat_failed'
 }
 
 async function decideNext(task: AgentTask, conversationId: string, ev: Evaluation, deps: RunnerDeps): Promise<StepOutcome> {
@@ -205,7 +232,8 @@ async function decideNext(task: AgentTask, conversationId: string, ev: Evaluatio
   const plannerReason = suggested && !decision.overridden ? suggested.reason : null
 
   if (decision.action === 'continue_chat') {
-    await log(task, '继续代聊', plannerReason ?? '还不确定合不合适，多聊几轮再判断', { conversation_id: conversationId })
+    const uncertain = ev.a.verdict === 'uncertain' || ev.b.verdict === 'uncertain'
+    await log(task, uncertain ? '判定不一致，多聊几轮' : '继续代聊', plannerReason ?? '还不确定合不合适，多聊几轮再判断', { conversation_id: conversationId })
     return 'continue_chat'
   }
 

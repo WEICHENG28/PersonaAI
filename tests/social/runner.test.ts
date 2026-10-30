@@ -268,12 +268,53 @@ describe('runTaskStep', () => {
   })
 })
 
-describe('runTaskStepSafely', () => {
-  it(`連續失敗 ${CONFIG.TASK_MAX_FAILS} 次就暫停任務，不丟錯`, async () => {
+describe('B9 異常處理', () => {
+  it('代聊函式失敗會重試一次，成功就照常繼續', async () => {
+    put(chatting())
+    let calls = 0
+    deps.runTwinRounds = vi.fn(async () => {
+      if (++calls === 1) throw new Error('blip')
+      return { roundCount: 4, ended: false }
+    })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await runTaskStep('t1', deps)).toBe('chatting')
+    expect(deps.runTwinRounds).toHaveBeenCalledTimes(2)
+  })
+
+  it('代聊函式一直失敗 → 跳過這位、收尾、不記成不合適', async () => {
     put(chatting())
     vi.spyOn(console, 'error').mockImplementation(() => {})
     deps.runTwinRounds = vi.fn(async () => {
       throw new Error('twin down')
+    })
+    expect(await runTaskStep('t1', deps)).toBe('chat_failed')
+    expect(deps.endConversation).toHaveBeenCalledWith('conv-1', 'done')
+    expect(store.tasks.get('t1')?.active_conversation_id).toBeNull()
+    expect(store.attempts).toHaveLength(0)
+    expect(logs.at(-1)?.action).toBe('跳过 xiaoan：代聊失败')
+  })
+
+  it('判定不一致 → 日誌寫「判定不一致，多聊几轮」', async () => {
+    put(chatting())
+    deps.evaluate = vi.fn(async () => evaluation('uncertain', 'suitable'))
+    await runTaskStep('t1', deps)
+    expect(logs.at(-1)?.action).toBe('判定不一致，多聊几轮')
+  })
+
+  it('篩選人數不重複計算同一批人', async () => {
+    put(makeTask({ attempted_user_ids: ['xiaoan'], progress: { screened: 3, chats: 1, suitable: 0 } }))
+    deps.searchLobby = vi.fn(async () => [candidate('azhe', 0.7), candidate('ziqing', 0.6)])
+    await runTaskStep('t1', deps)
+    expect(store.tasks.get('t1')?.progress.screened).toBe(3)
+  })
+})
+
+describe('runTaskStepSafely', () => {
+  it(`連續失敗 ${CONFIG.TASK_MAX_FAILS} 次就暫停任務，不丟錯`, async () => {
+    put(chatting())
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    deps.evaluate = vi.fn(async () => {
+      throw new Error('judge down')
     })
     const outcomes = []
     for (let i = 0; i < CONFIG.TASK_MAX_FAILS; i++) outcomes.push(await runTaskStepSafely('t1', deps))
