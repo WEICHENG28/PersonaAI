@@ -38,7 +38,9 @@ function row(overrides: Partial<ConversationRow> = {}): ConversationRow {
 }
 
 /** 假的資料庫＋假的 twinReply（每次呼叫就新增一則訊息）。 */
-function harness(opts: { conv?: ConversationRow; messages?: ChatMessage[]; reply?: TwinReplyFn } = {}): Harness {
+function harness(
+  opts: { conv?: ConversationRow; messages?: ChatMessage[]; reply?: TwinReplyFn; failDelete?: boolean } = {},
+): Harness {
   const rows = new Map<string, ConversationRow>()
   if (opts.conv) rows.set(opts.conv.id, opts.conv)
   const messages: ChatMessage[] = [...(opts.messages ?? [])]
@@ -70,6 +72,10 @@ function harness(opts: { conv?: ConversationRow; messages?: ChatMessage[]; reply
     async updateConversation(id, patch) {
       const current = rows.get(id)
       if (current) rows.set(id, { ...current, ...patch })
+    },
+    async deleteConversation(id) {
+      if (opts.failDelete) throw new Error('删除失败')
+      rows.delete(id)
     },
     getLastSenderId: async (id) => messages.filter((m) => m.conversation_id === id).at(-1)?.sender_id ?? null,
     listMessages: async (id) => messages.filter((m) => m.conversation_id === id),
@@ -121,15 +127,28 @@ describe('startConversation', () => {
     expect(h.rows.get(conversationId)).toMatchObject({ side_a_controller: 'human', side_b_controller: 'twin', task_id: null })
   })
 
-  it('開場失敗：對話設為 ended 再把錯誤丟給呼叫者（不留下沒人說話的對話）', async () => {
-    const h = harness({
-      reply: async () => {
-        throw new Error('LLM 逾時')
-      },
-    })
+  const failingReply: TwinReplyFn = async () => {
+    throw new Error('LLM 逾時')
+  }
+
+  it('開場失敗：刪掉剛建立的對話（不佔每日代聊次數），再把錯誤丟給呼叫者', async () => {
+    const h = harness({ reply: failingReply })
+    await expect(h.api.startConversation({ ...input, aController: 'twin' })).rejects.toThrow('LLM 逾時')
+    expect(h.rows.size).toBe(0)
+    expect(h.logs.map((l) => l.action)).toContain('开场失败，取消这场代聊')
+  })
+
+  it('開場失敗且刪不掉：退回設為 ended，錯誤照樣丟出', async () => {
+    const h = harness({ reply: failingReply, failDelete: true })
     await expect(h.api.startConversation({ ...input, aController: 'twin' })).rejects.toThrow('LLM 逾時')
     const [created] = [...h.rows.values()]
     expect(created).toMatchObject({ status: 'ended', ended_at: '2026-10-30T12:00:00.000Z' })
+  })
+
+  it('開場話題太長時截斷，不拒絕', async () => {
+    const h = harness()
+    const { conversationId } = await h.api.startConversation({ ...input, aController: 'twin', openingTopic: '山'.repeat(500) })
+    expect(h.rows.get(conversationId)?.opening_topic).toHaveLength(200)
   })
 
   it('輸入不正確（同一個人、缺 id）時丟 TwinError，不建立對話', async () => {

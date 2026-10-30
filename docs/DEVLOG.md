@@ -258,6 +258,28 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-30｜C3 代聊函式（開始、跑輪數、結束、等待本人）｜Jerry（AI 協助）｜Closes #23
+- **做了什麼**：
+  - `server/contracts/twin.ts` 的 `startConversation`、`runTwinRounds`、`getTranscript`、`endConversation`、`markWaitingHuman` 換成真實作（`server/twin/conversation.ts`，資料庫在 `server/twin/store.ts` 的 `supabaseConversationStore`），簽名不變。
+  - `startConversation`：zod 驗證輸入 → 建 `conversations`（b 方一律 twin）→ 寫日誌「开始代聊」→ a 方是分身就用 `twinReply` 送開場。開場話題超過 200 字截斷。
+  - `runTwinRounds`：一輪＝雙方分身各說一次，**從上一則發言者的對方開始**；本人在聊的一方跳過；每輪 `round_count + 1`，輪與輪之間重讀對話；達到 `MAX_ROUNDS` 或不是 active 就停、回 `ended = true`；一輪內失敗就丟錯（輪數不加）。雙方都是本人時不說話、輪數不變。
+  - `endConversation`：輪到的分身送一則收尾（Prompt 5 加「不要再提问、不要约下次、不要说不合适」），再設 ended＋`ended_at`，寫日誌；已結束就不做事。
+  - `markWaitingHuman`：設為 `waiting_human` 並寫日誌；已結束的對話丟 `TwinError`。
+  - 沒設定 Supabase 時（B 的記憶體模式、測試），contracts 改用原本 C0 的記憶體假資料版（搬到 `server/twin/conversationStub.ts`）。
+- **為什麼這樣做**：
+  - 輪的順序：開場是 a 說，如果每輪固定「a 先 b 後」，第 1 輪 a 會連說兩句。改成從上一則發言者的對方開始，開場後是 b、a、b、a…，4 輪後共 9 則（開場 1＋8）。
+  - 收尾失敗不擋結束：B 判定不合適後呼叫 `endConversation`，如果因為 LLM 失敗就丟錯，對話會一直停在 active。
+  - 開場失敗時**刪掉**剛建立的對話（還沒有訊息）：B 的 `startWithRetry` 會重試，而且每日代聊次數是數 `conversations` 列數，留著會吃額度。刪不掉才退回設為 ended。
+  - 記憶體版：B 的 `tests/social/server.test.ts` 和記憶體模式 worker 會直接呼叫 C 的 contracts；判斷條件和 B 的 `getAdminDb` 一樣（看 `SUPABASE_URL`／`SUPABASE_SERVICE_ROLE_KEY`），不用改 B 的檔案。
+- **影響其他線**：B 的 runner 拿到的是真的代聊（有設定 Supabase 時）。`runTwinRounds` 對 `waiting_human`／`ended` 的對話會直接回 `ended = true`，不再發言。
+- **改了哪些檔案**：`server/twin/conversation.ts`（新）、`server/twin/conversationStub.ts`（新，原 stub 搬過來）、`server/twin/store.ts`、`server/contracts/twin.ts`、`server/fixtures/twin.ts`（只改註解）、`tests/twin/conversation.test.ts`（新，29 項）。
+- **驗證**：vitest 全部 258 項通過、`tsc --noEmit`（server、app）無錯誤、`npm run build` 通過。用真的 LLM 跑 `.local/try-c3.ts`（只存記憶體、不寫資料庫）：小安 × 阿哲 開場＋4 輪＋收尾共 10 則，順序 小安、阿哲 交替，`round_count` 4，收尾「今天先聊到这…拜拜啦」沒有再提問。
+- **踩到的坑／注意事項**：`round_count + 1` 是讀後寫，同一段對話被兩個地方同時推進（worker 和手動 step）時輪數可能少算；黑客松先不處理。
+- **還沒做完／待辦**：
+  - C5「第 n 輪＝第 2n−1、2n 則」要改成扣掉開場那一則（第 n 輪＝第 2n、2n+1 則），本人插話時也會錯開，C5 做的時候再處理。
+  - C5「讓分身繼續聊」：對話是 `waiting_human` 時 `runTwinRounds` 會直接回 ended，要先把狀態改回 active。
+  - 真的 Supabase 路徑要等 Jerry 同意後開一段代聊實測（見 PR）。
+
 ### 2026-10-30｜C2 守門小瑕疵：改寫不加料、注入規則不誤擋、改寫版再檢查｜Jerry（AI 協助）
 - **做了什麼**：
   - Prompt 13：改寫只能刪掉或換成更籠統的說法，不能加入原文沒有的資訊（年級、學歷、職業、時間段等），並補了「我在北大上学 → 我在上学」「周日 9 点在人民广场见 → 到时候再约地方见」等範例，寫明範例不要照抄。

@@ -68,6 +68,11 @@ export function supabaseConversationStore(): ConversationStore {
       if (error) throw new Error(`更新对话失败：${error.message}`)
     },
 
+    async deleteConversation(id) {
+      const { error } = await getServiceClient().from('conversations').delete().eq('id', id)
+      if (error) throw new Error(`删除对话失败：${error.message}`)
+    },
+
     async getLastSenderId(conversationId) {
       const { data, error } = await getServiceClient()
         .from('messages')
