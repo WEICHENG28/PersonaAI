@@ -158,7 +158,8 @@ function NotificationItem({ n, state, onClose }: NotificationItemProps) {
           ))}
         </div>
       ) : (
-        n.response && <p className="notif-bell__note">{NOTIFY_TEXT.responded[n.response]}</p>
+        // 處理中不顯示結果：後端先記下回應再收尾／接手，Realtime 重讀會比動作完成早好幾秒
+        n.response && !busy && <p className="notif-bell__note">{NOTIFY_TEXT.responded[n.response]}</p>
       )}
       {busy && <p className="notif-bell__note" role="status">{pending === 'now' ? NOTIFY_TEXT.takingOver : NOTIFY_TEXT.responding}</p>}
       {error && <p className="notif-bell__note" role="alert">{error}</p>}
