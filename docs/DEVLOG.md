@@ -272,7 +272,7 @@
   - 開場失敗時**刪掉**剛建立的對話（還沒有訊息）：B 的 `startWithRetry` 會重試，而且每日代聊次數是數 `conversations` 列數，留著會吃額度。刪不掉才退回設為 ended。
   - 記憶體版：B 的 `tests/social/server.test.ts` 和記憶體模式 worker 會直接呼叫 C 的 contracts；判斷條件和 B 的 `getAdminDb` 一樣（看 `SUPABASE_URL`／`SUPABASE_SERVICE_ROLE_KEY`），不用改 B 的檔案。
 - **影響其他線**：B 的 runner 拿到的是真的代聊（有設定 Supabase 時）。`runTwinRounds` 對 `waiting_human`／`ended` 的對話會直接回 `ended = true`，不再發言。
-- **改了哪些檔案**：`server/twin/conversation.ts`（新）、`server/twin/conversationStub.ts`（新，原 stub 搬過來）、`server/twin/store.ts`、`server/contracts/twin.ts`、`server/fixtures/twin.ts`（只改註解）、`tests/twin/conversation.test.ts`（新，29 項）。
+- **改了哪些檔案**：`server/twin/conversation.ts`（新）、`server/twin/conversationStub.ts`（新，原 stub 搬過來）、`server/twin/store.ts`、`server/contracts/twin.ts`、`server/fixtures/twin.ts`（只改註解）、`tests/twin/conversation.test.ts`（新，28 項）。
 - **驗證**：vitest 全部 258 項通過、`tsc --noEmit`（server、app）無錯誤、`npm run build` 通過。用真的 LLM 跑 `.local/try-c3.ts`（只存記憶體、不寫資料庫）：小安 × 阿哲 開場＋4 輪＋收尾共 10 則，順序 小安、阿哲 交替，`round_count` 4，收尾「今天先聊到这…拜拜啦」沒有再提問。
 - **踩到的坑／注意事項**：`round_count + 1` 是讀後寫，同一段對話被兩個地方同時推進（worker 和手動 step）時輪數可能少算；黑客松先不處理。
 - **還沒做完／待辦**：
