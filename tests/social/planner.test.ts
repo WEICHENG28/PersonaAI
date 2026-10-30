@@ -3,7 +3,7 @@ import type { AgentTask, Evaluation, LobbyCandidate } from '../../shared/types'
 import { setLlmClient } from '../../server/lib/llm'
 import { setLogWriter } from '../../server/lib/log'
 import { MemoryAgentStore } from '../../server/social/agentStore'
-import { cleanReason, decide, pick, type PlannerContext } from '../../server/social/planner'
+import { chooseOpeningTopic, cleanReason, decide, pick, type PlannerContext } from '../../server/social/planner'
 
 beforeAll(() => {
   Object.assign(process.env, {
@@ -63,6 +63,7 @@ beforeEach(() => {
   setLogWriter(async () => {})
   ctx = {
     store: new MemoryAgentStore(),
+    getShareableProfile: vi.fn(async () => ({ intro: '', interests: ['登山', '摄影'], chat_style: '', looking_for: '' })),
     getAgentProfile: vi.fn(async () => ({
       big_five: { O: { score: 70, confidence: 0.6, evidence: '' }, C: { score: 50, confidence: 0.6, evidence: '' }, E: { score: 30, confidence: 0.6, evidence: '' }, A: { score: 80, confidence: 0.6, evidence: '' }, N: { score: 40, confidence: 0.6, evidence: '' } },
       values: ['真诚'],
@@ -79,7 +80,7 @@ afterEach(() => {
 
 const start = (id: string, reason = '对方也慢热，喜欢边爬山边拍照') => ({
   tool: 'start_conversation',
-  args: { target_user_id: id, opening_topic: '最近去的山' },
+  args: { target_user_id: id, opening_topic: '最近去登山拍到的照片' },
   reason,
 })
 
@@ -87,8 +88,9 @@ describe('pick', () => {
   it('選清單裡的人，帶理由與開場話題；輸入有後台檔案、沒有分數數字', async () => {
     fakeModel(start('xiaoan'))
     const r = await pick(task, candidates, ctx)
-    expect(r).toMatchObject({ target: { user_id: 'xiaoan' }, reason: '对方也慢热，喜欢边爬山边拍照', openingTopic: '最近去的山' })
+    expect(r).toMatchObject({ target: { user_id: 'xiaoan' }, reason: '对方也慢热，喜欢边爬山边拍照', openingTopic: '最近去登山拍到的照片' })
     expect(prompts[0]).toContain('后台档案')
+    expect(prompts[0]).toContain('摄影')
     expect(prompts[0]).not.toContain('0.71')
   })
 
@@ -113,6 +115,19 @@ describe('pick', () => {
   it('選 finish → 不挑人', async () => {
     fakeModel({ tool: 'finish', args: {}, reason: '都不太符合运动伙伴的条件' })
     expect(await pick(task, candidates, ctx)).toEqual({ target: null, reason: '都不太符合运动伙伴的条件' })
+  })
+})
+
+describe('chooseOpeningTopic（實跑時的「手冲咖啡」問題）', () => {
+  it('規劃器用了只有對方有的興趣 → 改用雙方共同的興趣', () => {
+    expect(chooseOpeningTopic('露营时手冲咖啡的绝佳搭配', ['登山', '摄影'], ['露营', '登山', '手冲咖啡'], ['喜欢登山'])).toBe('登山')
+  })
+  it('規劃器的話題有提到我的興趣或任務條件 → 照用', () => {
+    expect(chooseOpeningTopic('周末去哪里摄影比较好', ['摄影'], ['摄影'], [])).toBe('周末去哪里摄影比较好')
+  })
+  it('沒有共同興趣 → 用任務條件', () => {
+    expect(chooseOpeningTopic(undefined, ['看书'], ['越野跑'], ['喜欢登山'])).toBe('看书')
+    expect(chooseOpeningTopic(undefined, [], ['越野跑'], ['喜欢登山'])).toBe('登山')
   })
 })
 
