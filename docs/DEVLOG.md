@@ -122,6 +122,22 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B1 一句話任務解析＋任務確認卡｜Peter（AI 協助）｜Closes #31
+- **做了什麼**：
+  - 後端：Prompt 14（`server/prompts/14_task.ts`，restatement 改成簡體）；`server/social/task.ts` 的 `createTaskFromText`（解析→寫 `agent_tasks` pending_confirm→寫日誌）、`changeTaskStatus`（confirm／pause／resume／cancel）；API `POST /api/tasks`、`GET /api/tasks/:id`、`POST /api/tasks/:id/{confirm,pause,resume,cancel}`；contract `createTaskFromText` 換成真的。
+  - 前端：`src/lib/api/social.ts`（`createTask`／`getTask`／`updateTask`，`VITE_API_MODE=http` 打後端，否則 mock）、`src/features/social/components/TaskConfirmCard.tsx`（props `{ taskId, onStarted?, onCancelled? }`）。
+- **為什麼這樣做**：
+  - 模型漏給或給超出範圍的數字時，用 `normalizeParsed` 照 Prompt 14 規則補正（人數上限 10、合適人數預設 min(count,2)、最多代聊 count×2），不完全依賴模型。
+  - A0b（Supabase client、登入）還沒做，所以 `agent_tasks` 讀寫放在 `server/social/taskStore.ts`：有 Supabase 就寫資料庫，沒有就用記憶體；`server/social/db.ts` 是暫用的 client，`log.ts` 也改用它。沒接資料庫時以固定的 `dev-user` 身分執行；有資料庫但沒登入就回「请先登录」，避免假身分寫進正式資料。
+  - 狀態轉換寫成表（只允許合法轉換）；開始／繼續前檢查 `social_agent_enabled` 與 `shareable_confirmed`。
+- **改了哪些檔案**：`server/prompts/14_task.ts`、`server/social/{task,taskStore,db,user}.ts`、`server/routes/social.ts`、`server/contracts/social.ts`、`server/lib/log.ts`、`src/lib/api/social.ts`、`src/features/social/components/TaskConfirmCard.tsx`、`tests/social/{task,task-api}.test.ts`。
+- **給 A**：AI 朋友聊天頁的 mock 任務彈窗（`FriendPage.tsx` 的 `TaskConfirmModal`）可以換成 `createTask(text)` ＋ `<TaskConfirmCard taskId=… />`（A2）。
+- **踩到的坑**：`src/vite-env.d.ts` 沒有 `vite/client` 型別，所以 `import.meta.env` 沒型別；在 `src/lib/api/social.ts` 開頭加 `/// <reference types="vite/client" />`，沒改 A 的檔案。
+- **驗證**：`tsc -b` 通過；vitest 28/28，含驗收 1（登山任務解析為 sport／喜欢登山／3 人／2 位合適／最多 6 場，LLM 用 mock）與驗收 2（未確認對外檔案按開始回 403 與中文提示）；`npm run build` 成功。確認卡還沒放進任何頁面，畫面要等 A2 接上才看得到。
+- **還沒做完／待辦**：用真實模型跑一次驗收 1（等 `MODEL_*` 與金鑰）；A0b 後把 `db.ts`、`user.ts` 換成 A 的共用版本，前端 `request()` 帶上登入 token。
+
+---
+
 ### 2026-10-30｜B0 LLM 封裝、工作日誌、設定常數｜Peter（AI 協助）｜Closes #14
 - **做了什麼**：`server/lib/config.ts`（07 §6 CONFIG 逐字）；`server/lib/llm/`：`llmText`／`llmJson`／`embed`、`LlmError { role, reason, attempts }`、`extractJson`；`server/lib/log.ts`：`writeLog`（寫 `agent_logs`，失敗只記 console）。contracts stub 在 S0 已完成。
 - **為什麼這樣做**：
