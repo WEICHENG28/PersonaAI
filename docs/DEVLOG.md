@@ -26,6 +26,18 @@
 
 ## 共用與決策
 
+### 2026-10-30｜模型選定（團隊統一）｜Peter（AI 協助）
+- **決定**：`MODEL_CHAT=gemini-2.5-flash-nothinking`、`MODEL_REASON=gemini-2.5-flash-nothinking`、`MODEL_FAST=qwen-flash`、`MODEL_EMBED=text-embedding-3-small`（1024）。已寫進 `.env.example`，三人的 `.env.local` 要一樣。
+- **實測**（同一平台，只呼叫模型）：
+  - 推理（任務解析＋挑人，各 2 次）：deepseek-v4-pro 4/4、10.5 秒；gemini-2.5-flash-nothinking 4/4、2.7 秒；gemini-3-flash-preview-nothinking 4/4、2.3 秒（preview 可能變動，不選）；gpt-4.1-mini 4/4、2.1 秒但另一次連線失敗；claude-haiku-4-5 4/4、3.1 秒；deepseek-v4-flash、deepseek-v3.2 有連線錯誤。
+  - 評審一次（雙方各 3 次）：gemini-2.5-flash-nothinking 約 6～11 秒；deepseek-v4-pro **136 秒**（理由寫得更細，但太慢）。
+  - 聊天：kimi-k3 12 秒、deepseek-v4-pro 7 秒、gemini-2.5-flash-nothinking 4 秒；claude-sonnet-4-5 回 500。
+  - 隱私守門（含地址的句子）：qwen-flash、gemini-2.5-flash-lite 會擋；**gpt-4.1-nano 沒擋住**。
+- **原則**：不用名字有 thinking／reasoner／r1／o3 的模型（每次多想 10～30 秒）；分身代聊一場最多 32 次呼叫，速度優先。若之後覺得阿澈不夠自然，A 可以把 `MODEL_CHAT` 改成 `deepseek-v4-pro`（約 7 秒），其他不變。
+- **embedding 不要換**：雲端種子用戶的向量是用 `text-embedding-3-small` 算的。
+
+---
+
 ### 2026-10-30｜真實登入也改成只要用戶名稱（Supabase 匿名登入）｜Peter（AI 協助）
 - **做了什麼**：登入頁不分模式都只剩「用户名称」（隨機預填、可換、不填也能開始）。http 模式按「直接开始」→ `supabase.auth.signInAnonymously`（名稱存在 `display_name`）→ `POST /api/profile/init` 建 `users` 列；mock 模式照舊假登入。新增 `loginAnonymously()`（`src/lib/api/friend.ts`），信箱密碼表單移除，但 `register`／`login` 函式保留。
 - **為什麼這樣做**：Peter 決定產品先免註冊、什麼都不打就能開始；Demo 版和真實版登入頁一致。
@@ -173,6 +185,15 @@
 ---
 
 ## B：社交 Agent 線（Peter）
+
+### 2026-10-30｜B5 評審（3 次共識、各視角大綱）＋LLM 同時請求上限｜Peter（AI 協助）｜Closes #34
+- **做了什麼**：Prompt 6（`server/prompts/06_judge.ts`，簡體，含 fit_points）；`server/social/judge.ts`：`evaluate`（雙方視角各判 `JUDGE_RUNS` 次、平行）、`directionScore`、`toScoredRun`、`aggregateRuns`（2 次以上相同取多數，否則不確定）、`pickOutline`（各視角自己的大綱；不合適清空 fit_points；evidence 經 C 的 `guardText`，守的是被描述的對方）、`formatTranscript`；寫兩筆 `match_scores`；日誌「第 N 轮：你的视角…、对方视角…」＋「3 次判定：…」。`runnerDeps.ts` 換上真評審，刪掉暫代版。`server/lib/llm`：同時最多 3 個請求、失敗重試前等待（第 n 次等 n×0.8 秒）。`.env.example` 寫入選定模型。
+- **為什麼這樣做**：評審一次 6 個請求，平台同時收到太多會回 Connection error，所以在 LLM 層排隊＋退避，所有功能都受益。單次判定失敗不計入；全部失敗該視角就是「不確定」，迴圈會多聊幾輪，不會中斷。有的模型把 `fit_points` 放在最外層，schema 先搬回 `outline`。
+- **改了哪些檔案**：`server/prompts/06_judge.ts`、`server/social/{judge,agentStore,runnerDeps}.ts`、`server/lib/llm/index.ts`、`.env.example`、`tests/social/{judge,runner,llm}.test.ts`。
+- **驗證**：`tsc -b`；vitest 243/243（方向分數、≥70 判定、多數決四種情況、fit_points 守門與清空、逐輪格式、雙方 6 次判定與兩筆 match_scores、全部失敗變不確定、fit_points 放錯位置、同時請求上限）；`npm run build`。真實模型（樣本對話、不寫資料庫）：gemini-2.5-flash-nothinking 11 秒判雙向合適，fit_points「对方主动分享爬山习惯与私藏的不累路线，并提议下次一起慢慢走」。
+- **還沒做完／待辦**：B6 歷史頁（讀 `match_attempts`）、B8 回報補合適名單。整條主線要等 C3（#62）的真代聊函式合併後，由 Peter 開 worker 實跑一次。
+
+---
 
 ### 2026-10-30｜B4 規劃器（LLM 挑人與決策）｜Peter（AI 協助）｜Closes #15
 - **做了什麼**：Prompt 4（`server/prompts/04_planner.ts`，簡體）；`server/social/planner.ts`：`pick`（輸入任務、用戶偏好與後台檔案 Big Five、候選人對外檔案，回挑誰、理由、開場話題）、`decide`（輸入檔位、雙方判定、輪數，回下一步與理由）、`cleanReason`；`runnerDeps.ts` 換成真的規劃器；迴圈的 `decide` 改成回 `{ action, reason }`，程式規則和規劃器一致時，日誌用規劃器寫的理由；`UserSettings` 加上 `preferences`。

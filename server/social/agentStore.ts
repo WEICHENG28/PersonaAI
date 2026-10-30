@@ -30,6 +30,18 @@ export interface AttemptRecord {
   outline: Outline | null
 }
 
+/** match_scores 一列（每個視角一列；只給後台用，前端讀不到）。 */
+export interface ScoreRow {
+  conversation_id: string
+  perspective_user_id: string
+  round: number
+  runs: unknown[]
+  direction_score: number
+  verdict: string
+  reason_type: ReasonType | null
+  reason_text: string | null
+}
+
 export interface AgentStore {
   getTask(id: string): Promise<AgentTask | null>
   updateTask(id: string, patch: TaskPatch): Promise<AgentTask>
@@ -43,6 +55,7 @@ export interface AgentStore {
   countAutoChatsSince(userId: string, since: Date): Promise<number>
   conversationState(conversationId: string): Promise<ConversationState | null>
   recordAttempt(record: AttemptRecord): Promise<void>
+  recordScores(rows: ScoreRow[]): Promise<void>
   notifyMatch(userId: string, payload: Record<string, unknown>): Promise<void>
 }
 
@@ -69,6 +82,7 @@ export class MemoryAgentStore implements AgentStore {
   failCounts = new Map<string, number>()
   conversations = new Map<string, ConversationState>()
   attempts: AttemptRecord[] = []
+  scores: ScoreRow[] = []
   notifications: { userId: string; payload: Record<string, unknown> }[] = []
   autoChatsToday = 0
   settings: UserSettings = { match_tier: 'mutual', preferences: { personality: 'similar', conditions: [] }, daily_chat_limit: 10, manual_minutes_per_chat: 20 }
@@ -109,6 +123,9 @@ export class MemoryAgentStore implements AgentStore {
   }
   async recordAttempt(record: AttemptRecord) {
     this.attempts.push(structuredClone(record))
+  }
+  async recordScores(rows: ScoreRow[]) {
+    this.scores.push(...structuredClone(rows))
   }
   async notifyMatch(userId: string, payload: Record<string, unknown>) {
     this.notifications.push({ userId, payload })
@@ -174,6 +191,9 @@ function supabaseStore(db: Db): AgentStore {
     },
     async recordAttempt(record) {
       await one(db.from('match_attempts').insert(record))
+    },
+    async recordScores(rows) {
+      await one(db.from('match_scores').insert(rows))
     },
     async notifyMatch(userId, payload) {
       await one(db.from('notifications').insert({ user_id: userId, type: 'match', payload }))

@@ -5,7 +5,7 @@ import { setLogWriter } from '../../server/lib/log'
 import { MemoryAgentStore } from '../../server/social/agentStore'
 import { decideGuard, isNotifiable, isTaskDone, reachedDailyLimit } from '../../server/social/guards'
 import { runTaskStep, runTaskStepSafely, type RunnerDeps } from '../../server/social/runner'
-import { evaluatePlaceholder, pickMostSimilar } from '../../server/social/runnerDeps'
+import { pickMostSimilar } from '../../server/social/runnerDeps'
 
 const NOW = new Date('2026-10-30T12:00:00')
 
@@ -221,9 +221,9 @@ describe('runTaskStep', () => {
     expect(logs.at(-1)).toMatchObject({ action: '双向合适，通知你', reason: '双方都觉得聊得来' })
   })
 
-  it('暫代評審判「不確定」→ 繼續聊', async () => {
+  it('評審判「不確定」→ 繼續聊', async () => {
     put(chatting())
-    deps.evaluate = (task, conv, round) => evaluatePlaceholder(task, conv, round)
+    deps.evaluate = vi.fn(async () => evaluation('uncertain', 'suitable'))
     expect(await runTaskStep('t1', deps)).toBe('continue_chat')
   })
 })
