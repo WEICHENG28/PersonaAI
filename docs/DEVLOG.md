@@ -130,6 +130,36 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B1 一句話任務解析＋任務確認卡｜Peter（AI 協助）｜Closes #31
+- **做了什麼**：
+  - 後端：Prompt 14（`server/prompts/14_task.ts`，restatement 改成簡體）；`server/social/task.ts` 的 `createTaskFromText`（解析→寫 `agent_tasks` pending_confirm→寫日誌）、`changeTaskStatus`（confirm／pause／resume／cancel）；API `POST /api/tasks`、`GET /api/tasks/:id`、`POST /api/tasks/:id/{confirm,pause,resume,cancel}`；contract `createTaskFromText` 換成真的。
+  - 前端：`src/lib/api/social.ts`（`createTask`／`getTask`／`updateTask`，`VITE_API_MODE=http` 打後端，否則 mock）、`src/features/social/components/TaskConfirmCard.tsx`（props `{ taskId, onStarted?, onCancelled? }`）。
+- **為什麼這樣做**：
+  - 模型漏給或給超出範圍的數字時，用 `normalizeParsed` 照 Prompt 14 規則補正（人數上限 10、合適人數預設 min(count,2)、最多代聊 count×2），不完全依賴模型。
+  - A0b（Supabase client、登入）還沒做，所以 `agent_tasks` 讀寫放在 `server/social/taskStore.ts`：有 Supabase 就寫資料庫，沒有就用記憶體；`server/social/db.ts` 是暫用的 client，`log.ts` 也改用它。沒接資料庫時以固定的 `dev-user` 身分執行；有資料庫但沒登入就回「请先登录」，避免假身分寫進正式資料。
+  - 狀態轉換寫成表（只允許合法轉換）；開始／繼續前檢查 `social_agent_enabled` 與 `shareable_confirmed`。
+- **改了哪些檔案**：`server/prompts/14_task.ts`、`server/social/{task,taskStore,db,user}.ts`、`server/routes/social.ts`、`server/contracts/social.ts`、`server/lib/log.ts`、`src/lib/api/social.ts`、`src/features/social/components/TaskConfirmCard.tsx`、`tests/social/{task,task-api}.test.ts`。
+- **給 A**：AI 朋友聊天頁的 mock 任務彈窗（`FriendPage.tsx` 的 `TaskConfirmModal`）可以換成 `createTask(text)` ＋ `<TaskConfirmCard taskId=… />`（A2）。
+- **踩到的坑**：`src/vite-env.d.ts` 沒有 `vite/client` 型別，所以 `import.meta.env` 沒型別；在 `src/lib/api/social.ts` 開頭加 `/// <reference types="vite/client" />`，沒改 A 的檔案。
+- **驗證**：`tsc -b` 通過；vitest 28/28，含驗收 1（登山任務解析為 sport／喜欢登山／3 人／2 位合適／最多 6 場，LLM 用 mock）與驗收 2（未確認對外檔案按開始回 403 與中文提示）；`npm run build` 成功。確認卡還沒放進任何頁面，畫面要等 A2 接上才看得到。
+- **還沒做完／待辦**：用真實模型跑一次驗收 1（等 `MODEL_*` 與金鑰）；A0b 後把 `db.ts`、`user.ts` 換成 A 的共用版本，前端 `request()` 帶上登入 token。
+
+---
+
+### 2026-10-30｜B0 LLM 封裝、工作日誌、設定常數｜Peter（AI 協助）｜Closes #14
+- **做了什麼**：`server/lib/config.ts`（07 §6 CONFIG 逐字）；`server/lib/llm/`：`llmText`／`llmJson`／`embed`、`LlmError { role, reason, attempts }`、`extractJson`；`server/lib/log.ts`：`writeLog`（寫 `agent_logs`，失敗只記 console）。contracts stub 在 S0 已完成。
+- **為什麼這樣做**：
+  - 重試由我們自己控制（SDK `maxRetries: 0`），總次數 `LLM_MAX_RETRIES + 1`；`llmJson` 重試時把上次輸出和「上次输出格式错误：…」補進 messages，讓模型自己修。
+  - 平台不支援 `response_format: json_object`（回 400）時，記住並改用一般模式，再用 `extractJson` 從回應擷取第一段 JSON（支援 ```json 區塊、字串內含括號）。
+  - `embed` 長度不符是設定錯誤，直接丟錯不重試。
+  - 測試可用 `setLlmClient()`／`setLogWriter()` 換成假的，不打真 API、不碰共用資料庫。
+- **改了哪些檔案**：`server/lib/config.ts`、`server/lib/llm/{index,client,env,json}.ts`、`server/lib/log.ts`、`tests/social/llm.test.ts`。
+- **踩到的坑**：`npm ci` 在 Windows 上會因為有 Node 行程鎖住 `lightningcss` 原生檔而 EPERM，改用 `npm install`。用 tsx 動態 import 絕對路徑要寫成 `file:///D:/...`。
+- **驗證**：`tsc -b` 通過；vitest 18/18（extractJson、schema 不符重試、逾時重試、最多 3 次後丟 LlmError、空字串重試、embed 長度檢查、writeLog 失敗不中斷）；另用本機假平台實測真的 OpenAI SDK：json_object 回 400 → 自動改一般模式並擷取 JSON、embed 有帶 `dimensions`。
+- **還沒做完／待辦**：`server/lib/llm/env.ts` 與 `log.ts` 裡的 Supabase client 是暫時的，A0b 完成 `server/lib/env.ts`、`supabase.ts` 後改用共用的（log.ts 有 TODO）。真實平台的 JSON 模式支援度、`MODEL_*` 要實測後決定。
+
+---
+
 ### 2026-10-30｜S0 後端骨架｜Peter（AI 協助）｜Closes #43
 - **做了什麼**：新增 `server/`（Hono）：`app.ts` 組合三條線路由、`GET /api/health`、統一錯誤格式 `{ ok:false, error }`；`server/routes/{friend,social,twin}.ts` 空路由給各線填；`shared/types.ts`（07 §5 逐字）；`server/contracts/{friend,social,twin}.ts` 三個 stub＋`server/fixtures/`；`scripts/worker.ts` 佔位；`npm run server／worker／seed`；Vite `/api` 代理到 `127.0.0.1:8787`；`tsconfig.server.json`；`.env.example` 改成 docs/10 §2。介面語言定為簡體（07 §7.9、AGENTS 同步）。
 - **為什麼這樣做**：A0 是純前端，LLM 金鑰與 service role 只能放後端；先把骨架和三條線的 contracts stub 立好，A0b、B0、C0 可以同時開工。各線只改自己的 `server/routes/<線>.ts`，`app.ts` 不用動，避免撞車。
