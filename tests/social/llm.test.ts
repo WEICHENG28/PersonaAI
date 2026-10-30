@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { CONFIG } from '../../server/lib/config'
-import { LlmError, embed, extractJson, llmJson, llmText, setLlmClient, type LlmClient } from '../../server/lib/llm'
+import { LlmError, embed, extractJson, llmJson, llmText, llmTuning, setLlmClient, type LlmClient } from '../../server/lib/llm'
 import { setLogWriter, writeLog } from '../../server/lib/log'
 
 beforeAll(() => {
@@ -83,6 +83,25 @@ describe('llmJson', () => {
     expect(err).toBeInstanceOf(LlmError)
     expect(err).toMatchObject({ role: 'reason', attempts: MAX_ATTEMPTS })
     expect(calls).toHaveLength(MAX_ATTEMPTS)
+  })
+})
+
+describe('同時請求上限', () => {
+  it('同時最多 llmTuning.maxConcurrent 個，其他排隊', async () => {
+    let now = 0
+    let peak = 0
+    setLlmClient({
+      chat: async () => {
+        peak = Math.max(peak, ++now)
+        await new Promise((r) => setTimeout(r, 10))
+        now--
+        return 'ok'
+      },
+      embed: async () => [1, 2, 3, 4],
+    })
+    const outs = await Promise.all(Array.from({ length: 6 }, () => llmText({ ...base, role: 'chat' })))
+    expect(outs).toEqual(Array(6).fill('ok'))
+    expect(peak).toBe(llmTuning.maxConcurrent)
   })
 })
 
