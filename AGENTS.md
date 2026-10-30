@@ -34,8 +34,9 @@
 ## 工作中
 
 - **只做這個任務、只改這條線的檔案。** 不順手重構、不改格式、不升級套件、不做下一個任務。
-- **跨線只呼叫 `lib/contracts/`**，不讀寫別條線的內部檔案；對方還沒做好就用 stub／`fixtures/`。覺得簽名要改，停下來告訴使用者。
-- 遵守 07 第 7 節「給開發 Agent 的共通規則」（AI 標示、隱私分層、寫日誌、LLM 走 `lib/llm`、zod 驗證、檔案 ≤ 400 行等）。
+- **跨線只呼叫 `server/contracts/`**，不讀寫別條線的內部檔案；對方還沒做好就用 stub／`server/fixtures/`。覺得簽名要改，停下來告訴使用者。
+- 遵守 07 第 7 節「給開發 Agent 的共通規則」（AI 標示、隱私分層、寫日誌、LLM 走 `server/lib/llm`、zod 驗證、檔案 ≤ 400 行等）。
+- **介面文字、AI 產生的對話、API 錯誤訊息一律用簡體中文**；程式碼註解與規格文件不限。
 - 測試放 `tests/<friend|social|twin>/`，只放自己那條線的；LLM 一律 mock。
 - 所有檔案讀寫明確指定 `encoding="utf-8"`。
 - 做畫面時照 [docs/08](docs/08_前端設計規範.md)（Hallmark **Hum** 主題），只用 `src/theme/tokens.css` 的 token，不新增顏色或字型。A 已做好的頁面 UI 不要重做，只把資料從 mock 接到 `/api`（10 第 3 節）。

@@ -122,7 +122,13 @@
 
 ## B：社交 Agent 線（Peter）
 
-（還沒有紀錄）
+### 2026-10-30｜S0 後端骨架｜Peter（AI 協助）｜Closes #43
+- **做了什麼**：新增 `server/`（Hono）：`app.ts` 組合三條線路由、`GET /api/health`、統一錯誤格式 `{ ok:false, error }`；`server/routes/{friend,social,twin}.ts` 空路由給各線填；`shared/types.ts`（07 §5 逐字）；`server/contracts/{friend,social,twin}.ts` 三個 stub＋`server/fixtures/`；`scripts/worker.ts` 佔位；`npm run server／worker／seed`；Vite `/api` 代理到 `127.0.0.1:8787`；`tsconfig.server.json`；`.env.example` 改成 docs/10 §2。介面語言定為簡體（07 §7.9、AGENTS 同步）。
+- **為什麼這樣做**：A0 是純前端，LLM 金鑰與 service role 只能放後端；先把骨架和三條線的 contracts stub 立好，A0b、B0、C0 可以同時開工。各線只改自己的 `server/routes/<線>.ts`，`app.ts` 不用動，避免撞車。
+- **改了哪些檔案**：`server/**`、`shared/types.ts`、`scripts/worker.ts`、`tests/social/server.test.ts`、`package.json`／lockfile（新增 hono、@hono/node-server、openai、zod、@supabase/supabase-js、tsx）、`vite.config.ts`、`tsconfig.json`、`tsconfig.server.json`、`.env.example`、`docs/07`、`docs/10`、`AGENTS.md`。
+- **踩到的坑**：Windows 上 `localhost` 可能先解析成 IPv6，後端綁 `127.0.0.1`、代理也寫 `127.0.0.1`；`.env.local` 用 Node 內建 `process.loadEnvFile` 載入，不另裝 dotenv。zod 裝到的是 v4。
+- **驗證**：`tsc -b` 通過；vitest 7/7；實際啟動後 `curl` 直連 8787 與經 Vite 代理的 `/api/health` 都回 `{"ok":true}`。
+- **還沒做完／待辦**：`server/lib/env.ts`、`supabase.ts`、`auth.ts` 由 A0b 做；`server/lib/llm`、`log.ts`、`config.ts` 由 B0 做；`scripts/seed.ts` 由 C0 做。
 
 ---
 
