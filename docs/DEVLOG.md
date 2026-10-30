@@ -26,6 +26,13 @@
 
 ## 共用與決策
 
+### 2026-10-30｜Rive 檔名重接｜Vincent（AI 協助）｜直接 commit main（骨架階段）
+- **做了什麼**：使用者更名 `public/riv/`（robot→clover_bot、fish→fish_vase），`RiveAvatar.tsx` 的 SOURCES 重接新檔名。
+- **為什麼**：舊路徑被 Vite SPA fallback 吃掉回傳 HTML，頭像 404 掛掉；三個新檔內部都有 `State Machine 1`，runtime 設定不用改。
+- **驗證**：tsc 過；HTTP 實測新檔回 RIVE magic bytes、舊檔回 HTML。
+
+---
+
 ### 2026-10-30｜Vite SPA 重構（02 全流程可點）＋導航/落地頁修正｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：把 Next.js SSR 骨架整個換成 Vite 6 + React 19 SPA（TS strict、Tailwind v4、Zustand demo 引擎、零後端依賴），02 的 12 步流程全可點；本次修正容器排版（卡片 box-sizing、grid min-width:0、防橫向溢出）、導航響應式（≥64rem 頂欄 nav；手機極簡頂欄 wordmark＋阿澈鈕、底部 Hum 卡紙 tab 拖攔）、新增 `/landing` 落地頁（點頂欄 PersonaAI wordmark 進入，less wordy、Hum 構成：settled hero、卡紙角色卡、撕紙流程帶、梨黃數字 field）。
 - **為什麼這樣做**：demo 階段 UI 呈現優先，客戶端模擬最快可跑；保留 `lib/api` 型別+MockApi 縫隙之後接真後端。單語 zh-CN（使用者決定 scrap 多語）。
@@ -43,6 +50,12 @@
 - **還沒做完／待辦**：Hum token 數值是主題頁的近似值，正式 skill 檔安裝後可比對微調；Chillax 字型檔尚未放入（後備 Noto Sans 已生效）。
 
 ---
+
+### 2026-10-30｜README 與進度追蹤｜Peter
+- **做了什麼**：新增 `README.md`（新成員開工步驟、進度在哪看、文件索引）；新增 `.github/scripts/task.sh`，AI 開工／卡住／完成時自動更新 Issue 留言與看板狀態；AGENTS.md 規定開工就開 Draft PR 並寫 `Closes #`；建立 GitHub Projects 進度看板。
+- **為什麼這樣做**：讓 Peter 和大家上 GitHub 就看得到每個人做到哪，不用在群組問；PR 合併時 Issue 自動關閉、看板自動移到 Done。
+- **踩到的坑／注意事項**：腳本需要 `gh` 有 project 權限（`gh auth refresh -s project`），沒有時 AI 會請使用者手動更新。
+- **還沒做完／待辦**：無。
 
 ### 2026-10-29｜開發前準備｜Peter｜PR #1、#37
 - **做了什麼**：建立 repo 協作規則（`CONTRIBUTING.md`、`AGENTS.md`、`CLAUDE.md`、PR 範本）、放入 01～07 規格文件、開好 A0～C10 共 34 個 Issue。

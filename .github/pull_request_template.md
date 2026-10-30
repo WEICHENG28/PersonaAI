@@ -1,3 +1,5 @@
+Closes #<!-- Issue 編號，合併後會自動關閉 Issue -->
+
 ## 任務
 <!-- 線別與任務 ID，例如：B3 Agent 迴圈與 worker -->
 
