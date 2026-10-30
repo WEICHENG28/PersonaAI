@@ -224,10 +224,11 @@
   - `guardText` 先接 `server/contracts/twin.ts`（C2 前是原樣回傳的 stub），C2 完成後自動生效。
   - 多加了三個檢查：說話者不是對話成員、該方 controller 是 human、說話者沒有對外檔案 → 丟 `TwinError`，不呼叫 LLM、不寫入。沒有風格設定時用預設風格（中等句長、emoji 1）。
   - 第三個參數 `options.extraInstruction` 給 C3 收尾用（Prompt 5 的 `{{extra_instruction}}`）。
-  - Prompt 5 照 07C 翻成簡體，另外補了三處（實測後）：句長與 emoji 程度加上文字說明（只寫「1/3」時，emoji 1 的小安幾乎每句都帶 emoji）；「不編造」清單加上「住址」；被問到個資時也說「要问一下本人」並設 `ask_human`（原本只會婉拒，不符合驗收「會說要問本人」）。
+  - Prompt 5 照 07C 翻成簡體，另外實測後調整：句長與 emoji 程度加上文字說明（只寫「1/3」時，emoji 1 的小安幾乎每句都帶 emoji）；被問到個資時也說「要问一下本人」並設 `ask_human`（原本只會婉拒，不符合驗收「會說要問本人」）。
+  - 「檔案沒寫的一律不知道」照字面執行時，分身幾乎每輪都說要問本人（小安 4 輪有 3 輪），對方分身還吐槽「你把我的话术学走了」。改成：**具體事實**（去過哪、路線、行程、拍過什麼、裝備、經歷、感情、住址、學校、工作）才問本人；**感受、喜好、看法**只要和檔案一致可以回答；說要問本人時也要先接住話題。（Jerry 同意後改）
 - **改了哪些檔案**：`server/twin/twin.ts`、`server/twin/store.ts`、`server/prompts/05_twin.ts`、`tests/twin/twin-reply.test.ts`。
 - **踩到的坑／注意事項**：Prompt 填值用 `replace` 的函式寫法，避免內容裡的 `$` 被當成替換語法。最近 12 則用 `created_at` 由新到舊取再反轉。
-- **驗證**：vitest 全過、`npm run build` 成功。開發腳本（只存在本機、記憶體模式、真的 LLM）讓小安和阿哲聊 8 輪：小安短句、幾乎不用 emoji、語氣溫和；阿哲長句、每則多個 emoji、一次丟好幾個話題。插入「你住哪里？」「你读哪所学校？」，小安都回「要问一下本人」，沒有編造（跑 3 次都一樣）。
+- **驗證**：vitest 全過、`npm run build` 成功。開發腳本（只存在本機、記憶體模式、真的 LLM）讓小安和阿哲聊 8 輪：小安短句、幾乎不用 emoji、語氣溫和；阿哲長句、每則多個 emoji、一次丟好幾個話題。插入「你住哪里？」「你读哪所学校？」，都回「要问一下本人」，沒有編造（改版前後共跑 5 次，含小安 × 子晴一組）。
 - **還沒做完／待辦**：寫入真的 `messages` 表要等 C3 建立對話後一起驗（`is_ai` 寫死為 true，有單元測試）。風格要等 A4 的 `getShareableProfile`／`getStyleProfile` 真實作才會在正式流程生效。
 
 ### 2026-10-30｜C0 種子用戶、seed 腳本、twin contracts stub｜Jerry（AI 協助）｜PR #48、Closes #20
