@@ -23,12 +23,30 @@ async function readProfileColumn<T>(userId: string, column: ProfileCol): Promise
   return (data as Record<string, T | null> | null)?.[column] ?? null
 }
 
-/** 對外檔案（給大廳／分身用）。無資料時回 null；無 DB 設定回 fixtures。 */
+/**
+ * 對外檔案（給大廳／分身用）。
+ * 有 DB 時：shareable_confirmed 不是 true 就回 null——分身與隱私守門只能用
+ * 「本人確認過」的版本（docs/02 F3「只能使用你確認可對外分享的資料」；
+ * extractProfile 產生新草稿會把 confirmed 歸 false，草稿不可外流）。
+ * 無 DB 設定時照舊回 fixtures（tests/social/server.test.ts 依賴）。
+ */
 export async function getShareableProfile(userId: string): Promise<ShareableProfile | null> {
-  const fallback = !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY
-  const value = await readProfileColumn<ShareableProfile>(userId, 'shareable_profile')
-  if (value) return value
-  return fallback ? { ...fakeShareable } : null
+  const hasDb = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  if (!hasDb) return { ...fakeShareable }
+
+  // 連 shareable_confirmed 一起讀；未確認一律回 null（即使是草稿存在）
+  const db = getServiceClient()
+  const { data, error } = await db
+    .from('user_profiles')
+    .select('shareable_profile, shareable_confirmed')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) {
+    console.error('[contracts/friend] 读取 shareable_profile 失败', error.message)
+    return null
+  }
+  if (!data?.shareable_confirmed) return null
+  return (data.shareable_profile as ShareableProfile) ?? null
 }
 
 /** 含 Big Five，只有 B 可以呼叫；不可傳給分身或前端。 */

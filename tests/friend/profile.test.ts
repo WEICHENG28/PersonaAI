@@ -301,13 +301,14 @@ describe('contracts（无 DB 设定回退 fixtures；有 DB 读库）', () => {
     }
   })
 
-  it('有 DB 设定且库中有值：shareable 原样、agent 深拷贝、style 只回 agent_profile.style', async () => {
+  it('有 DB 设定且库中有值（shareable_confirmed = true）：shareable 原样、agent 深拷贝、style 只回 agent_profile.style', async () => {
     process.env.SUPABASE_URL = 'http://127.0.0.1:54321'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
     try {
       const full = validExtract()
       tables['user_profiles']!.list.push({
         shareable_profile: full.shareable_profile,
+        shareable_confirmed: true,
         agent_profile: full.agent_profile,
       })
       const shareable = await getShareableProfile('u1')
@@ -317,6 +318,42 @@ describe('contracts（无 DB 设定回退 fixtures；有 DB 读库）', () => {
       expect(agent).not.toBe(full.agent_profile) // 深拷贝，不回同一引用
       const style = await getStyleProfile('u1')
       expect(style?.sentence_length).toBe('short')
+    } finally {
+      delete process.env.SUPABASE_URL
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY
+    }
+  })
+
+  it('shareable_confirmed = false（extractProfile 产出新草稿）：getShareableProfile 回 null，分身/守门拿不到未确认内容', async () => {
+    process.env.SUPABASE_URL = 'http://127.0.0.1:54321'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
+    try {
+      const full = validExtract()
+      tables['user_profiles']!.list.push({
+        shareable_profile: full.shareable_profile,
+        shareable_confirmed: false,
+        agent_profile: full.agent_profile,
+      })
+      expect(await getShareableProfile('u1')).toBeNull()
+      // agent_profile 不受确认状态影响（B 判定用，不外流）
+      expect(await getAgentProfile('u1')).not.toBeNull()
+    } finally {
+      delete process.env.SUPABASE_URL
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY
+    }
+  })
+
+  it('shareable_confirmed 缺省（null，从未确认）：getShareableProfile 回 null', async () => {
+    process.env.SUPABASE_URL = 'http://127.0.0.1:54321'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
+    try {
+      const full = validExtract()
+      tables['user_profiles']!.list.push({
+        shareable_profile: full.shareable_profile,
+        shareable_confirmed: null,
+        agent_profile: full.agent_profile,
+      })
+      expect(await getShareableProfile('u1')).toBeNull()
     } finally {
       delete process.env.SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
