@@ -193,6 +193,13 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B3 修正：對方本人接手時迴圈放手｜Peter（AI 協助）｜分支 b/B3-side-b-takeover
+- **做了什麼**：`ConversationState` 加上 `sideBController`（Supabase 版多讀 `side_b_controller`，記憶體版預設 `twin`）；`advanceChat` 改成任一方是本人就清掉 `active_conversation_id`、寫日誌、回 `chat_cleared`，不再呼叫 `runTwinRounds`。日誌分成「你已接手」和「对方本人已接手」。
+- **為什麼這樣做**：C3（#62）的 `runTwinRounds` 會跳過本人在聊的那一方。原本迴圈只看 a 方，對方按「我來聊」後，我方分身會一次連發 4 則、不等對方回話，聊夠輪數後還會拿這種對話去判定。
+- **改了哪些檔案**：`server/social/{agentStore,runner}.ts`、`tests/social/runner.test.ts`。
+- **踩到的坑／注意事項**：無。
+- **還沒做完／待辦**：對方本人接手後，這場對話要不要記一筆 `match_attempts`、算不算進 `progress`，規格沒寫，等三人決定；目前只放手、換下一位，不記錄也不計數。
+
 ### 2026-10-30｜B5 評審（3 次共識、各視角大綱）＋LLM 同時請求上限｜Peter（AI 協助）｜Closes #34
 - **做了什麼**：Prompt 6（`server/prompts/06_judge.ts`，簡體，含 fit_points）；`server/social/judge.ts`：`evaluate`（雙方視角各判 `JUDGE_RUNS` 次、平行）、`directionScore`、`toScoredRun`、`aggregateRuns`（2 次以上相同取多數，否則不確定）、`pickOutline`（各視角自己的大綱；不合適清空 fit_points；evidence 經 C 的 `guardText`，守的是被描述的對方）、`formatTranscript`；寫兩筆 `match_scores`；日誌「第 N 轮：你的视角…、对方视角…」＋「3 次判定：…」。`runnerDeps.ts` 換上真評審，刪掉暫代版。`server/lib/llm`：同時最多 3 個請求、失敗重試前等待（第 n 次等 n×0.8 秒）。`.env.example` 寫入選定模型。
 - **為什麼這樣做**：評審一次 6 個請求，平台同時收到太多會回 Connection error，所以在 LLM 層排隊＋退避，所有功能都受益。單次判定失敗不計入；全部失敗該視角就是「不確定」，迴圈會多聊幾輪，不會中斷。有的模型把 `fit_points` 放在最外層，schema 先搬回 `outline`。

@@ -16,6 +16,7 @@ export interface UserSettings {
 export interface ConversationState {
   status: 'active' | 'waiting_human' | 'ended'
   sideAController: Controller
+  sideBController: Controller
 }
 
 export interface AttemptRecord {
@@ -119,7 +120,7 @@ export class MemoryAgentStore implements AgentStore {
     return this.autoChatsToday
   }
   async conversationState(id: string) {
-    return this.conversations.get(id) ?? { status: 'active' as const, sideAController: 'twin' as const }
+    return this.conversations.get(id) ?? { status: 'active' as const, sideAController: 'twin' as const, sideBController: 'twin' as const }
   }
   async recordAttempt(record: AttemptRecord) {
     this.attempts.push(structuredClone(record))
@@ -183,11 +184,12 @@ function supabaseStore(db: Db): AgentStore {
       return count ?? 0
     },
     async conversationState(id) {
-      const row = (await one(db.from('conversations').select('status,side_a_controller').eq('id', id).maybeSingle())) as {
+      const row = (await one(db.from('conversations').select('status,side_a_controller,side_b_controller').eq('id', id).maybeSingle())) as {
         status: ConversationState['status']
         side_a_controller: Controller
+        side_b_controller: Controller
       } | null
-      return row ? { status: row.status, sideAController: row.side_a_controller } : null
+      return row ? { status: row.status, sideAController: row.side_a_controller, sideBController: row.side_b_controller } : null
     },
     async recordAttempt(record) {
       await one(db.from('match_attempts').insert(record))

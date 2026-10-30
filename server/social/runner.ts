@@ -170,11 +170,17 @@ async function startWithRetry(task: AgentTask, target: { candidate: LobbyCandida
 /** 執行＋評估＋決策：讓分身再聊幾輪，夠多輪後判定，再決定下一步。 */
 async function advanceChat(task: AgentTask, conversationId: string, deps: RunnerDeps): Promise<StepOutcome> {
   const state = await deps.store.conversationState(conversationId)
-  if (!state || state.status === 'ended' || state.sideAController === 'human') {
+  // 任一方本人接手就放手：runTwinRounds 會跳過本人那方，我方分身會連發不等對方回話
+  const meHuman = state?.sideAController === 'human'
+  const otherHuman = state?.sideBController === 'human'
+  if (!state || state.status === 'ended' || meHuman || otherHuman) {
     await deps.store.updateTask(task.id, { active_conversation_id: null })
-    await log(task, '这场代聊已结束或你已接手，换下一位', state?.sideAController === 'human' ? '本人接手' : '对话已结束', {
-      conversation_id: conversationId,
-    })
+    const [title, detail] = meHuman
+      ? ['你已接手这场对话，换下一位', '你本人接手']
+      : otherHuman
+        ? ['对方本人已接手这场对话，换下一位', '对方本人接手']
+        : ['这场代聊已结束，换下一位', '对话已结束']
+    await log(task, title, detail, { conversation_id: conversationId })
     return 'chat_cleared'
   }
 
