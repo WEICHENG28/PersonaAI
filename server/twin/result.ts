@@ -66,7 +66,10 @@ export interface ResultStore extends Pick<ChatRoomStore, 'getConversation' | 'ge
   getMyLatestAttempt(conversationId: string, userId: string): Promise<AttemptRow | null>
   /** 等本人（waiting_human）的對話改回 active；其他狀態不動。 */
   resumeConversation(conversationId: string): Promise<void>
-  /** 繼續聊完後 active 改回 waiting_human；其他狀態不動。不寫日誌、不通知（不是 markWaitingHuman）。 */
+  /**
+   * 繼續聊完後 active 改回 waiting_human；只在狀態是 active 且雙方都還是分身時改（有人本人接手就不動）。
+   * 不寫日誌、不通知（不是 markWaitingHuman）。
+   */
   pauseConversation(conversationId: string): Promise<void>
 }
 

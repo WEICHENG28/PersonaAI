@@ -57,8 +57,9 @@ const AN_OUTLINE = {
 
 interface Harness {
   conv?: ConversationRow | null
-  /** runTwinRounds 跑完後把對話改成這個狀態（模擬聊到一半被結束）。 */
+  /** runTwinRounds 跑完後把對話改成這個樣子（模擬聊到一半被結束或被本人接手）。 */
   statusAfterRun?: ConversationRow['status']
+  convAfterRun?: Partial<ConversationRow>
   scores?: (ScoreRow & { perspective: string })[]
   attempts?: (AttemptRow & { user_id: string })[]
   run?: (id: string, rounds: number) => Promise<{ roundCount: number; ended: boolean }>
@@ -90,12 +91,16 @@ function harness(opts: Harness = {}) {
     resumeConversation: vi.fn(async () => {
       if (row?.status === 'waiting_human') row = { ...row, status: 'active' }
     }),
+    // 和 Supabase 版相同的條件：active 且雙方都是分身才改
     pauseConversation: vi.fn(async () => {
-      if (row?.status === 'active') row = { ...row, status: 'waiting_human' }
+      if (row?.status === 'active' && row.side_a_controller === 'twin' && row.side_b_controller === 'twin') {
+        row = { ...row, status: 'waiting_human' }
+      }
     }),
   }
   const defaultRun = async () => {
     if (row && opts.statusAfterRun) row = { ...row, status: opts.statusAfterRun }
+    if (row && opts.convAfterRun) row = { ...row, ...opts.convAfterRun }
     return { roundCount: 12, ended: opts.statusAfterRun === 'ended' }
   }
   const runTwinRounds = vi.fn(opts.run ?? defaultRun)
@@ -277,6 +282,15 @@ describe('continueTwin：讓分身繼續聊', () => {
     const out = await api.continueTwin('conv-1', ME)
     expect(out.ended).toBe(true)
     expect(current()?.status).toBe('ended')
+  })
+
+  it('跑的途中有一方本人接手（controller 變 human、狀態 active）→ 狀態不改，維持 active', async () => {
+    for (const side of ['side_a_controller', 'side_b_controller'] as const) {
+      const { api, current } = harness({ convAfterRun: { [side]: 'human' } })
+      await api.continueTwin('conv-1', ME)
+      expect(current()?.status).toBe('active')
+      expect(current()?.[side]).toBe('human')
+    }
   })
 
   it('聊到 MAX_ROUNDS（ended = true 但狀態還是 active）→ 改回 waiting_human，不會一直顯示代聊中', async () => {

@@ -36,12 +36,15 @@ export function supabaseResultStore(): ResultStore {
     },
 
     async pauseConversation(conversationId) {
-      // 只改 active；聊到一半被結束或改成別的狀態就不動
+      // 只改 active 且雙方都還是分身：聊到一半被結束、或有人本人接手（C6 會設成 active）就不動，
+      // 否則本人發言後對方分身會因為 waiting_human 而不回
       const { error } = await getServiceClient()
         .from('conversations')
         .update({ status: 'waiting_human' })
         .eq('id', conversationId)
         .eq('status', 'active')
+        .eq('side_a_controller', 'twin')
+        .eq('side_b_controller', 'twin')
       if (error) throw new Error(`更新对话状态失败：${error.message}`)
     },
   }

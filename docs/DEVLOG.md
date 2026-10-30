@@ -388,7 +388,7 @@
   - 瀏覽器（本機 Chrome headless＋CDP，`.local/c5-cdp.ts`，`/api` 在瀏覽器裡攔截回假資料，不登入、不碰資料庫）14 項通過：聊天室「查看结果」能按並導到結果頁；有「双向合适 💞」；判定「对你来说：合适 · 走势上升」；為什麼你們合每點有「你在意的」＋表現＋第 n 輪；大綱四區；完整紀錄預設收起；整頁除了「第 n 轮」沒有數字；點「第 4 轮」→ 展開、捲到畫面內、那兩則標亮；我方在右、對方在左；每則都有 AI 標示；讓分身繼續聊只打一次 `/continue`、紀錄從 12 則變 16 則；先略过回到聊天室。
 - **踩到的坑／注意事項**：
   - 「讓分身繼續聊」**對話是 active 時不行**（409「分身正在代聊中，等这一段聊完再说」）：聊天室的「查看结果」任何時候都能按，active 代表 B 的 worker 可能還在推進，同時跑 `runTwinRounds` 會讓訊息順序亂掉、輪數對不上 fit_points。只有 `waiting_human`（B 通知本人後）才能繼續聊。
-  - 繼續聊完把對話改回 `waiting_human`（`ResultStore.pauseConversation`，只改 active → waiting_human，不呼叫 `markWaitingHuman`，避免重複寫日誌）：這樣可以再按一次，聊天室也不會一直顯示「代聊中」。三種情況都會改回：沒結束、聊到 `MAX_ROUNDS`（`ended = true` 但狀態還是 active，不改的話會一直卡在代聊中、永遠不能再按）、分身出錯（失敗只記在日誌）。聊的過程中對話被設成 ended 就不動。
+  - 繼續聊完把對話改回 `waiting_human`（`ResultStore.pauseConversation`，只改 active → waiting_human，不呼叫 `markWaitingHuman`，避免重複寫日誌）：這樣可以再按一次，聊天室也不會一直顯示「代聊中」。三種情況都會改回：沒結束、聊到 `MAX_ROUNDS`（`ended = true` 但狀態還是 active，不改的話會一直卡在代聊中、永遠不能再按）、分身出錯（失敗只記在日誌）。聊的過程中對話被設成 ended 就不動；**有一方本人接手（controller 變 human，C6 會設成 active）也不動**（`pauseConversation` 條件含雙方 controller 都是 twin），否則本人發言後對方分身會因為 waiting_human 不回。
   - 同時只跑一次的鎖在後端記憶體裡，開多個後端程序時不共用。
   - CDP 測試的攔截規則不能寫 `*/api/*`，會把 Vite 的 `/src/lib/api/*.ts` 原始碼也攔掉，畫面整個不會載入；Chrome 的 profile 放在 repo 裡會讓 Vite 監看檔案時 EBUSY 當掉，要放到 repo 外。
 - **還沒做完／待辦**：
