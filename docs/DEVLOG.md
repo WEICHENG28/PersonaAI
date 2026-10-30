@@ -26,6 +26,14 @@
 
 ## 共用與決策
 
+### 2026-10-30｜Demo 登入簡化成只要用戶名稱｜Peter（AI 協助）
+- **做了什麼**：mock 模式（GitHub Pages demo）的登入頁只剩「用户名称」一欄，預填隨機名字（例如「爱看展的小鹿」），有「换一个」按鈕；什麼都不打按「直接开始」就能進入。新增 `src/features/friend/randomName.ts`、5 個 `login.*` 文字。http 模式（真實 Supabase 登入）的信箱／密碼表單**完全沒動**，改名為 `AuthLogin`。
+- **為什麼這樣做**：產品規劃的成員看 demo 時不用想帳號密碼；真實登入仍需要信箱密碼，所以只改 mock 模式。
+- **給 A**：這是 A 的頁面，Peter 決定的需求、由 B 的 AI 修改。之後若想讓正式版也免註冊，可以用 Supabase 的匿名登入（`signInAnonymously`，要在 Supabase 後台開啟）。
+- **驗證**：`tsc -b`、vitest 47/47（含 `randomName` 測試）、`npm run build` 成功。
+
+---
+
 ### 2026-10-30｜前端 demo 部署到 GitHub Pages｜Peter（AI 協助）
 - **做了什麼**：新增 `.github/workflows/pages.yml`：`main` 有新提交就把前端（mock 模式，不需要後端）建置並部署到 https://weicheng28.github.io/PersonaAI/ ，給產品規劃的成員看介面。為了讓網站在 `/PersonaAI/` 底下能跑，改了 A 的兩個檔案各一行：`src/main.tsx` 的路由加 `basename: import.meta.env.BASE_URL`、`src/components/ui/RiveAvatar.tsx` 的 Rive 檔路徑前面加 `BASE_URL`（本機開發 BASE_URL 是 `/`，行為不變）。
 - **為什麼這樣做**：GitHub Pages 的專案網址多一層 `/PersonaAI/`，絕對路徑 `/riv/...`、路由 `/friend` 都會找不到；SPA 直接打開子頁面時 Pages 回 404，所以建置後把 `index.html` 複製成 `404.html`。

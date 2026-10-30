@@ -25,7 +25,12 @@
     "errorGeneric": "出了点问题，再试一次？",
     "birdCaption": "小鸟正在帮你把信送给 AI 朋友",
     "footer": "注册即代表同意 AI 会在画面上清楚标示，对话为虚构角色设定。",
-    "demoHint": "Demo：任意邮箱密码即可进入"
+    "demoHint": "Demo：任意邮箱密码即可进入",
+    "username": "用户名称",
+    "usernameHint": "随机帮你取好了，想改也可以",
+    "shuffle": "换一个",
+    "start": "直接开始",
+    "demoHintStart": "Demo：不用注册，按「直接开始」就能进入"
   },
   "friend": {
     "title": "阿澈",
