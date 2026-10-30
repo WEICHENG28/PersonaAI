@@ -366,6 +366,35 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-11-01｜C7 請求真人＋通知元件｜Jerry（AI 協助）｜PR #82｜Closes #27
+- **做了什麼**：
+  - 後端（`server/twin/requestHuman.ts`、`notifications.ts`、`notificationStore.ts`，路由在 `server/routes/twin.ts`）：
+    - `POST /api/conversations/:id/request-human`：確認是對話一方、對方是分身、對話沒結束、對方還沒有一則未回應的請求 → 新增通知給對方（type `request_human`，payload `{ conversationId, fromName }`）→ 寫日誌。對方是種子用戶（`users.is_seed`）時 3 秒後自動用 `CONFIG.SEED_AUTO_RESPONSE`（`later`）回應。
+    - `POST /api/notifications/:id/respond`，`{ response: 'now' | 'later' | 'decline' }`：now → 呼叫 C6 的接手（回傳接手卡片）；later → 自己的分身說「本人晚点会上线，我们可以先继续聊」（Prompt 5 的 extra_instruction），對話照常；decline → `endConversation(id, 'declined')`（分身收尾、對話結束）。每個回應都寫日誌。
+    - `GET /api/notifications`：自己最近 20 則，每種只回鈴鐺要的欄位（名字、對話 id、雙向合適、回應）；friend_report 的報告內容不回。`POST /api/notifications/:id/read`：只有 match 能從這裡設已讀。
+    - 錯誤：沒登入 401、id 不是 uuid 404、不是成員 403、別人的通知 404、不是請求真人的通知 400、已回應／重複請求／對話已結束／對方本人已在聊 409。
+  - 前端：聊天室「请求真人」可以按（對方是分身、對話沒結束時），按了變「已通知对方本人」並提示等對方回應。新元件 `src/features/twin/components/NotificationBell.tsx`（＋`useNotifications.ts`、`notificationView.ts`、`notificationBell.css`）：顶栏 knob＋未讀數，點開是通知面板；match →「查看结果」到結果頁並設已讀；request_human → 现在聊／稍后聊／拒绝（现在聊會到聊天室先顯示接手卡片）；anomaly → 文字，動作先停用（C8）；friend_report →「去看看」到 `/friend`。mock 模式不顯示。
+- **為什麼這樣做**：
+  - **鈴鐺還沒放進顶栏**：NavBar 是 A 的檔案，照 `.local/c-prep` 的計畫，C7 合併後請 A 加一行 `<NotificationBell />`。
+  - **面板用 portal 掛到 body**：顶栏有撕紙下緣的 `clip-path`，放在顶栏裡的下拉面板會整個被裁掉（第一版 DOM 檢查都過，截圖才發現看不到）。改成 `createPortal`＋`position: fixed`，位置依鈴鐺算（`panelPlacement`），手機不超出畫面。
+  - **friend_report 點了不設已讀**：A 的「下次見面」是讀「未讀的 friend_report」來回報，鈴鐺設已讀的話阿澈就不會說了。request_human 回應時設已讀，所以只有 match 能從 `/read` 設已讀。
+  - **先記下回應再動作**（條件更新：`response is null` 才寫）：連按兩次、兩個分頁同時按時只有一次會接手或收尾。對話已結束時只設已讀、回 409，鈴鐺上不會一直掛著。
+  - **我方已經本人在聊時只記下回應**：例如先按了「我来聊」再回應，不再接手、不讓分身說「晚點上線」、不結束對話。
+  - **請求真人不限定我方是本人**：照 07C C4 的「對方是 twin 時」顯示按鈕；B 的「直接請求真人」本來就是本人。
+  - 通知列表的 Realtime 只當「該重讀了」的訊號，內容一律從 `/api/notifications` 讀（payload 由不同線寫，後端統一整理）；打開面板時也重讀一次，Realtime 漏掉事件也不會一直是舊的；斷線時每 15 秒輪詢。
+- **改了哪些檔案**：`server/twin/{requestHuman,notifications,notificationStore}.ts`（新）、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/components/{NotificationBell.tsx,useNotifications.ts,notificationView.ts,notificationBell.css}`（新）、`src/features/twin/components/{LiveChatRoom.tsx,useChatRoom.ts,chatRoomView.ts}`、`tests/twin/{request-human,notifications,notification-view}.test.ts`（新）、`tests/twin/{chat-room-routes,chat-room-view}.test.ts`。沒有動共用檔。
+- **驗證**：vitest 488 項、`tsc -b`、`npm run build` 通過；和最新 main 試合併（暫時的 worktree）後 498 項也全過。
+  - 瀏覽器（headless Chrome＋CDP，`.local/c7-cdp.ts`，`/api` 在瀏覽器裡攔截回假資料，不登入、不碰資料庫；NavBar 暫時掛上鈴鐺，測完還原）30 項通過：請求真人只打一次、按鈕變已通知；鈴鐺 6 則未讀；面板真的看得到（`elementFromPoint`）、點裡面不關、點外面和 Esc 會關；五種文字、「双向合适」、沒有 emoji；稍後聊／拒絕後顯示結果、未讀數減少；match 設已讀並到結果頁；friend_report 到 `/friend` 不設已讀；現在聊顯示整理中 → 到聊天室先看接手卡片 → 可以打字；已經在同一個聊天室時也會跳出卡片；375px 面板在畫面內。
+  - 真後端只打了不寫入的請求：新路由沒登入 401、token 錯 401、回應內容不對 400。
+- **踩到的坑／注意事項**：
+  - 顶栏的 `clip-path` 會裁掉所有放在裡面的東西（下拉、提示框），要用 portal。
+  - B 的「直接請求真人」（`server/social/history.ts`）自己寫通知、沒有種子用戶自動回應；要的話之後把 `requestHuman` 包成 contract（改簽名要三人同意）。
+  - 分支疊在 C6（PR #80）上，PR 目標先設 `c/C6-takeover`；C6 合併後改成 main。
+- **還沒做完／待辦**：
+  - 真資料端到端（種子用戶 3 秒自動回應、兩個真人帳號三種回應）要寫入資料庫，等 Jerry 同意後再測。
+  - 請 A 把 `<NotificationBell />` 放進 NavBar 右端（手機顶栏已經很擠，A 決定位置）。
+  - anomaly 的「继续聊／结束对话／检举」在 C8 接上；畫面文字之後和 C4～C6 的一起搬到 `messages/strings.json`。
+
 ### 2026-10-31｜C6 本人接手＋接手卡片｜Jerry（AI 協助）｜PR #80｜Closes #26
 - **做了什麼**：
   - 後端（`server/twin/handoff.ts`、`handoffStore.ts`，Prompt 7 在 `server/prompts/07_handoff.ts`，路由在 `server/routes/twin.ts`）：`POST /api/conversations/:id/takeover`：確認是對話一方、我方還是分身、對話沒結束 → Prompt 7（`fast`，temperature 0.3）產生接手摘要 → 我方 controller 改 human、狀態改 active → 寫入 `handoffs` → 寫日誌「本人接手，分身停止代聊」→ 回傳 `{ verdict, summary, summaryFailed }`。
