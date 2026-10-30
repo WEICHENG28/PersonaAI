@@ -155,6 +155,13 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-31｜A4 修正：getShareableProfile 只回確認過的檔案｜Vincent（AI 協助）｜分支 a/A4-confirmed-only
+- **做了什麼**：`server/contracts/friend.ts` 的 `getShareableProfile` 有 DB 時連 `shareable_confirmed` 一起讀，不是 `true` 一律回 null（簽名不變；`getAgentProfile`／`getStyleProfile` 照舊；無 DB 設定回 fixtures 照舊）。`tests/friend/profile.test.ts` 補三個 case：confirmed=false 回 null、confirmed 缺省（null）回 null、原本「有值」測試改為明確帶 `shareable_confirmed: true`。
+- **為什麼**：`extractProfile` 每次重整會覆蓋 `shareable_profile` 並把 `shareable_confirmed` 歸 false，但舊版 `getShareableProfile` 不看確認狀態照樣回傳草稿——C 的分身與隱私守門會拿到「本人還沒確認」的內容去跟別人聊，違反 docs/02 F3「分身只能使用你確認可對外分享的資料」。未確認回 null 後，分身停止發言（C 的錯誤訊息「这位用户还没有确认对外档案」已存在，C 不用改）；B 的大廳本來就只列 confirmed=true、且只用 `getAgentProfile`，不受影響。
+- **驗證**：tsc 過；vitest 340/340（profile 36 測，含新增 3 個確認狀態 case）。
+- **坑**：無。
+- **還沒做完／待辦**：無。
+
 ### 2026-10-30｜A7 设定页 + A8 记忆编辑 + A9 娱乐标签｜Vincent（AI 协助）｜分支 a/A7-settings｜Closes #10 #11 #12
 - **做了什么**：
   - **A7**：`server/friend/settings.ts`（`getSettings`/`updateSettings`/`settingsUpdateSchema`；开 social_agent 前检查 shareable_confirmed）；`GET /api/settings` + `PUT /api/settings`；`SettingsPage.tsx` http 模式接线（mount 时 fetchSettings，各按钮点击后 httpSave，禁用期间 disabled）。
@@ -225,6 +232,15 @@
 - **改了哪些檔案**：`server/social/{stats,report,runner}.ts`、`src/features/social/{formatDuration.ts,components/StatsCard.tsx}`、`tests/social/{report,runner}.test.ts`。
 - **踩到的坑**：vitest 沒有設定 `@components` 等路徑別名，測試 import 含別名的元件會失敗，所以 `formatDuration` 獨立成不 import 任何別名的小檔案。
 - **驗證**：`tsc -b`；vitest 341/341（computeStats、formatDuration 前後端一致、buildReport 只取本任務且不含分數、match 通知格式）；`npm run build`。
+
+---
+
+### 2026-10-30｜B7 工作日誌面板｜Peter（AI 協助）｜Closes #16
+- **做了什麼**：`GET /api/logs`（自己的日誌、新的在前、可依 `task_id` 篩選、預設 50 筆）；`agentStore.listLogs`；前端 `getLogs`、`subscribeLogs`（Supabase Realtime 訂 `agent_logs` 的 INSERT）；`AgentLogPanel` 改版：http 模式自己載入＋即時加入新日誌（依 id 去重、最多保留 200 筆），不同 Agent 用不同顏色標籤（AI 朋友梨黃、社交 Agent 墨色、分身灰、評審薄荷、隱私守門珊瑚），多個任務時可篩選，有對話的日誌可以「看这场对话」跳到 `/chat/<id>`；mock 模式照舊顯示傳進來的 demo 日誌。
+- **為什麼這樣做**：面板被 A 的 `FriendPage`、`SettingsPage` 引用，`logs` 參數改成選填、mock 行為不變，A 不用改。Realtime 不加 user 篩選，靠資料表權限（`own` policy）只收到自己的日誌，前端不需要知道 `users.id`。
+- **改了哪些檔案**：`server/social/agentStore.ts`、`server/routes/social.ts`、`src/lib/api/social.ts`、`src/components/AgentLogPanel.tsx`、`tests/social/logs.test.ts`。
+- **驗證**：`tsc -b`；vitest 341/341（只回自己的、新的在前、不含 user_id、任務篩選、筆數、參數錯誤 400）；`npm run build`；雲端唯讀跑 `listLogs` 語法正確。**Realtime 即時更新沒有實測**（要登入真實帳號跑任務才會產生日誌），請 Peter 實跑主線時打開開發者開關確認。
+- **還沒做完／待辦**：A 的頁面在 http 模式還會傳 demo 日誌進來（目前會被忽略，不影響）。
 
 ---
 

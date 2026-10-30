@@ -51,6 +51,18 @@ socialRoutes.post('/history/:id/reopen', async (c) => {
   return respond(c, (userId) => reopenAttempt(userId, c.req.param('id'), body.data.mode, { store: getAgentStore(), startConversation }))
 })
 
+const logsQuery = z.object({
+  task_id: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+})
+
+/** B7：工作日誌（開發者面板初始載入；之後前端用 Realtime 訂閱新的）。 */
+socialRoutes.get('/logs', (c) => {
+  const q = logsQuery.safeParse(c.req.query())
+  if (!q.success) return c.json({ ok: false, error: '参数不正确' }, 400)
+  return respond(c, (userId) => getAgentStore().listLogs(userId, { taskId: q.data.task_id, limit: q.data.limit }))
+})
+
 /**
  * 先確認登入者，再執行 run。
  * TaskError 原樣回給用戶；LLM 失敗換成好懂的訊息；其他錯誤交給 app.onError。

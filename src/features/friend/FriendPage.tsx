@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
@@ -9,9 +9,19 @@ import { useDemoStore } from '@store/useDemoStore'
 import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
-import { triggerNextMeet, isHttpMode } from '@lib/api/friend'
+import {
+  triggerNextMeet,
+  isHttpMode,
+  callFriendIntro,
+  callFriendChat,
+  getFriendMessages,
+  type FriendMessage,
+} from '@lib/api/friend'
 
-/** 画面 2-4：AI 朋友聊天 + 记忆侧栏 + 任务确认 + 回报 */
+/** 画面 2-4：AI 朋友聊天 + 记忆侧栏 + 任务确认 + 回报
+ *  http 模式：消息来自 GET /api/friend/messages；发送走 POST /api/friend/chat。
+ *  mock 模式：demo store 驱动（不打 API）。
+ */
 export function FriendPage() {
   const s = useDemoStore()
   const navigate = useNavigate()
@@ -19,13 +29,76 @@ export function FriendPage() {
   const [taskDraftOpen, setTaskDraftOpen] = useState(false)
   const [taskText, setTaskText] = useState('帮我找 3 个喜欢登山的人聊聊')
   const [nextMeetLoading, setNextMeetLoading] = useState(false)
-  const chatRef = useAutoScrollBottom<HTMLDivElement>(s.friendMessages.length)
 
-  const send = () => {
-    if (!draft.trim() || s.friendTyping) return
-    s.sendFriendMessage(draft.trim())
+  // http 模式专用状态
+  const [httpMessages, setHttpMessages] = useState<FriendMessage[]>([])
+  const [httpTyping, setHttpTyping] = useState(false)
+  const [httpError, setHttpError] = useState<string | null>(null)
+
+  // 消息数量用于自动滚动（mock 或 http 模式均适用）
+  const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
+  const chatRef = useAutoScrollBottom<HTMLDivElement>(msgCount)
+
+  // http 模式：挂载时拉消息 + 首次见面
+  useEffect(() => {
+    if (!isHttpMode) return
+    const init = async () => {
+      try {
+        await callFriendIntro()   // 幂等，intro_done 时直接 ok
+      } catch { /* 非致命 */ }
+      try {
+        const msgs = await getFriendMessages()
+        setHttpMessages(msgs)
+      } catch (e) {
+        console.error('[FriendPage] loadMessages', e)
+      }
+    }
+    void init()
+  }, [])
+
+  const send = useCallback(async () => {
+    const text = draft.trim()
+    if (!text) return
     setDraft('')
-  }
+
+    if (!isHttpMode) {
+      s.sendFriendMessage(text)
+      return
+    }
+
+    // http 模式：乐观添加用户消息，再打 API
+    const tempId = `tmp-${Date.now()}`
+    setHttpMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        role: 'user' as const,
+        kind: 'chat',
+        content: text,
+        meta: {},
+        created_at: new Date().toISOString(),
+      },
+    ])
+    setHttpTyping(true)
+    setHttpError(null)
+
+    try {
+      const result = await callFriendChat(text)
+      // 拉最新消息（包含 AI 回复）
+      const msgs = await getFriendMessages()
+      setHttpMessages(msgs)
+      // task_intent：弹出任务确认
+      if (result.taskId) {
+        setTaskDraftOpen(true)
+      }
+    } catch (e: unknown) {
+      setHttpError(e instanceof Error ? e.message : '阿澈刚刚恍神了，再说一次？')
+      // 移除乐观消息
+      setHttpMessages((prev) => prev.filter((m) => m.id !== tempId))
+    } finally {
+      setHttpTyping(false)
+    }
+  }, [draft, s])
 
   const canAssignTask = s.userReplyCount >= 5
 
@@ -70,19 +143,40 @@ export function FriendPage() {
             <RiveAvatar name="robot" size={44} />
             <div>
               <strong>{t('friend.title')}</strong>
-              <span>{s.friendTyping ? t('friend.typing') : t('friend.subtitle')}</span>
+              <span>{(isHttpMode ? httpTyping : s.friendTyping) ? t('friend.typing') : t('friend.subtitle')}</span>
             </div>
             {s.reportReady && <Chip tone="pear">{t('friend.hasNews')}</Chip>}
           </div>
 
           <div className="chat" ref={chatRef}>
-            {s.friendMessages.length === 0 && <p className="empty">{t('friend.empty')}</p>}
-            {s.friendMessages.map((m) => (
-              <ChatBubble key={m.id} speaker={m.speaker}>
-                {m.text}
-              </ChatBubble>
-            ))}
-            {s.friendTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
+            {isHttpMode ? (
+              <>
+                {httpMessages.length === 0 && !httpTyping && (
+                  <p className="empty">{t('friend.empty')}</p>
+                )}
+                {httpMessages.map((m) => (
+                  <ChatBubble key={m.id} speaker={m.role === 'user' ? 'human' : 'friend'}>
+                    {m.content}
+                  </ChatBubble>
+                ))}
+                {httpTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
+                {httpError && (
+                  <p style={{ color: 'var(--c-err)', fontSize: '0.85em', padding: '0.5rem 0' }}>
+                    {httpError}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {s.friendMessages.length === 0 && <p className="empty">{t('friend.empty')}</p>}
+                {s.friendMessages.map((m) => (
+                  <ChatBubble key={m.id} speaker={m.speaker}>
+                    {m.text}
+                  </ChatBubble>
+                ))}
+                {s.friendTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
+              </>
+            )}
           </div>
 
           <div className="chat-input">
@@ -91,10 +185,14 @@ export function FriendPage() {
               placeholder={t('friend.inputPlaceholder')}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && send()}
-              disabled={s.friendTyping}
+              onKeyDown={(e) => e.key === 'Enter' && void send()}
+              disabled={isHttpMode ? httpTyping : s.friendTyping}
             />
-            <Button small onClick={send} disabled={!draft.trim() || s.friendTyping}>
+            <Button
+              small
+              onClick={() => void send()}
+              disabled={!draft.trim() || (isHttpMode ? httpTyping : s.friendTyping)}
+            >
               {t('friend.send')}
             </Button>
           </div>
