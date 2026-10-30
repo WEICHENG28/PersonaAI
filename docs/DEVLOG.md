@@ -26,6 +26,32 @@
 
 ## 共用與決策
 
+### 2026-10-30｜真實登入也改成只要用戶名稱（Supabase 匿名登入）｜Peter（AI 協助）
+- **做了什麼**：登入頁不分模式都只剩「用户名称」（隨機預填、可換、不填也能開始）。http 模式按「直接开始」→ `supabase.auth.signInAnonymously`（名稱存在 `display_name`）→ `POST /api/profile/init` 建 `users` 列；mock 模式照舊假登入。新增 `loginAnonymously()`（`src/lib/api/friend.ts`），信箱密碼表單移除，但 `register`／`login` 函式保留。
+- **為什麼這樣做**：Peter 決定產品先免註冊、什麼都不打就能開始；Demo 版和真實版登入頁一致。
+- **Supabase 設定**：已由 Peter 開啟 Authentication → Sign In / Providers → **Allow anonymous sign-ins**（雲端共用專案）。Vincent 本機的 Supabase 也要在 `supabase/config.toml` 的 `[auth]` 設 `enable_anonymous_sign_ins = true` 才能測。
+- **給 A**：改了 A 的 `LoginPage.tsx`、`src/lib/api/friend.ts`（新增函式＋一條錯誤翻譯）。A 的後端不用改：`resolveAuthUser` 在沒有 email 時會用 metadata 的 `display_name`。匿名帳號換電腦或清瀏覽器資料就找不回來；之後若要保留帳號，可以加「綁定邮箱」（Supabase `updateUser({ email })`）。
+- **驗證**：`tsc -b`、vitest 73/73、`npm run build` 成功。匿名登入實際寫入雲端資料庫的流程由 Peter 在瀏覽器測（AI 不寫共用資料庫）。
+
+---
+
+### 2026-10-30｜Demo 登入簡化成只要用戶名稱｜Peter（AI 協助）
+- **做了什麼**：mock 模式（GitHub Pages demo）的登入頁只剩「用户名称」一欄，預填隨機名字（例如「爱看展的小鹿」），有「换一个」按鈕；什麼都不打按「直接开始」就能進入。新增 `src/features/friend/randomName.ts`、5 個 `login.*` 文字。http 模式（真實 Supabase 登入）的信箱／密碼表單**完全沒動**，改名為 `AuthLogin`。
+- **為什麼這樣做**：產品規劃的成員看 demo 時不用想帳號密碼；真實登入仍需要信箱密碼，所以只改 mock 模式。
+- **給 A**：這是 A 的頁面，Peter 決定的需求、由 B 的 AI 修改。之後若想讓正式版也免註冊，可以用 Supabase 的匿名登入（`signInAnonymously`，要在 Supabase 後台開啟）。
+- **驗證**：`tsc -b`、vitest 47/47（含 `randomName` 測試）、`npm run build` 成功。
+
+---
+
+### 2026-10-30｜前端 demo 部署到 GitHub Pages｜Peter（AI 協助）
+- **做了什麼**：新增 `.github/workflows/pages.yml`：`main` 有新提交就把前端（mock 模式，不需要後端）建置並部署到 https://weicheng28.github.io/PersonaAI/ ，給產品規劃的成員看介面。為了讓網站在 `/PersonaAI/` 底下能跑，改了 A 的兩個檔案各一行：`src/main.tsx` 的路由加 `basename: import.meta.env.BASE_URL`、`src/components/ui/RiveAvatar.tsx` 的 Rive 檔路徑前面加 `BASE_URL`（本機開發 BASE_URL 是 `/`，行為不變）。
+- **為什麼這樣做**：GitHub Pages 的專案網址多一層 `/PersonaAI/`，絕對路徑 `/riv/...`、路由 `/friend` 都會找不到；SPA 直接打開子頁面時 Pages 回 404，所以建置後把 `index.html` 複製成 `404.html`。
+- **給 A**：之後新增的靜態檔路徑請用 `import.meta.env.BASE_URL + '...'`，不要寫死 `/` 開頭；頁面跳轉用 react-router 的 `navigate`／`Link`，不要用 `<a href="/...">`。
+- **踩到的坑**：在 Git Bash 執行 `vite build --base=/PersonaAI/` 會被改寫成 Windows 路徑，本機要先 `export MSYS_NO_PATHCONV=1`；GitHub 的 Linux runner 沒這問題。
+- **驗證**：`tsc -b`、vitest 28/28；本機 `vite preview --base=/PersonaAI/`：首頁、`/PersonaAI/friend`、Rive 檔都回 200。
+
+---
+
 ### 2026-10-30｜落地頁大改版：Hero 留白＋Rive 三角＋細節區擴充｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：`LandingPage.tsx` 全面擴寫 — hero 副標新增；三角色卡各配 Rive（robot/fish/birdie，96px）取代 emoji；每張角色卡加 3 條清單式細節；新增三個 detail section（判定檔位、記憶掌控、大廳導覽，各 3 張小卡）；flow/stats/CTA 補副標。`landing.css`：hero `line-height: 1.06→1.35`、`margin-block: var(--space-xl)`、`padding-block: 2xl/3xl`（上下大留白）；新增 `.landing-sec__sub`、`.role-card__list`（accent 圓點）、`.detail-card`（radius-stock）樣式。
 - **為什麼**：使用者要求標題垂直間距加大、首區上下留白、內容大幅擴充但每格保持精簡（1-2 短句）、禁 emoji 改用三個 Rive。
@@ -109,6 +135,24 @@
 ---
 
 ## A：AI 朋友線（Vincent）
+
+### 2026-10-30｜A3 記憶擷取與「它記得的事」｜Vincent（AI 協助）｜分支 a/A3-memory｜Closes #6
+- **做了什麼**：`server/prompts/02_memory.ts`（Prompt 2 逐字＋schema）；`server/friend/memory.ts`（`isDuplicateMemory` 必測去重、`extractMemories` MODEL_FAST→去重→寫入、`listMemories` 未刪除、`deleteMemory` 軟刪、`markNotLikeMe`）；`server/routes/friend.ts` 加 `GET /api/memory`、`DELETE /api/memory/:id`、`POST /api/memory/:id/not-like-me`；A2 的 `friendChat` 第 6 步接上背景 `extractMemories`（不等待、失敗只記日誌）；CONFIG 加 `MEMORY_LIMIT: 50`。
+- **為什麼**：07A A3 規格；記憶背景抽取不阻塞回覆；confidence 由 DB check constraint 0–1 夾住。
+- **驗證**：tsc 過；vitest 73/73（memory 14 測：去重六情形、渲染、寫入/過濾/空批/夾值、list/delete/not-like-me）。
+- **坑**：chat.test 裡要 mock `./memory` 模組，否則背景鉤子打到未 mock 的表噴錯（不影響斷言但噴 console）。
+
+### 2026-10-30｜A2 AI 朋友聊天（含首次見面、任務辨識）｜Vincent（AI 協助）｜分支 a/A2-friend-chat｜Closes #5
+- **做了什麼**：`server/prompts/01_friend.ts`（Prompt 1 逐字＋`renderFriendSystem`／`friendReplySchema`）；`server/friend/chat.ts`（`ensureFriendRow` 冪等、`friendIntro`、`friendChat` 主流程：存訊息→組上下文→llmJson→存回覆→shared_event_ids→task_intent 接 B 的 `createTaskFromText`＋task_card→writeLog、`getFriendMessages`）；`server/routes/friend.ts` 加 `POST /api/friend/{intro,chat}`、`GET /api/friend/messages`；`tests/friend/chat.test.ts` 12 測。
+- **為什麼**：07A A2 規格；LLM 失敗統一 `FriendChatError`（前端顯示「阿澈剛剛恍神了」不白屏）；B 解析失敗不中斷聊天只記日誌。前端頁面接 API 留給下一批（mock demo 頁已可點）。
+- **驗證**：tsc 過；vitest 59/59（chat 12：zod 邊界、system 渲染、普通對話、task_card、shared_event、B 失敗降級、新用戶建行、intro 冪等）。
+- **坑**：測試裡 Supabase mock 要按表分 chain，`from(name)` 每次返回同一引用才能讓 insert/select 共享狀態。A3（記憶）未做，上下文記憶先留鉤子。
+
+### 2026-10-30｜A1 阿澈人設與事件庫｜Vincent（AI 協助）｜分支 a/A1-persona｜Closes #4
+- **做了什麼**：`server/friend/persona.ts`（ACHE 人設、EVENTS 六事件帶 unlockStage/severity/observe、LIFE_UPDATES 四階段近況、`pickNextEvent`/`getLifeUpdate` 純函式）；`tests/friend/persona.test.ts` 覆蓋解鎖規則、不重複、強度排序、id 唯一、階段越界。
+- **為什麼**：07A A1 規格逐字落地（簡體文 UI 文案）；放 `server/friend/` 而非 `lib/friend/`，路徑照 docs/10 §3 換算表。
+- **驗證**：tsc 過；vitest 45/45（含既有 37）。
+- **坑**：無。`pickNextEvent` 用 `find` 天然「由輕到重」。
 
 ### 2026-10-30｜A0b 真實登入與 Supabase｜Vincent（AI 協助）｜分支 a/A0b-real-auth｜Closes #44
 - **做了什麼**：前端 `src/lib/supabase.ts`＋`src/lib/api/friend.ts`（`VITE_API_MODE=http|mock`）；LoginPage／Settings 接 Supabase Auth（mock 假登录保留）；后端 `server/lib/{supabase,auth,profile}.ts`、`POST /api/profile/init`（JWT＋users 表幂等）；`tests/friend/auth.test.ts`。

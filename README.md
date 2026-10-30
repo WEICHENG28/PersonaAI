@@ -33,6 +33,7 @@
 
 ## 進度在哪看
 
+- **介面 demo（mock，不用後端）**：https://weicheng28.github.io/PersonaAI/ ，`main` 更新後幾分鐘內自動同步
 - **進度看板**：[PersonaAI 進度](https://github.com/users/WEICHENG28/projects/2)，分成 Todo／In Progress／Done，卡片就是 Issue，會自動移動
 - **每個任務**：[Issues](https://github.com/WEICHENG28/PersonaAI/issues)，Issue 留言是開工、卡住、完成的紀錄
 - **正在做的程式**：[Pull requests](https://github.com/WEICHENG28/PersonaAI/pulls)，Draft PR 代表還在做

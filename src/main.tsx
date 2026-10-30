@@ -6,6 +6,7 @@ import '@theme/base.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={createBrowserRouter(routes)} />
+    {/* basename：部署到 GitHub Pages 時網址在 /PersonaAI/ 底下；本機是 / */}
+    <RouterProvider router={createBrowserRouter(routes, { basename: import.meta.env.BASE_URL })} />
   </StrictMode>,
 )

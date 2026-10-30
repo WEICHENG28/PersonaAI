@@ -1,0 +1,47 @@
+# 把前端（mock 模式，不需要後端）部署到 GitHub Pages：https://weicheng28.github.io/PersonaAI/
+# main 有新提交就自動更新；也可以在 Actions 頁手動執行。
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc -b
+      # 網址在 /PersonaAI/ 底下；不設 VITE_API_MODE，所以是 mock 模式
+      - run: npx vite build --base=/PersonaAI/
+      # SPA：直接打開 /PersonaAI/friend 這類網址時，GitHub Pages 會回 404.html，讓它也載入 app
+      - run: cp dist/index.html dist/404.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
