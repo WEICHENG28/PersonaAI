@@ -1,5 +1,6 @@
 // C2 隱私守門（docs/07C C2）。擁有者：C。
-// guardText：先用規則遮蔽個資（maskByRules），再用 Prompt 13 檢查；有改寫就寫日誌。LLM 失敗時只送出規則處理後的版本。
+// guardText：先用規則遮蔽個資（maskByRules），再用 Prompt 13 檢查；LLM 改寫過的版本再檢查一次，不過就換成 GUARD_FALLBACK。
+// 有改寫就寫日誌。第一次 LLM 檢查失敗時只送出規則處理後的版本。
 // 個資格式以中國大陸為準（手機號 1 開頭 11 碼、18 位身份證號、微信／QQ 等帳號、小區＋棟＋單元地址）；簡繁字形都認。
 // MASK、hits、issues、日誌會出現在畫面和工作日誌上，所以用簡體中文。
 import type { AgentLogInput, GuardResult, ShareableProfile } from '../../shared/types'
@@ -114,8 +115,11 @@ function unique(items: readonly string[]): string[] {
   return [...new Set(items)]
 }
 
-async function checkWithLlm(deps: GuardDeps, maskedText: string, ownerUserId: string): Promise<GuardLlmResult> {
-  const shareable = await deps.getShareableProfile(ownerUserId)
+async function checkWithLlm(
+  deps: GuardDeps,
+  shareable: ShareableProfile | null,
+  maskedText: string,
+): Promise<GuardLlmResult> {
   return deps.llmJson({
     role: 'fast',
     system: renderGuardSystem({ shareable }),
@@ -142,6 +146,33 @@ function describeError(err: unknown): string {
   return err instanceof Error ? `${err.name}: ${err.message}` : String(err)
 }
 
+type RecheckOutcome = 'passed' | 'fallback' | 'skipped'
+
+interface RecheckResult {
+  result: GuardResult
+  recheck: RecheckOutcome
+  error?: string
+}
+
+/**
+ * LLM 改寫過的版本再檢查一次：同一句每次跑結果不同，實測偶爾會把時間地點原樣留在改寫版裡。
+ * 第二次仍判洩漏、或檢查失敗 → 保守換成 GUARD_FALLBACK。
+ */
+async function recheckRewrite(
+  deps: GuardDeps,
+  shareable: ShareableProfile | null,
+  result: GuardResult,
+): Promise<RecheckResult> {
+  if (result.text === GUARD_FALLBACK) return { result, recheck: 'skipped' }
+  const fallback = { ...result, text: GUARD_FALLBACK }
+  try {
+    const second = await checkWithLlm(deps, shareable, result.text)
+    return second.ok ? { result, recheck: 'passed' } : { result: fallback, recheck: 'fallback' }
+  } catch (err) {
+    return { result: fallback, recheck: 'fallback', error: describeError(err) }
+  }
+}
+
 export function createGuardText(deps: GuardDeps): GuardTextFn {
   return async function guardText(text, ownerUserId) {
     if (text.trim() === '') return { ok: true, text, issues: [] }
@@ -152,8 +183,10 @@ export function createGuardText(deps: GuardDeps): GuardTextFn {
 
     // 2. 再用 LLM 檢查；4. 失敗時保守處理，只送出規則處理後的版本
     let llm: GuardLlmResult
+    let shareable: ShareableProfile | null
     try {
-      llm = await checkWithLlm(deps, rules.text, ownerUserId)
+      shareable = await deps.getShareableProfile(ownerUserId)
+      llm = await checkWithLlm(deps, shareable, rules.text)
     } catch (err) {
       const issues = hitsToIssues(rules.hits)
       await deps.writeLog({
@@ -165,17 +198,24 @@ export function createGuardText(deps: GuardDeps): GuardTextFn {
       return { ok: rules.hits.length === 0, text: rules.text, issues }
     }
 
-    // 3. 有改寫時寫日誌（不記原文，避免日誌裡留下個資）
-    const result = combine(text, rules, llm)
-    if (!result.ok) {
-      await deps.writeLog({
-        ...base,
-        action: '改写分身消息',
-        reason: result.issues.join('、'),
-        detail: { rule_hits: rules.hits, rewritten_by_llm: !llm.ok },
-      })
-    }
-    return result
+    // 3. 有改寫時寫日誌（不記原文，避免日誌裡留下個資）；LLM 改寫過的版本再檢查一次
+    const combined = combine(text, rules, llm)
+    if (combined.ok) return combined
+    const checked: RecheckResult = llm.ok
+      ? { result: combined, recheck: 'skipped' }
+      : await recheckRewrite(deps, shareable, combined)
+    await deps.writeLog({
+      ...base,
+      action: '改写分身消息',
+      reason: checked.result.issues.join('、'),
+      detail: {
+        rule_hits: rules.hits,
+        rewritten_by_llm: !llm.ok,
+        recheck: checked.recheck,
+        ...(checked.error ? { recheck_error: checked.error } : {}),
+      },
+    })
+    return checked.result
   }
 }
 

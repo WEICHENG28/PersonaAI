@@ -194,11 +194,22 @@ describe('guardResultSchema', () => {
 
 type LlmOut = { ok: boolean; rewritten: string | null; issues: string[] }
 
-function harness(opts: { llmOut?: LlmOut; llmError?: Error; shareable?: ShareableProfile | null } = {}) {
+const LLM_OK: LlmOut = { ok: true, rewritten: null, issues: [] }
+
+/** llmOut／llmError 是第一次檢查；recheckOut 是改寫版的第二次檢查（預設通過）。 */
+function harness(
+  opts: { llmOut?: LlmOut; llmError?: Error; recheckOut?: LlmOut | Error; shareable?: ShareableProfile | null } = {},
+) {
   const logs: AgentLogInput[] = []
+  let calls = 0
   const llm = vi.fn(async () => {
-    if (opts.llmError) throw opts.llmError
-    return opts.llmOut ?? { ok: true, rewritten: null, issues: [] }
+    calls += 1
+    if (calls === 1) {
+      if (opts.llmError) throw opts.llmError
+      return opts.llmOut ?? LLM_OK
+    }
+    if (opts.recheckOut instanceof Error) throw opts.recheckOut
+    return opts.recheckOut ?? LLM_OK
   })
   const getShareable = vi.fn(async () => (opts.shareable === undefined ? anShareable : opts.shareable))
   const deps: GuardDeps = {
@@ -314,6 +325,49 @@ describe('guardText', () => {
     const h = harness({ shareable: null })
     await h.guardText('我喜欢拍照', OWNER)
     expect(systemSentToLlm(h.llm)).toContain('（没有对外档案）')
+  })
+
+  it('LLM 改寫後再檢查一次，通過就用改寫版；對外檔案只讀一次', async () => {
+    const h = harness({ llmOut: { ok: false, rewritten: '我在上学', issues: ['提到具体学校名称'] } })
+    const result = await h.guardText('我在复旦读书', OWNER)
+    expect(result).toEqual({ ok: false, text: '我在上学', issues: ['提到具体学校名称'] })
+    expect(h.llm).toHaveBeenCalledTimes(2)
+    expect((h.llm.mock.calls[1]![0] as LlmCall).messages[0]!.content).toContain('<message>\n我在上学\n</message>')
+    expect(h.getShareable).toHaveBeenCalledTimes(1)
+    expect(h.logs[0]!.detail).toMatchObject({ recheck: 'passed' })
+  })
+
+  it('改寫版再檢查仍判洩漏 → 換成「这个我之后再跟你说」', async () => {
+    const h = harness({
+      llmOut: { ok: false, rewritten: '周日 9 点在人民广场见', issues: ['提到具体学校名称'] },
+      recheckOut: { ok: false, rewritten: '到时候再约', issues: ['提到具体时间地点'] },
+    })
+    const result = await h.guardText('我在复旦读书，周日 9 点在人民广场见', OWNER)
+    expect(result).toEqual({ ok: false, text: GUARD_FALLBACK, issues: ['提到具体学校名称'] })
+    expect(h.logs).toHaveLength(1)
+    expect(h.logs[0]).toMatchObject({ action: '改写分身消息', detail: { recheck: 'fallback' } })
+    expect(JSON.stringify(h.logs)).not.toContain('人民广场')
+  })
+
+  it('改寫版再檢查失敗 → 保守換成「这个我之后再跟你说」，日誌記錯誤原因', async () => {
+    const h = harness({
+      llmOut: { ok: false, rewritten: '我在上学', issues: ['提到具体学校名称'] },
+      recheckOut: new Error('timeout'),
+    })
+    const result = await h.guardText('我在复旦读书', OWNER)
+    expect(result.text).toBe(GUARD_FALLBACK)
+    expect(h.logs[0]!.detail).toMatchObject({ recheck: 'fallback', recheck_error: 'Error: timeout' })
+  })
+
+  it('只有規則擋到（LLM 說沒問題）、或 LLM 沒給改寫 → 不再檢查第二次', async () => {
+    const rulesOnly = harness()
+    await rulesOnly.guardText('加我微信 anhiker88 吧', OWNER)
+    expect(rulesOnly.llm).toHaveBeenCalledTimes(1)
+    expect(rulesOnly.logs[0]!.detail).toMatchObject({ recheck: 'skipped' })
+
+    const noRewrite = harness({ llmOut: { ok: false, rewritten: null, issues: ['提到感情私事'] } })
+    await noRewrite.guardText('我上个月刚分手', OWNER)
+    expect(noRewrite.llm).toHaveBeenCalledTimes(1)
   })
 
   it('空白訊息不呼叫 LLM', async () => {
