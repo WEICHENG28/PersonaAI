@@ -36,6 +36,33 @@ export class LlmError extends Error {
 
 const MAX_ATTEMPTS = CONFIG.LLM_MAX_RETRIES + 1
 
+/**
+ * 模型平台同時收到太多請求會回 Connection error（評審一次就要 6 個），所以：
+ * - 同時最多 MAX_CONCURRENT 個請求，其他排隊；
+ * - 呼叫失敗後等一下再重試（第 n 次等 n × backoffMs）。測試時不等待。
+ */
+export const llmTuning = { maxConcurrent: 3, backoffMs: process.env.VITEST ? 0 : 800 }
+
+let running = 0
+const waiting: (() => void)[] = []
+
+async function limited<T>(run: () => Promise<T>): Promise<T> {
+  if (running >= llmTuning.maxConcurrent) await new Promise<void>((resolve) => waiting.push(resolve))
+  running++
+  try {
+    return await run()
+  } finally {
+    running--
+    waiting.shift()?.()
+  }
+}
+
+function backoff(attempt: number): Promise<void> {
+  return attempt < MAX_ATTEMPTS && llmTuning.backoffMs > 0
+    ? new Promise((r) => setTimeout(r, attempt * llmTuning.backoffMs))
+    : Promise.resolve()
+}
+
 export async function llmText(opts: LlmTextOptions): Promise<string> {
   const model = modelFor(opts.role)
   let reason = ''
@@ -46,6 +73,7 @@ export async function llmText(opts: LlmTextOptions): Promise<string> {
       reason = '模型回傳空字串'
     } catch (err) {
       reason = describe(err)
+      await backoff(attempt)
     }
   }
   throw new LlmError(opts.role, reason, MAX_ATTEMPTS)
@@ -61,6 +89,7 @@ export async function llmJson<T>(opts: LlmJsonOptions<T>): Promise<T> {
       raw = await chat(model, opts, messages, true)
     } catch (err) {
       reason = describe(err)
+      await backoff(attempt)
       continue
     }
     const parsed = parseWith(raw, opts.schema)
@@ -80,13 +109,14 @@ export async function embed(text: string): Promise<number[]> {
   let reason = ''
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const vec = await getLlmClient().embed({ model: env.MODEL_EMBED, input: text, dimensions: env.EMBEDDING_DIM })
+      const vec = await limited(() => getLlmClient().embed({ model: env.MODEL_EMBED, input: text, dimensions: env.EMBEDDING_DIM }))
       if (vec.length === env.EMBEDDING_DIM) return vec
       // 長度不符是設定錯誤，重試也不會好
       throw new LlmError('embed', `向量長度 ${vec.length}，預期 ${env.EMBEDDING_DIM}`, attempt)
     } catch (err) {
       if (err instanceof LlmError) throw err
       reason = describe(err)
+      await backoff(attempt)
     }
   }
   throw new LlmError('embed', reason, MAX_ATTEMPTS)
@@ -94,7 +124,7 @@ export async function embed(text: string): Promise<number[]> {
 
 function chat(model: string, opts: LlmTextOptions, messages: LlmMessage[], jsonMode: boolean): Promise<string> {
   const all: ChatMessage[] = [{ role: 'system', content: opts.system }, ...messages]
-  return getLlmClient().chat({ model, messages: all, temperature: opts.temperature, jsonMode })
+  return limited(() => getLlmClient().chat({ model, messages: all, temperature: opts.temperature, jsonMode }))
 }
 
 function parseWith<T>(raw: string, schema: z.ZodType<T>): { ok: true; data: T } | { ok: false; reason: string } {

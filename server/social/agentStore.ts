@@ -16,6 +16,7 @@ export interface UserSettings {
 export interface ConversationState {
   status: 'active' | 'waiting_human' | 'ended'
   sideAController: Controller
+  sideBController: Controller
 }
 
 export interface AttemptRecord {
@@ -28,6 +29,18 @@ export interface AttemptRecord {
   reason_type: ReasonType | null
   reason_text: string | null
   outline: Outline | null
+}
+
+/** match_scores 一列（每個視角一列；只給後台用，前端讀不到）。 */
+export interface ScoreRow {
+  conversation_id: string
+  perspective_user_id: string
+  round: number
+  runs: unknown[]
+  direction_score: number
+  verdict: string
+  reason_type: ReasonType | null
+  reason_text: string | null
 }
 
 export interface AgentStore {
@@ -43,6 +56,7 @@ export interface AgentStore {
   countAutoChatsSince(userId: string, since: Date): Promise<number>
   conversationState(conversationId: string): Promise<ConversationState | null>
   recordAttempt(record: AttemptRecord): Promise<void>
+  recordScores(rows: ScoreRow[]): Promise<void>
   notifyMatch(userId: string, payload: Record<string, unknown>): Promise<void>
 }
 
@@ -69,6 +83,7 @@ export class MemoryAgentStore implements AgentStore {
   failCounts = new Map<string, number>()
   conversations = new Map<string, ConversationState>()
   attempts: AttemptRecord[] = []
+  scores: ScoreRow[] = []
   notifications: { userId: string; payload: Record<string, unknown> }[] = []
   autoChatsToday = 0
   settings: UserSettings = { match_tier: 'mutual', preferences: { personality: 'similar', conditions: [] }, daily_chat_limit: 10, manual_minutes_per_chat: 20 }
@@ -105,10 +120,13 @@ export class MemoryAgentStore implements AgentStore {
     return this.autoChatsToday
   }
   async conversationState(id: string) {
-    return this.conversations.get(id) ?? { status: 'active' as const, sideAController: 'twin' as const }
+    return this.conversations.get(id) ?? { status: 'active' as const, sideAController: 'twin' as const, sideBController: 'twin' as const }
   }
   async recordAttempt(record: AttemptRecord) {
     this.attempts.push(structuredClone(record))
+  }
+  async recordScores(rows: ScoreRow[]) {
+    this.scores.push(...structuredClone(rows))
   }
   async notifyMatch(userId: string, payload: Record<string, unknown>) {
     this.notifications.push({ userId, payload })
@@ -166,14 +184,18 @@ function supabaseStore(db: Db): AgentStore {
       return count ?? 0
     },
     async conversationState(id) {
-      const row = (await one(db.from('conversations').select('status,side_a_controller').eq('id', id).maybeSingle())) as {
+      const row = (await one(db.from('conversations').select('status,side_a_controller,side_b_controller').eq('id', id).maybeSingle())) as {
         status: ConversationState['status']
         side_a_controller: Controller
+        side_b_controller: Controller
       } | null
-      return row ? { status: row.status, sideAController: row.side_a_controller } : null
+      return row ? { status: row.status, sideAController: row.side_a_controller, sideBController: row.side_b_controller } : null
     },
     async recordAttempt(record) {
       await one(db.from('match_attempts').insert(record))
+    },
+    async recordScores(rows) {
+      await one(db.from('match_scores').insert(rows))
     },
     async notifyMatch(userId, payload) {
       await one(db.from('notifications').insert({ user_id: userId, type: 'match', payload }))

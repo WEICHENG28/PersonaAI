@@ -5,7 +5,7 @@ import { setLogWriter } from '../../server/lib/log'
 import { MemoryAgentStore } from '../../server/social/agentStore'
 import { decideGuard, isNotifiable, isTaskDone, reachedDailyLimit } from '../../server/social/guards'
 import { runTaskStep, runTaskStepSafely, type RunnerDeps } from '../../server/social/runner'
-import { evaluatePlaceholder, pickMostSimilar } from '../../server/social/runnerDeps'
+import { pickMostSimilar } from '../../server/social/runnerDeps'
 
 const NOW = new Date('2026-10-30T12:00:00')
 
@@ -165,9 +165,19 @@ describe('runTaskStep', () => {
 
   it('本人已接手 → 清掉進行中的對話，不再代聊', async () => {
     put(chatting())
-    store.conversations.set('conv-1', { status: 'active', sideAController: 'human' })
+    store.conversations.set('conv-1', { status: 'active', sideAController: 'human', sideBController: 'twin' })
     expect(await runTaskStep('t1', deps)).toBe('chat_cleared')
     expect(deps.runTwinRounds).not.toHaveBeenCalled()
+  })
+
+  it('對方本人接手（b 方是 human）→ 不再呼叫 runTwinRounds，清掉進行中的對話', async () => {
+    put(chatting())
+    store.conversations.set('conv-1', { status: 'active', sideAController: 'twin', sideBController: 'human' })
+    expect(await runTaskStep('t1', deps)).toBe('chat_cleared')
+    expect(deps.runTwinRounds).not.toHaveBeenCalled()
+    expect(deps.evaluate).not.toHaveBeenCalled()
+    expect(store.tasks.get('t1')?.active_conversation_id).toBeNull()
+    expect(store.attempts).toHaveLength(0)
   })
 
   it('達到完成條件 → 任務完成並交給 AI 朋友回報', async () => {
@@ -221,9 +231,9 @@ describe('runTaskStep', () => {
     expect(logs.at(-1)).toMatchObject({ action: '双向合适，通知你', reason: '双方都觉得聊得来' })
   })
 
-  it('暫代評審判「不確定」→ 繼續聊', async () => {
+  it('評審判「不確定」→ 繼續聊', async () => {
     put(chatting())
-    deps.evaluate = (task, conv, round) => evaluatePlaceholder(task, conv, round)
+    deps.evaluate = vi.fn(async () => evaluation('uncertain', 'suitable'))
     expect(await runTaskStep('t1', deps)).toBe('continue_chat')
   })
 })
