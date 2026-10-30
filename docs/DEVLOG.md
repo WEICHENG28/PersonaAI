@@ -26,6 +26,16 @@
 
 ## 共用與決策
 
+### 2026-10-30｜Vite SPA 重構（02 全流程可點）＋導航/落地頁修正｜Vincent（AI 協助）｜直接 commit main（骨架階段）
+- **做了什麼**：把 Next.js SSR 骨架整個換成 Vite 6 + React 19 SPA（TS strict、Tailwind v4、Zustand demo 引擎、零後端依賴），02 的 12 步流程全可點；本次修正容器排版（卡片 box-sizing、grid min-width:0、防橫向溢出）、導航響應式（≥64rem 頂欄 nav；手機極簡頂欄 wordmark＋阿澈鈕、底部 Hum 卡紙 tab 拖攔）、新增 `/landing` 落地頁（點頂欄 PersonaAI wordmark 進入，less wordy、Hum 構成：settled hero、卡紙角色卡、撕紙流程帶、梨黃數字 field）。
+- **為什麼這樣做**：demo 階段 UI 呈現優先，客戶端模擬最快可跑；保留 `lib/api` 型別+MockApi 縫隙之後接真後端。單語 zh-CN（使用者決定 scrap 多語）。
+- **改了哪些檔案**：`src/routes.tsx`、`src/components/AppShell.tsx`、`src/components/ui/NavBar.tsx`、`src/features/landing/LandingPage.tsx`（新）、`src/theme/{layout,landing,pages,base}.css`。
+- **驗證**：`tsc -b` 通過、vitest 4/4、`npm run build` 成功；headless Chrome CDP 於 375/768/1280px 實測六頁面：導航切換正確（手機 tabbar flex／桌機 knobs flex）、零橫向溢出、tabbar 貼底（y=752 h=60 @375×812）；瀏覽器 walkthrough 登入→聊天→記憶抽取→任務卡→大廳→歷史全通。
+- **踩到的坑**：這台機器 `--headless=new` 會靜默 crash，要用舊 `--headless`；vite 只聽 IPv6 `[::1]`，curl 127.0.0.1 會失敗；`.knobs` 在 media query 前後重複定義會蓋掉（同 specificity 後者勝），已去重。
+- **還沒做完／待辦**：bundle 743kB（Rive+React），之後 manualChunks 或 route-level code splitting；登入沒有持久化（重整即登出，demo 可接受）。
+
+---
+
 ### 2026-10-30｜A0 加入三語 i18n、Rive 動畫與兩個新套件｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：A0 骨架在 07 §3 的結構上擴充三項：全站三語（zh-CN 預設、zh-HK 粵語、en）、三個 Rive 動畫（`public/riv/`：robot=friends 頁頭像、fish=大廳、red_birdie=登入頁）、新增套件 `next-intl`、`@rive-app/react-canvas`。
 - **為什麼這樣做**：頁面結構因此從 `app/friend/...` 改為 `app/[locale]/friend/...`（07 §3 的字面路徑位移一層，檔案歸屬不變）；zh-CN 走無前綴 URL（`/friend`），zh-HK／en 走 `/zh-HK/...`、`/en/...`。介面文字改走 `messages/*.json`，取代 07 §7.9 的「介面文字用繁體中文」——這是規格變更，之後補進 02／07 文件。

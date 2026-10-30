@@ -1,0 +1,92 @@
+/* ── Hallmark · Hum 真規格 token（取自 skills/hallmark references/themes/hum.md + site/themes/hum）── */
+
+:root {
+  color-scheme: light;
+
+  /* 空間 */
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px;
+  --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px;
+
+  /* 字級 */
+  --text-xs: 0.8125rem; --text-sm: 0.875rem; --text-md: 1rem;
+  --text-lg: 1.25rem; --text-xl: 1.5625rem; --text-2xl: 1.953rem;
+  --text-title: clamp(1.25rem, 0.75vw + 0.875rem, 1.625rem);
+  --text-lead: clamp(1.125rem, 0.35vw + 1rem, 1.375rem);
+
+  /* 動效 */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-snap: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+
+  /* 顏色（oklch，hum.md 原值） */
+  --color-paper: oklch(97% 0.012 95);
+  --color-paper-2: oklch(94.5% 0.018 95);
+  --color-paper-3: oklch(91% 0.022 95);
+  --color-ink: oklch(20% 0.014 255);
+  --color-ink-2: oklch(29% 0.014 255);
+  --color-muted: oklch(47% 0.014 255);
+  --color-rule: oklch(87% 0.016 95);
+  --color-accent: oklch(87% 0.175 96);        /* 梨黃：AI 朋友 / 主要動作 */
+  --color-accent-deep: oklch(72% 0.16 92);
+  --color-accent-ink: oklch(20% 0.014 255);
+  --color-accent-2: oklch(50% 0.17 250);      /* 藍：連結、twin 分身 */
+  --color-accent-3: oklch(70% 0.2 22);        /* 珊瑚：警示 / 一個大聲的時刻 */
+  --color-mint: oklch(82% 0.15 152);          /* 薄荷：人類 / 成長 */
+  --color-mint-deep: oklch(48% 0.12 155);
+  --color-focus: oklch(50% 0.17 250);
+  --color-card: oklch(98.8% 0.007 95);
+  --color-edge: oklch(83% 0.04 88);
+  --color-fringe: oklch(99.2% 0.006 95);
+  --color-white: oklch(99.6% 0.005 95);
+  --color-ink-deep: oklch(13% 0.012 255);
+  --color-kraft: oklch(63% 0.085 62);
+  --color-coral-deep: oklch(56% 0.17 24);
+  --color-blue-deep: oklch(36% 0.13 255);
+  --color-leaf: oklch(64% 0.15 150);
+  --color-error: oklch(52% 0.19 27);
+  --color-success: oklch(50% 0.12 150);
+
+  /* 字體 */
+  --font-display: 'Chillax', 'Noto Sans SC', 'Noto Sans TC', ui-rounded, ui-sans-serif, sans-serif;
+  --font-body: var(--font-display);
+  --font-outlier: ui-monospace, monospace;
+
+  /* 圓角 */
+  --radius-card: 24px;   /* 桌面 24 / 兒童產品 28 */
+  --radius-stock: 16px;
+  --radius-input: 14px;
+  --radius-pill: 999px;
+  --rule-hair: 1px;
+
+  /* 陰影（光從左上來，影子往右下掉） */
+  --shadow-card: 0 1px 2px oklch(20% 0.014 255 / 0.06), 0 12px 28px -14px oklch(20% 0.014 255 / 0.22);
+  --shadow-paper: drop-shadow(0 0 0.6px oklch(20% 0.014 255 / 0.32)) drop-shadow(1.5px 2.5px 1.5px oklch(20% 0.014 255 / 0.1)) drop-shadow(6px 14px 16px oklch(20% 0.014 255 / 0.13));
+  --shadow-paper-low: drop-shadow(0 0 0.6px oklch(20% 0.014 255 / 0.34)) drop-shadow(1px 2px 1.5px oklch(20% 0.014 255 / 0.13));
+
+  /* 追蹤與字重 */
+  --tracking-display: -0.03em;
+  --display-weight: 600;
+
+  /* 紙紋（feTurbulence data URI，非圖片） */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .42 -.18'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --fibre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='turbulence' baseFrequency='.024' numOctaves='4' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .36 0 0 0 0 .24 -10 0 0 0 .42'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+  --fibre-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='turbulence' baseFrequency='.024' numOctaves='4' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 .96 -10 0 0 0 .5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+  --grain-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .27 0 0 0 0 .18 0 0 0 .3 -.12'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+
+  /* 版面 */
+  --container: 640px;
+  --bar-h: 64px;
+  --gutter: 20px;
+}
+
+@media (min-width: 64rem) {
+  :root { --container: 1080px; --bar-h: 76px; --gutter: 40px; }
+}
+
+/* 訊息泡泡色票（02 的角色色：朋友梨黃、twin 藍、人類薄荷） */
+:root {
+  --bubble-friend: color-mix(in oklab, var(--color-accent) 38%, var(--color-paper));
+  --bubble-twin: color-mix(in oklab, var(--color-accent-2) 12%, var(--color-paper));
+  --bubble-human: color-mix(in oklab, var(--color-mint) 30%, var(--color-paper));
+}

@@ -1,0 +1,287 @@
+/* ── 落地页：Hum 构成（settled hero、卡纸 tile、梨黄 field、撕纸带） ── */
+
+.landing {
+  max-width: var(--container);
+  margin-inline: auto;
+  padding: 0 var(--gutter);
+  display: grid;
+  gap: var(--space-2xl);
+  padding-block: var(--space-md) var(--space-3xl);
+}
+
+/* ── 极简顶栏 ── */
+.landing-bar {
+  display: flex;
+  align-items: center;
+  min-height: var(--bar-h);
+}
+.landing-bar .knob { margin-left: auto; }
+
+/* ── Hero ── */
+.landing-hero {
+  display: grid;
+  gap: var(--space-2xl);
+  align-items: center;
+}
+
+@media (min-width: 64rem) {
+  .landing-hero {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  }
+}
+
+.landing-hero h1 {
+  font-size: clamp(2.1rem, 5.5vw, 4rem);
+  line-height: 1.06;
+  max-width: 14ch;
+}
+
+.landing-hero mark {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border-radius: var(--space-2xs);
+  padding: 0 0.14em;
+  box-decoration-break: clone;
+}
+
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+.landing-note {
+  margin-top: var(--space-md);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  max-width: 36ch;
+}
+
+/* 产品卡：卡纸 + 卷角 + tab */
+.landing-card {
+  margin: 0;
+  position: relative;
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border-radius: 22px;
+  background: var(--grain), var(--fibre), var(--color-card);
+  filter: var(--shadow-paper);
+  rotate: -1.2deg;
+  max-width: 520px;
+  justify-self: center;
+  width: 100%;
+}
+
+.landing-card__tab {
+  justify-self: start;
+  font: 600 var(--text-xs)/1 var(--font-body);
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: 10px;
+  background: var(--fibre), var(--color-paper-2);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 8%, transparent);
+}
+
+.landing-card__chat { display: grid; gap: var(--space-sm); }
+
+.landing-card__msg {
+  max-width: 88%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 18px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.landing-card__msg--friend {
+  justify-self: start;
+  background: var(--grain), var(--fibre), var(--bubble-friend);
+  border-bottom-left-radius: 5px;
+}
+
+.landing-card__msg--twin {
+  justify-self: end;
+  background: var(--grain), var(--fibre), var(--bubble-twin);
+  border-bottom-right-radius: 5px;
+}
+
+.landing-card__msg--meta {
+  justify-self: stretch;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  background: none;
+  padding: var(--space-2xs);
+}
+
+.landing-card__msg--meta b { color: var(--color-mint-deep); }
+
+/* ── 三个角色卡 ── */
+.landing-roles h2,
+.landing-cta h2 {
+  font-size: var(--text-title);
+  margin-bottom: var(--space-lg);
+}
+
+.landing-roles__grid {
+  display: grid;
+  gap: var(--space-md);
+}
+
+@media (min-width: 40rem) {
+  .landing-roles__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.role-card {
+  display: grid;
+  gap: var(--space-2xs);
+  justify-items: start;
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--grain), var(--fibre), var(--color-card);
+  box-shadow: var(--shadow-card);
+  box-sizing: border-box;
+}
+
+.role-card h3 { font-size: var(--text-lg); }
+.role-card p { font-size: var(--text-sm); color: var(--color-ink-2); line-height: 1.45; }
+.role-emoji { font-size: var(--text-2xl); }
+
+/* ── 流程：卡纸 tile 排在撕纸色带上 ── */
+.landing-flow { display: grid; gap: var(--space-sm); justify-items: center; }
+
+.landing-flow__strip {
+  --strip-c: var(--color-kraft);
+  position: relative;
+  width: 100%;
+  padding: var(--space-lg) var(--space-md) var(--space-xl);
+  background: var(--grain), var(--fibre), var(--strip-c);
+  clip-path: polygon(
+    0 14px, 3% 8px, 6% 13px, 9% 6px, 12% 12px, 15% 7px, 18% 13px, 21% 5px,
+    24% 11px, 27% 8px, 30% 14px, 33% 6px, 36% 12px, 39% 7px, 42% 13px,
+    45% 5px, 48% 11px, 51% 8px, 54% 14px, 57% 6px, 60% 12px, 63% 7px,
+    66% 13px, 69% 5px, 72% 11px, 75% 8px, 78% 14px, 81% 6px, 84% 12px,
+    87% 7px, 90% 13px, 93% 5px, 96% 11px, 100% 8px,
+    100% calc(100% - 10px), 96% calc(100% - 6px), 92% calc(100% - 12px),
+    88% calc(100% - 7px), 84% calc(100% - 13px), 80% calc(100% - 5px),
+    76% calc(100% - 11px), 72% calc(100% - 8px), 68% calc(100% - 14px),
+    64% calc(100% - 6px), 60% calc(100% - 12px), 56% calc(100% - 7px),
+    52% calc(100% - 13px), 48% calc(100% - 5px), 44% calc(100% - 11px),
+    40% calc(100% - 8px), 36% calc(100% - 14px), 32% calc(100% - 6px),
+    28% calc(100% - 12px), 24% calc(100% - 7px), 20% calc(100% - 13px),
+    16% calc(100% - 5px), 12% calc(100% - 11px), 8% calc(100% - 8px),
+    4% calc(100% - 14px), 0 calc(100% - 7px)
+  );
+  filter: drop-shadow(0 0 0.6px color-mix(in oklab, var(--color-ink) 30%, transparent))
+    drop-shadow(1px 3px 3px color-mix(in oklab, var(--color-ink) 10%, transparent))
+    drop-shadow(5px 10px 12px color-mix(in oklab, var(--color-ink) 12%, transparent));
+}
+
+.landing-flow__tiles {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-xs);
+  justify-content: center;
+  rotate: 0.8deg;
+}
+
+.landing-flow__tiles li {
+  --edge: 4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-md);
+  border-radius: 12px;
+  font: 600 var(--text-sm)/1 var(--font-body);
+  color: var(--color-ink);
+  background: var(--fibre), var(--color-card);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 10%, transparent),
+    0 var(--edge) 0 0 var(--color-edge);
+  counter-increment: step;
+  position: relative;
+}
+
+.landing-flow__tiles li::before {
+  content: counter(step);
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font: 600 11px/1 var(--font-body);
+}
+
+.landing-flow__note {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  text-align: center;
+}
+
+/* ── 数字：梨黄 field ── */
+.landing-stats {
+  padding: var(--space-xs);
+}
+
+.landing-stats__in {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-md);
+  border-radius: var(--radius-card);
+  background: var(--grain), var(--fibre), var(--color-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent-deep) 40%, transparent),
+    0 5px 0 0 var(--color-accent-deep),
+    2px 9px 16px -4px color-mix(in oklab, var(--color-ink) 28%, transparent);
+  rotate: -0.6deg;
+}
+
+.stat-item {
+  display: grid;
+  gap: var(--space-3xs);
+  text-align: center;
+}
+
+.stat-item b {
+  font: 600 var(--text-2xl)/1 var(--font-display);
+  color: var(--color-accent-ink);
+  letter-spacing: -0.03em;
+}
+
+.stat-item span {
+  font-size: var(--text-xs);
+  color: color-mix(in oklab, var(--color-accent-ink) 78%, transparent);
+  line-height: 1.35;
+}
+
+@media (max-width: 30rem) {
+  .landing-stats__in { grid-template-columns: 1fr; gap: var(--space-md); }
+  .stat-item { text-align: left; }
+}
+
+/* ── CTA ── */
+.landing-cta {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-md);
+  text-align: center;
+  padding: var(--space-xl) var(--space-md);
+  border-radius: var(--radius-card);
+  background: var(--grain), var(--fibre), var(--color-paper-2);
+}
+
+.landing-cta h2 { margin: 0; }
+
+/* 手机微调 */
+@media (max-width: 40rem) {
+  .landing { gap: var(--space-xl); }
+  .landing-hero h1 { font-size: clamp(1.9rem, 8.5vw, 2.6rem); }
+  .landing-card { rotate: -1deg; padding: var(--space-md); }
+}

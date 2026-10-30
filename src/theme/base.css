@@ -1,0 +1,193 @@
+@import './tokens.css';
+@import './layout.css';
+@import './pages.css';
+@import './landing.css';
+
+/* ── Hallmark Hum 基礎樣式（結構沿用 reference site base.css 的構成規則）── */
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-weight: 500;
+  font-family: var(--font-body);
+  color: var(--color-ink-2);
+  background: var(--grain), var(--fibre), var(--color-paper);
+  min-height: 100svh;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-weight: var(--display-weight);
+  color: var(--color-ink);
+  line-height: 1.05;
+  letter-spacing: var(--tracking-display);
+  margin: 0;
+}
+
+p { margin: 0; line-height: 1.5; }
+
+a { color: var(--color-accent-2); text-underline-offset: 0.18em; }
+
+mark {
+  background: color-mix(in oklab, var(--color-accent) 55%, transparent);
+  color: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0 0.14em;
+  border-radius: var(--space-2xs);
+}
+
+/* focus ring：藍色 */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+::selection { background: color-mix(in oklab, var(--color-accent) 60%, transparent); }
+
+button { font-family: inherit; }
+input, textarea, select { font-family: inherit; }
+
+/* ── 卡片：紙卡，光從左上 ── */
+.card {
+  background: var(--grain), var(--fibre), var(--color-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── 按鈕：厚卡紙，邊緣會壓下去（Hum 真規格） ── */
+.btn {
+  --edge: 5px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 54px;
+  padding: 0 var(--space-lg);
+  border: 0;
+  border-radius: var(--radius-stock);
+  font: 600 var(--text-md)/1 var(--font-body);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  color: var(--color-ink);
+  transition:
+    translate var(--dur-micro) var(--ease-snap),
+    box-shadow var(--dur-micro) var(--ease-snap),
+    background-color var(--dur-short) var(--ease-snap);
+}
+
+.btn--primary {
+  background: var(--grain), var(--fibre), var(--color-accent);
+  color: var(--color-accent-ink);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--color-white) 55%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, var(--color-accent-deep) 40%, transparent),
+    0 var(--edge) 0 0 var(--color-accent-deep),
+    2px calc(var(--edge) + 4px) 10px -3px color-mix(in oklab, var(--color-ink) 32%, transparent);
+  transition-timing-function: var(--ease-spring);
+}
+.btn--primary:hover { --edge: 7px; translate: 0 -2px; }
+.btn--primary:active { --edge: 1px; translate: 0 4px; transition-duration: calc(var(--dur-micro) / 2); }
+
+.btn--secondary {
+  background: var(--fibre), var(--color-card);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 13%, transparent),
+    0 var(--edge) 0 0 var(--color-edge),
+    2px calc(var(--edge) + 3px) 8px -3px color-mix(in oklab, var(--color-ink) 22%, transparent);
+}
+.btn--secondary:hover { --edge: 6px; translate: 0 -1px; background-color: var(--color-white); }
+.btn--secondary:active { --edge: 1px; translate: 0 4px; }
+
+.btn--danger {
+  background: var(--grain), var(--fibre), var(--color-accent-3);
+  color: var(--color-ink);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--color-white) 55%, transparent),
+    0 var(--edge) 0 0 var(--color-coral-deep),
+    2px calc(var(--edge) + 4px) 10px -3px color-mix(in oklab, var(--color-ink) 32%, transparent);
+}
+.btn--danger:hover { --edge: 7px; translate: 0 -2px; }
+.btn--danger:active { --edge: 1px; translate: 0 4px; }
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  translate: none;
+}
+
+.btn--small { --edge: 4px; min-height: 44px; padding: 0 var(--space-md); border-radius: 13px; font-size: var(--text-sm); }
+.btn--small:hover { --edge: 5px; }
+.btn--small:active { --edge: 1px; translate: 0 3px; }
+
+/* ── 輸入欄：14px 圓角、52px 高、藍 focus ring ── */
+.input {
+  min-height: 52px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-muted);
+  background: var(--fibre), var(--color-paper);
+  color: var(--color-ink);
+  font: 500 var(--text-md)/1.2 var(--font-body);
+  transition: border-color var(--dur-short) var(--ease-snap), box-shadow var(--dur-short) var(--ease-snap);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-focus) 25%, transparent);
+}
+.input::placeholder { color: var(--color-muted); }
+
+/* ── chips（小紙片） ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 40px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font: 600 var(--text-sm)/1 var(--font-body);
+  white-space: nowrap;
+}
+.chip--ink { background: var(--color-ink); color: var(--color-paper); }
+.chip--well { background: var(--color-paper-2); }
+.chip--mint { background: var(--color-mint); color: var(--color-ink); }
+.chip--pear { background: var(--color-accent); color: var(--color-accent-ink); }
+.chip--coral { background: var(--color-accent-3); color: var(--color-ink); }
+
+/* ── 撕紙 bar（頂欄） ── */
+.tear-bar {
+  background: var(--grain), var(--fibre), var(--color-card);
+  clip-path: polygon(
+    0 0, 100% 0,
+    100% calc(100% - 8px), 97% calc(100% - 7px), 94% calc(100% - 8px),
+    91% calc(100% - 6px), 88% calc(100% - 8px), 85% calc(100% - 7px),
+    82% calc(100% - 9px), 79% calc(100% - 6px), 76% calc(100% - 8px),
+    73% calc(100% - 7px), 70% calc(100% - 9px), 67% calc(100% - 6px),
+    64% calc(100% - 8px), 61% calc(100% - 7px), 58% calc(100% - 8px),
+    55% calc(100% - 6px), 52% calc(100% - 9px), 49% calc(100% - 7px),
+    46% calc(100% - 8px), 43% calc(100% - 6px), 40% calc(100% - 8px),
+    37% calc(100% - 7px), 34% calc(100% - 9px), 31% calc(100% - 6px),
+    28% calc(100% - 8px), 25% calc(100% - 7px), 22% calc(100% - 8px),
+    19% calc(100% - 6px), 16% calc(100% - 9px), 13% calc(100% - 7px),
+    10% calc(100% - 8px), 7% calc(100% - 6px), 4% calc(100% - 8px), 0 calc(100% - 7px)
+  );
+}
+
+/* ── 減速動效 ── */
+@media (prefers-reduced-motion: reduce) {
+  .btn, .btn:hover, .btn:active { transition: none; }
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* ── safe area ── */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
+.safe-top { padding-top: env(safe-area-inset-top, 0); }
