@@ -31,23 +31,27 @@ interface Row {
  * Agent 工作日志面板（settings.dev_mode 开启时显示，02 §4）。
  * http 模式：自己载入最新 50 笔，再用 Realtime 即时加入新的；mock 模式：显示传进来的 demo 日志。
  */
-export function AgentLogPanel({ logs = [] }: { logs?: AgentLog[] }) {
-  if (historyFromApi) return <LiveLogPanel />
+export function AgentLogPanel({ logs = [], taskId }: { logs?: AgentLog[]; taskId?: string }) {
+  if (historyFromApi) return <LiveLogPanel fixedTaskId={taskId} />
   const rows = logs.map((l): Row => ({ id: l.id, role: l.role === 'privacy' ? 'guard' : l.role, at: l.at, text: l.text, reason: l.reason }))
   return <LogCard rows={rows} />
 }
 
-function LiveLogPanel() {
+/** fixedTaskId：只看這個任務（任務頁用），不顯示篩選。 */
+function LiveLogPanel({ fixedTaskId }: { fixedTaskId?: string }) {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [taskId, setTaskId] = useState('')
 
   useEffect(() => {
-    getLogs()
+    getLogs(fixedTaskId)
       .then((rows) => setLogs((live) => mergeLogs(live, rows)))
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : t('login.errorGeneric')))
-    return subscribeLogs((log) => setLogs((prev) => mergeLogs(prev, [log])))
-  }, [])
+    return subscribeLogs((log) => {
+      if (fixedTaskId && log.task_id !== fixedTaskId) return
+      setLogs((prev) => mergeLogs(prev, [log]))
+    })
+  }, [fixedTaskId])
 
   const taskIds = useMemo(() => [...new Set(logs.map((l) => l.task_id).filter((id): id is string => Boolean(id)))], [logs])
   const rows = logs
@@ -64,7 +68,7 @@ function LiveLogPanel() {
 
   return (
     <LogCard rows={rows} error={error}>
-      {taskIds.length > 1 && (
+      {!fixedTaskId && taskIds.length > 1 && (
         <label className="field">
           <span>依任务筛选</span>
           <select className="input" value={taskId} onChange={(e) => setTaskId(e.target.value)}>

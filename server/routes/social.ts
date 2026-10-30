@@ -8,6 +8,8 @@ import { startConversation } from '../contracts/twin'
 import { getAgentStore } from '../social/agentStore'
 import { listHistory, reopenAttempt } from '../social/history'
 import { runTaskStepSafely } from '../social/runner'
+import { computeStats } from '../social/stats'
+import { getTaskStore } from '../social/taskStore'
 import { defaultRunnerDeps } from '../social/runnerDeps'
 import { requireUserId } from '../social/user'
 
@@ -20,6 +22,18 @@ socialRoutes.post('/tasks', async (c) => {
   if (!body.success) return c.json({ ok: false, error: '请用一句话说说想找什么样的人（200 字以内）' }, 400)
   return respond(c, (userId) => createTaskFromText(userId, body.data.text))
 })
+
+/** B10：我最近的任務（任務頁列表）。 */
+socialRoutes.get('/tasks', (c) => respond(c, (userId) => getTaskStore().listByUser(userId, 20)))
+
+/** B10：任務的效率統計（附計算依據）。 */
+socialRoutes.get('/tasks/:id/stats', (c) =>
+  respond(c, async (userId) => {
+    const task = await getOwnTask(userId, c.req.param('id'))
+    const { manual_minutes_per_chat } = await getAgentStore().userSettings(userId)
+    return computeStats(task.progress, manual_minutes_per_chat)
+  }),
+)
 
 socialRoutes.get('/tasks/:id', (c) => respond(c, (userId) => getOwnTask(userId, c.req.param('id'))))
 

@@ -15,6 +15,7 @@ export interface TaskView {
   done_condition: { suitable_count?: number; max_chats?: number; deadline?: string | null }
   status: TaskStatus
   progress: { screened: number; chats: number; suitable: number }
+  active_conversation_id?: string | null
 }
 
 export type TaskAction = 'confirm' | 'pause' | 'resume' | 'cancel'
@@ -118,6 +119,36 @@ export function createTask(text: string): Promise<TaskView> {
 
 export function getTask(id: string): Promise<TaskView> {
   return useHttp ? request('GET', `/api/tasks/${id}`) : mock.get(id)
+}
+
+/** B10：我最近的任務（http 模式）。 */
+export function listTasks(): Promise<TaskView[]> {
+  return request('GET', '/api/tasks')
+}
+
+export interface TaskStatsView {
+  screened: number
+  chats: number
+  suitable: number
+  saved_minutes: number
+  basis: string
+}
+
+export function getTaskStats(id: string): Promise<TaskStatsView> {
+  return request('GET', `/api/tasks/${id}/stats`)
+}
+
+/** 訂閱這個任務的狀態與進度變化（Supabase Realtime，資料表權限只讓本人讀到）。回傳取消訂閱。 */
+export function subscribeTask(id: string, onChange: (task: TaskView) => void): () => void {
+  const channel = supabase
+    .channel(`agent_tasks-${id}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'agent_tasks', filter: `id=eq.${id}` }, (payload) =>
+      onChange(payload.new as TaskView),
+    )
+    .subscribe()
+  return () => {
+    void supabase.removeChannel(channel)
+  }
 }
 
 export function updateTask(id: string, action: TaskAction): Promise<TaskView> {

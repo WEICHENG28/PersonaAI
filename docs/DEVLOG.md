@@ -233,6 +233,17 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜B10 任務頁｜Peter（AI 協助）｜Closes #18
+- **做了什麼**：
+  - 後端：`GET /api/tasks`（我最近 20 個任務）、`GET /api/tasks/:id/stats`（效率統計，用我的人工平均分鐘）；`TaskStore.listByUser`。
+  - 前端：新頁面 `/tasks`（任務列表）與 `/tasks/:id`（複述、狀態、目的／條件／完成條件、合適進度條、`StatsCard`、「看正在进行的代聊」連到 C4 的 `/chat/:id`、確認／暫停／繼續／取消、只看這個任務的工作日誌）；Realtime 訂閱 `agent_tasks`，worker 推進時進度即時更新；`AgentLogPanel` 加選填的 `taskId`。路由加在 `src/routes.tsx`（共用檔，只加兩行）。mock 模式顯示說明文字。
+- **沒有做 `SocialSettings` 元件**：A 的設定頁（A7）已經有檔位、人工平均時間；只缺**每日代聊上限（1–20）**，建議 A 在同一張卡片加一個欄位（`PUT /api/settings` 已支援 `daily_chat_limit`），就不用再多一個元件。找人目的是 B11（P1）。
+- **給 A**：導覽列還沒有「我的任务」的入口；阿澈聊天頁建立任務後也可以連到 `/tasks/<id>`。要不要加由 A 決定。
+- **改了哪些檔案**：`server/social/taskStore.ts`、`server/routes/social.ts`、`src/lib/api/social.ts`、`src/components/AgentLogPanel.tsx`、`src/features/social/TaskPage.tsx`、`src/routes.tsx`、`tests/social/task-page.test.ts`。
+- **驗證**：`tsc -b`；vitest 381/381（只列自己的任務、新的在前、統計用用戶設定、別人的任務 404）；`npm run build`；雲端唯讀 `listByUser` 查到 Peter 的實跑任務。畫面要 Peter 用瀏覽器看。
+
+---
+
 ### 2026-10-30｜B8 效率統計＋任務結果回報｜Peter（AI 協助）｜Closes #36
 - **做了什麼**：`server/social/stats.ts`（`computeStats`：省下時間＝代聊場數 × 人工平均分鐘，附計算依據；`formatDuration`：120 →「约 2 小时」）；`buildReport` 從這個任務的歷史嘗試取合適名單（雙向／單向）與不合適原因（抽象說法、已過隱私守門），不含任何分數，交給 A 的 `deliverReport`；`match` 通知的內容改成 07B 規定的 `{ conversationId, targetName, mutual, taskId }`；前端 `StatsCard`（沿用 A 回報卡的 `stats-row`／`stat` 樣式）與 `formatDuration`。
 - **給 A（Vincent）**：`deliverReport` 收到的 `TaskReport` 現在有 `suitable`（名字、是否雙向、對話 ID）與 `unsuitable_reasons`，阿澈回報時可以直接用。`StatsCard` 可以放進回報卡或任務頁。
