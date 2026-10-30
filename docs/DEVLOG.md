@@ -315,7 +315,10 @@
   - 對話 1 `364c39f7-ccf2-4aa1-a5af-144aa71d4e01`（c-test1 分身 ↔ 小安分身，開場＋3 輪）：c-test1 用 anon key＋登入 JWT 訂閱，**經 RLS 即時收到開場後的 6/6 則**；c-test2 訂閱同一段收到 0 則。聊天室 API 回對方「小安」、雙方都是分身、7 則都是 AI。c-test2 讀聊天室／判定、發言都是 403；c-test1（分身在聊）發言 409。
   - 跑 B 的評審兩次（第 2、3 輪）寫入 `match_scores`（方向分數 83），`/status` 只回 `{"value":"suitable","trend":"flat"}`，沒有數字；小安那邊看到的是小安自己的視角。
   - 對話 2 `76f1570c-72a6-41b9-a123-80e00e46b0d3`（c-test1 本人 ↔ 小安分身）：本人發言後小安分身回覆，Realtime 即時收到 2 則；超過 1000 字回 400。
-  - 沒有在瀏覽器看畫面（這個環境沒有瀏覽器工具）。
+  - 瀏覽器實測（本機 Chrome headless＋CDP，`.local/c4-cdp.ts`，帳號 c4-browser1／c4-browser2）：訊息逐輪自己出現、頁面沒重新載入（7/7 都有「AI 代聊中」）；頂部「和 小安 的对话」、「你的分身 · 代聊中／对方的分身」；輸入框停用；評審後判定顯示「合适 · 走势持平」、整頁沒有分數；另一個 browser context 登入後打開同一段顯示「打不开这段对话」；本人送出後出現輸入中，小安分身回覆。
+- **給 A 的兩個問題（不在 C4 範圍，C 沒改）**：
+  - `src/theme/layout.css` 的 `.chat` 是 flex column，`.bubble--twin`／`.bubble--human` 的 `justify-self: end` 在 flex 裡沒作用 → 我方訊息也靠左（demo 頁一樣）。改成 `align-self: flex-end`（對方那組 `align-self: flex-start`）就好。
+  - 登入狀態只存在 `useDemoStore`（沒有持久化），網址列直接開 `/chat/<id>` 或重新整理會被 `RequireAuth` 送回登入頁，再登入會變成新的匿名帳號（不是對話成員 → 403）。需要在啟動時用 `currentUser()` 從 Supabase session 還原。
 - **踩到的坑／注意事項**：
   - 畫面文字放在 `chatRoomView.ts` 的 `CHAT_TEXT`：08 第 6 節要求文字放 `messages/strings.json`，但那是 A 的檔案；之後要搬過去再和 A 說。
   - 本人和分身聊時 `round_count` 不會增加（只有 `runTwinRounds` 會加），C5 換算「第 n 輪」時要注意。
