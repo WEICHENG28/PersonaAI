@@ -6,7 +6,7 @@ import type { AgentLogInput, GuardResult, ShareableProfile } from '../../shared/
 import { getShareableProfile } from '../contracts/friend'
 import { llmJson, type LlmJsonOptions } from '../lib/llm'
 import { writeLog } from '../lib/log'
-import { guardResultSchema, renderGuardSystem, type GuardLlmResult } from '../prompts/13_guard'
+import { guardResultSchema, renderGuardSystem, renderGuardUserMessage, type GuardLlmResult } from '../prompts/13_guard'
 
 export const MASK = '（已隐藏）'
 /** Prompt 13：LLM 判定洩漏卻沒給改寫版時用。 */
@@ -118,8 +118,8 @@ async function checkWithLlm(deps: GuardDeps, maskedText: string, ownerUserId: st
   const shareable = await deps.getShareableProfile(ownerUserId)
   return deps.llmJson({
     role: 'fast',
-    system: renderGuardSystem({ shareable, text: maskedText }),
-    messages: [{ role: 'user', content: '检查这则消息，只输出 JSON。' }],
+    system: renderGuardSystem({ shareable }),
+    messages: [{ role: 'user', content: renderGuardUserMessage(maskedText) }],
     temperature: GUARD_TEMPERATURE,
     schema: guardResultSchema,
   })

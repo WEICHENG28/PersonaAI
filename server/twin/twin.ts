@@ -11,7 +11,7 @@ import type {
   StyleProfile,
 } from '../../shared/types'
 import { getShareableProfile, getStyleProfile } from '../contracts/friend'
-import { guardText } from '../contracts/twin'
+import { guardText } from './guard'
 import { llmJson, type LlmJsonOptions } from '../lib/llm'
 import { writeLog } from '../lib/log'
 import { renderTwinSystem, twinReplySchema } from '../prompts/05_twin'
