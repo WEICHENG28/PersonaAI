@@ -98,6 +98,29 @@ export interface TakeoverView {
   summaryFailed: boolean
 }
 
+export type HumanResponse = 'now' | 'later' | 'decline'
+export type NotificationType = 'match' | 'request_human' | 'friend_report' | 'anomaly'
+
+/** C7 通知铃铛的一则通知：只有铃铛要显示的栏位，没有报告内容和分数。 */
+export interface NotificationView {
+  id: string
+  type: NotificationType
+  createdAt: string
+  read: boolean
+  response: HumanResponse | null
+  conversationId: string | null
+  /** match 是对方名字、request_human 是请求的人。 */
+  name: string | null
+  mutual: boolean
+}
+
+/** C7 回应请求真人的结果；now 且这次真的接手时带接手卡片。 */
+export interface RespondView {
+  response: HumanResponse
+  conversationId: string
+  handoff: TakeoverView | null
+}
+
 /** 失败时丢出的错误，message 是可以直接给用户看的简体中文；status 是 HTTP 状态码（连不上时为 0）。 */
 export class TwinApiError extends Error {
   constructor(
@@ -136,6 +159,57 @@ export function continueTwin(conversationId: string): Promise<ContinueResult> {
 /** 本人接手：产生接手卡片、我方改成本人（大约要十几秒）。接手后不能交回分身。 */
 export function takeOver(conversationId: string): Promise<TakeoverView> {
   return request('POST', `/api/conversations/${encodeURIComponent(conversationId)}/takeover`)
+}
+
+/** C7 请求对方本人上线（通知对方，对方选现在聊／稍后聊／拒绝）。 */
+export function requestHuman(conversationId: string): Promise<{ notificationId: string }> {
+  return request('POST', `/api/conversations/${encodeURIComponent(conversationId)}/request-human`)
+}
+
+/** C7 自己最近的通知（新的在前）。 */
+export function listNotifications(): Promise<NotificationView[]> {
+  return request('GET', '/api/notifications')
+}
+
+/** C7 回应请求真人；now 要整理接手卡片，大约十几秒。 */
+export function respondNotification(notificationId: string, response: HumanResponse): Promise<RespondView> {
+  return request('POST', `/api/notifications/${encodeURIComponent(notificationId)}/respond`, { response })
+}
+
+/** C7「找到合适的人」点开后设为已读。 */
+export function markNotificationRead(notificationId: string): Promise<{ id: string }> {
+  return request('POST', `/api/notifications/${encodeURIComponent(notificationId)}/read`)
+}
+
+/**
+ * 订阅自己的通知有变化（新增或回应；RLS：只收得到自己的）。回传取消订阅的函数。
+ * 资料表事件只当成「该重新读了」的讯号，内容一律重新从 /api/notifications 读。
+ */
+export function subscribeNotifications(onChange: () => void, onFailed: () => void): () => void {
+  let channel: ReturnType<typeof supabase.channel> | null = null
+  let cancelled = false
+  void supabase.auth
+    .getSession()
+    .then(({ data }) => supabase.realtime.setAuth(data.session?.access_token ?? null))
+    .catch(() => onFailed())
+    .finally(() => {
+      if (cancelled) return
+      channel = supabase
+        .channel(`notifications-${Math.random().toString(36).slice(2)}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => onChange())
+        .on('system', {}, (payload: { extension?: string; status?: string }) => {
+          if (payload.extension !== 'postgres_changes') return
+          if (payload.status === 'ok') onChange()
+          else onFailed()
+        })
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') onFailed()
+        })
+    })
+  return () => {
+    cancelled = true
+    if (channel) void supabase.removeChannel(channel)
+  }
 }
 
 export interface MessageSubscription {
