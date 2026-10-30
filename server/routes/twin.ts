@@ -7,12 +7,15 @@ import { isAuthFailure, requireAuth } from '../lib/auth'
 import { writeLog } from '../lib/log'
 import { CONFIG } from '../lib/config'
 import { getServiceClient } from '../lib/supabase'
-import { runTwinRounds } from '../contracts/twin'
+import { endConversation, runTwinRounds } from '../contracts/twin'
 import { ChatRoomError, createChatRoomApi, MESSAGE_MAX, messageBodySchema, type ChatRoomApi } from '../twin/chatRoom'
 import { supabaseChatRoomStore } from '../twin/chatRoomStore'
 import { createHandoffApi, type HandoffApi } from '../twin/handoff'
 import { supabaseHandoffStore } from '../twin/handoffStore'
 import { llmJson } from '../lib/llm'
+import { supabaseNotificationStore } from '../twin/notificationStore'
+import { createNotificationApi, type NotificationApi } from '../twin/notifications'
+import { createRequestHumanApi, humanResponseSchema, type RequestHumanApi } from '../twin/requestHuman'
 import { createResultApi, type ResultApi } from '../twin/result'
 import { supabaseResultStore } from '../twin/resultStore'
 import { twinReply } from '../twin/twin'
@@ -24,10 +27,13 @@ export interface TwinRouteDeps {
   chatRoom(): ChatRoomApi
   result(): ResultApi
   handoff(): HandoffApi
+  requestHuman(): RequestHumanApi
+  notifications(): NotificationApi
   resolveUserId: ResolveUserId
 }
 
 const idSchema = z.uuid()
+const NOTIFICATION_NOT_FOUND = '找不到这则通知'
 
 /** Bearer JWT → auth 用戶 → users.id。 */
 async function resolveAppUserId(c: Context): Promise<string | Response> {
@@ -39,12 +45,17 @@ async function resolveAppUserId(c: Context): Promise<string | Response> {
   return data.id as string
 }
 
-/** 先確認登入與對話 id，再執行 run；ChatRoomError 原樣回給用戶，其他錯誤交給 app.onError。 */
-async function respond<T>(c: Context, deps: TwinRouteDeps, run: (id: string, userId: string) => Promise<T>) {
+/** 先確認登入與 id（對話或通知），再執行 run；ChatRoomError 原樣回給用戶，其他錯誤交給 app.onError。 */
+async function respond<T>(
+  c: Context,
+  deps: TwinRouteDeps,
+  run: (id: string, userId: string) => Promise<T>,
+  notFound = '找不到这段对话',
+) {
   const userId = await deps.resolveUserId(c)
   if (userId instanceof Response) return userId
   const id = idSchema.safeParse(c.req.param('id'))
-  if (!id.success) return c.json({ ok: false, error: '找不到这段对话' }, 404)
+  if (!id.success) return c.json({ ok: false, error: notFound }, 404)
   try {
     return c.json({ ok: true, data: await run(id.data, userId) })
   } catch (err) {
@@ -78,12 +89,44 @@ export function createTwinRoutes(deps: TwinRouteDeps): Hono {
   // C6 本人接手：產生接手卡片（只用我方視角的判定）、我方改成本人、寫入 handoffs；接手後不再交回分身
   routes.post('/conversations/:id/takeover', (c) => respond(c, deps, (id, userId) => deps.handoff().takeOver(id, userId)))
 
+  // C7 請求真人：通知對方本人（對方是分身、對話沒結束、還沒請求過）；種子用戶 3 秒後自動回應
+  routes.post('/conversations/:id/request-human', (c) =>
+    respond(c, deps, (id, userId) => deps.requestHuman().requestHuman(id, userId)),
+  )
+
+  // C7 通知鈴鐺：自己最近的通知（只有鈴鐺要顯示的欄位）
+  routes.get('/notifications', async (c) => {
+    const userId = await deps.resolveUserId(c)
+    if (userId instanceof Response) return userId
+    return c.json({ ok: true, data: await deps.notifications().list(userId) })
+  })
+
+  // C7 回應請求真人：{ response: 'now' | 'later' | 'decline' }
+  routes.post('/notifications/:id/respond', async (c) => {
+    const body = z.object({ response: humanResponseSchema }).safeParse(await c.req.json().catch(() => null))
+    if (!body.success) return c.json({ ok: false, error: '请选择现在聊、稍后聊或拒绝' }, 400)
+    return respond(c, deps, (id, userId) => deps.requestHuman().respond(id, userId, body.data.response), NOTIFICATION_NOT_FOUND)
+  })
+
+  // C7「找到合适的人」點開後設為已讀
+  routes.post('/notifications/:id/read', (c) =>
+    respond(c, deps, async (id, userId) => {
+      await deps.notifications().markRead(id, userId)
+      return { id }
+    }, NOTIFICATION_NOT_FOUND),
+  )
+
   return routes
 }
 
 let chatRoomApi: ChatRoomApi | null = null
 let resultApi: ResultApi | null = null
 let handoffApi: HandoffApi | null = null
+let requestHumanApi: RequestHumanApi | null = null
+let notificationApi: NotificationApi | null = null
+
+const getHandoffApi = (): HandoffApi =>
+  (handoffApi ??= createHandoffApi({ store: supabaseHandoffStore(), llmJson, writeLog }))
 
 export const twinRoutes = createTwinRoutes({
   chatRoom: () => (chatRoomApi ??= createChatRoomApi({ store: supabaseChatRoomStore(), twinReply, writeLog })),
@@ -95,6 +138,18 @@ export const twinRoutes = createTwinRoutes({
       roundsPerStep: CONFIG.ROUNDS_PER_STEP,
       maxRounds: CONFIG.MAX_ROUNDS,
     })),
-  handoff: () => (handoffApi ??= createHandoffApi({ store: supabaseHandoffStore(), llmJson, writeLog })),
+  handoff: getHandoffApi,
+  requestHuman: () =>
+    (requestHumanApi ??= createRequestHumanApi({
+      store: supabaseNotificationStore(),
+      takeOver: (id, userId) => getHandoffApi().takeOver(id, userId),
+      twinReply,
+      endConversation,
+      writeLog,
+      schedule: (ms, run) => void setTimeout(run, ms),
+      now: () => new Date(),
+      seedAutoResponse: CONFIG.SEED_AUTO_RESPONSE,
+    })),
+  notifications: () => (notificationApi ??= createNotificationApi({ store: supabaseNotificationStore(), now: () => new Date() })),
   resolveUserId: resolveAppUserId,
 })
