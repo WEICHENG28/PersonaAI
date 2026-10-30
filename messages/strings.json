@@ -159,7 +159,9 @@
     "initiatedManual": "自行发起",
     "viewChat": "看对话纪录",
     "selfInsight": "帮你了解自己",
-    "selfInsightText": "最近 5 次没成的里面，有 3 次是对方偏好节奏比较慢的人。这不是谁的错，只是刚好不同步。"
+    "selfInsightText": "最近 5 次没成的里面，有 3 次是对方偏好节奏比较慢的人。这不是谁的错，只是刚好不同步。",
+    "restartRequestHuman": "直接请求真人",
+    "requestSent": "已通知对方本人，对方回应后会出现在通知里"
   },
   "lobby": {
     "title": "大厅",

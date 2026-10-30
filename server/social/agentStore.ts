@@ -31,6 +31,14 @@ export interface AttemptRecord {
   outline: Outline | null
 }
 
+/** 歷史嘗試頁看到的一筆（不含任何分數）。 */
+export interface HistoryItem extends AttemptRecord {
+  id: string
+  target_name: string
+  reopened_at: string | null
+  created_at: string
+}
+
 /** match_scores 一列（每個視角一列；只給後台用，前端讀不到）。 */
 export interface ScoreRow {
   conversation_id: string
@@ -52,12 +60,20 @@ export interface AgentStore {
   resetFailCount(id: string): Promise<void>
   userSettings(userId: string): Promise<UserSettings>
   displayName(userId: string): Promise<string>
+  /** 種子用戶（is_seed）不需要幫他寫歷史紀錄。 */
+  isSeedUser(userId: string): Promise<boolean>
   /** 今天這位用戶自動發起的代聊場數。 */
   countAutoChatsSince(userId: string, since: Date): Promise<number>
   conversationState(conversationId: string): Promise<ConversationState | null>
   recordAttempt(record: AttemptRecord): Promise<void>
   recordScores(rows: ScoreRow[]): Promise<void>
+  /** 這位用戶的歷史嘗試，新的在前。 */
+  listAttempts(userId: string, limit: number): Promise<HistoryItem[]>
+  getAttempt(id: string): Promise<HistoryItem | null>
+  markReopened(id: string, at: Date): Promise<void>
   notifyMatch(userId: string, payload: Record<string, unknown>): Promise<void>
+  /** 請求對方本人上線（格式同 C7：{ conversationId, fromName }）。 */
+  notifyRequestHuman(userId: string, payload: { conversationId: string; fromName: string }): Promise<void>
 }
 
 let override: AgentStore | null = null
@@ -82,9 +98,9 @@ export class MemoryAgentStore implements AgentStore {
   constructor(public tasks: Map<string, AgentTask> = new Map()) {}
   failCounts = new Map<string, number>()
   conversations = new Map<string, ConversationState>()
-  attempts: AttemptRecord[] = []
+  attempts: HistoryItem[] = []
   scores: ScoreRow[] = []
-  notifications: { userId: string; payload: Record<string, unknown> }[] = []
+  notifications: { userId: string; type?: string; payload: Record<string, unknown> }[] = []
   autoChatsToday = 0
   settings: UserSettings = { match_tier: 'mutual', preferences: { personality: 'similar', conditions: [] }, daily_chat_limit: 10, manual_minutes_per_chat: 20 }
 
@@ -116,6 +132,10 @@ export class MemoryAgentStore implements AgentStore {
   async displayName(userId: string) {
     return userId
   }
+  seedUserIds = new Set<string>()
+  async isSeedUser(userId: string) {
+    return this.seedUserIds.has(userId)
+  }
   async countAutoChatsSince() {
     return this.autoChatsToday
   }
@@ -123,13 +143,28 @@ export class MemoryAgentStore implements AgentStore {
     return this.conversations.get(id) ?? { status: 'active' as const, sideAController: 'twin' as const, sideBController: 'twin' as const }
   }
   async recordAttempt(record: AttemptRecord) {
-    this.attempts.push(structuredClone(record))
+    const item = { ...structuredClone(record), id: `attempt-${this.attempts.length + 1}`, target_name: record.target_user_id, reopened_at: null, created_at: new Date().toISOString() }
+    this.attempts.push(item)
+  }
+  async listAttempts(userId: string, limit: number) {
+    return this.attempts.filter((a) => a.user_id === userId).reverse().slice(0, limit).map((a) => structuredClone(a))
+  }
+  async getAttempt(id: string) {
+    const a = this.attempts.find((x) => x.id === id)
+    return a ? structuredClone(a) : null
+  }
+  async markReopened(id: string, at: Date) {
+    const a = this.attempts.find((x) => x.id === id)
+    if (a) a.reopened_at = at.toISOString()
   }
   async recordScores(rows: ScoreRow[]) {
     this.scores.push(...structuredClone(rows))
   }
   async notifyMatch(userId: string, payload: Record<string, unknown>) {
-    this.notifications.push({ userId, payload })
+    this.notifications.push({ userId, type: 'match', payload })
+  }
+  async notifyRequestHuman(userId: string, payload: { conversationId: string; fromName: string }) {
+    this.notifications.push({ userId, type: 'request_human', payload })
   }
 }
 
@@ -173,6 +208,10 @@ function supabaseStore(db: Db): AgentStore {
       const row = (await one(db.from('users').select('display_name').eq('id', userId).maybeSingle())) as { display_name: string } | null
       return row?.display_name ?? '对方'
     },
+    async isSeedUser(userId) {
+      const row = (await one(db.from('users').select('is_seed').eq('id', userId).maybeSingle())) as { is_seed: boolean } | null
+      return row?.is_seed ?? true
+    },
     async countAutoChatsSince(userId, since) {
       const { count, error } = await db
         .from('conversations')
@@ -194,11 +233,38 @@ function supabaseStore(db: Db): AgentStore {
     async recordAttempt(record) {
       await one(db.from('match_attempts').insert(record))
     },
+    async listAttempts(userId, limit) {
+      const rows = (await one(
+        db.from('match_attempts').select(HISTORY_COLUMNS).eq('user_id', userId).order('created_at', { ascending: false }).limit(limit),
+      )) as unknown as HistoryRow[] | null
+      return (rows ?? []).map(toHistoryItem)
+    },
+    async getAttempt(id) {
+      const row = (await one(db.from('match_attempts').select(HISTORY_COLUMNS).eq('id', id).maybeSingle())) as unknown as HistoryRow | null
+      return row ? toHistoryItem(row) : null
+    },
+    async markReopened(id, at) {
+      await one(db.from('match_attempts').update({ reopened_at: at.toISOString() }).eq('id', id))
+    },
     async recordScores(rows) {
       await one(db.from('match_scores').insert(rows))
     },
     async notifyMatch(userId, payload) {
       await one(db.from('notifications').insert({ user_id: userId, type: 'match', payload }))
     },
+    async notifyRequestHuman(userId, payload) {
+      await one(db.from('notifications').insert({ user_id: userId, type: 'request_human', payload }))
+    },
   }
+}
+
+const HISTORY_COLUMNS =
+  'id,user_id,target_user_id,conversation_id,task_id,origin,result,reason_type,reason_text,outline,reopened_at,created_at,target:users!match_attempts_target_user_id_fkey(display_name)'
+
+type HistoryRow = Omit<HistoryItem, 'target_name'> & { target: { display_name: string } | { display_name: string }[] | null }
+
+function toHistoryItem(row: HistoryRow): HistoryItem {
+  const { target, ...rest } = row
+  const t = Array.isArray(target) ? target[0] : target
+  return { ...rest, target_name: t?.display_name ?? '对方' }
 }

@@ -4,12 +4,27 @@ import { Button, Chip } from '@components/ui/Button'
 import { Card, CardHead } from '@components/ui/Card'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
+import { historyFromApi } from '@lib/api/social'
+import { HistoryList } from './components/HistoryList'
 
 /** 画面 9：历史尝试（不合适合例 + 抽象原因 + 重启对话） + 自我观察 */
 export function HistoryPage() {
   const s = useDemoStore()
   const navigate = useNavigate()
   const [restartOpen, setRestartOpen] = useState(false)
+
+  // http 模式：真的歷史資料（B6）；mock 模式：下面的 demo 畫面
+  if (historyFromApi) {
+    return (
+      <div className="page">
+        <div className="page-head">
+          <h1>{t('history.title')}</h1>
+          <p>{t('history.subtitle')}</p>
+        </div>
+        <HistoryList />
+      </div>
+    )
+  }
 
   const fail = s.failedMatch
   const hasRun = s.task !== null || s.proxyDone
@@ -92,7 +107,7 @@ export function HistoryPage() {
                   {t('history.restartSelf')}
                 </Button>
                 <Button block onClick={() => setRestartOpen(false)}>
-                  {t('history.restartTwin')}
+                  {t('history.restartRequestHuman')}
                 </Button>
               </div>
             </div>

@@ -79,6 +79,32 @@ export async function createTaskFromText(userId: string, text: string): Promise<
   return task
 }
 
+/**
+ * 大廳選「分身去聊」或歷史頁「讓分身再試一次」：直接建立 running 的單人任務（只聊這一位）。
+ * 和確認任務一樣，要先確認對外檔案、開啟社交 Agent。
+ */
+export async function createSingleTargetTask(userId: string, targetUserId: string, targetName = '对方'): Promise<AgentTask> {
+  const ready = await getTaskStore().readiness(userId)
+  if (!ready.socialAgentEnabled || !ready.shareableConfirmed) {
+    throw new TaskError('先到「我的档案」确认对外档案，并在设置开启社交 Agent', 403)
+  }
+  const restatement = `让分身和${targetName}聊一聊`
+  const task = await getTaskStore().insert({
+    user_id: userId,
+    kind: 'single',
+    raw_instruction: null,
+    restatement,
+    purpose: 'friend',
+    conditions: [],
+    target_count: 1,
+    done_condition: { suitable_count: 1, max_chats: 1, deadline: null },
+    target_user_id: targetUserId,
+    status: 'running',
+  })
+  await writeLog({ user_id: userId, agent: 'social', action: `收到任务：${restatement}`, reason: '你指定了这位', task_id: task.id })
+  return task
+}
+
 /** 只有任務的主人能看、能改。 */
 export async function getOwnTask(userId: string, taskId: string): Promise<AgentTask> {
   const task = await getTaskStore().get(taskId)

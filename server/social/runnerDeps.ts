@@ -27,6 +27,7 @@ export function defaultRunnerDeps(): RunnerDeps {
     runTwinRounds,
     endConversation,
     markWaitingHuman,
+    guardText,
   }
 }
 
