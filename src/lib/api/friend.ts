@@ -120,6 +120,41 @@ export async function requestExtractProfile(): Promise<ShareableView> {
   return apiCall<ShareableView>('/api/profile/extract', { method: 'POST' })
 }
 
+// ── AI 朋友聊天（http 模式）────────────────────────────────────────
+
+export interface FriendMessage {
+  id: string
+  role: 'user' | 'friend'
+  kind: string
+  content: string
+  meta: Record<string, unknown>
+  created_at: string
+}
+
+export interface FriendChatResult {
+  reply: string
+  taskId: string | null
+  sharedEventId: string | null
+}
+
+/** POST /api/friend/intro：首次见面（幂等）。 */
+export async function callFriendIntro(): Promise<void> {
+  await apiCall<null>('/api/friend/intro', { method: 'POST' })
+}
+
+/** POST /api/friend/chat：发送消息，返回 AI 回复。 */
+export async function callFriendChat(text: string): Promise<FriendChatResult> {
+  return apiCall<FriendChatResult>('/api/friend/chat', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  })
+}
+
+/** GET /api/friend/messages：拉取聊天记录。 */
+export async function getFriendMessages(): Promise<FriendMessage[]> {
+  return apiCall<FriendMessage[]>('/api/friend/messages')
+}
+
 export class ProfileApiError extends Error {
   constructor(message: string) {
     super(message)

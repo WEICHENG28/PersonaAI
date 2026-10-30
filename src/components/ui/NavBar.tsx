@@ -49,6 +49,7 @@ export function NavBar() {
             <div className="topbar__right">
               <FriendKnob unread={unread} />
               <ProfileKnob />
+              <SettingsKnob />
             </div>
           ) : (
             <StartNowKnob />
@@ -76,6 +77,13 @@ export function NavBar() {
           >
             <span className="tabbar__label">{t('nav.profile')}</span>
           </NavLink>
+          {/* Settings 进底拦（第 5 格） */}
+          <NavLink
+            to="/settings"
+            className={`tabbar__tab ${/^\/settings/.test(location.pathname) ? 'is-on' : ''}`}
+          >
+            <span className="tabbar__label">设置</span>
+          </NavLink>
         </nav>
       )}
     </>
@@ -90,6 +98,23 @@ function ProfileKnob() {
     <button className="knob knob--profile" onClick={() => navigate('/profile')} title="我的档案">
       <span className="knob__avatar">{nickname.slice(0, 1)}</span>
       <span className="knob__meta">{nickname}</span>
+    </button>
+  )
+}
+
+/** 设置按钮（顶栏右端，⚙ 图标） */
+function SettingsKnob() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isActive = /^\/settings/.test(location.pathname)
+  return (
+    <button
+      className={`knob knob--settings ${isActive ? 'is-on' : ''}`}
+      onClick={() => navigate('/settings')}
+      title="设置"
+      aria-label="设置"
+    >
+      <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>⚙</span>
     </button>
   )
 }
