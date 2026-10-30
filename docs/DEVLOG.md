@@ -216,4 +216,17 @@
 
 ## C：分身與大廳線（Jerry）
 
-（還沒有紀錄）
+### 2026-10-30｜C0 種子用戶、seed 腳本、twin contracts stub｜Jerry（AI 協助）｜PR #48、Closes #20
+- **做了什麼**：10 位種子用戶資料（`server/fixtures/seed-users.ts`）；`npm run seed`（`server/twin/seed.ts` 流程＋`scripts/seed.ts` 用 A0b 的 `server/lib/supabase.ts` 連 Supabase）；`server/contracts/twin.ts` stub 改成記住輪數、依輪數產生假訊息。
+- **為什麼這樣做**：
+  - seed 先算好 10 筆向量才刪舊資料：LLM 失敗時不會留下「舊的刪了、新的沒寫」的空資料庫。
+  - 重跑時用 `is_seed = true` 找舊資料刪除（`user_profiles` 會 cascade）。舊種子用戶如果已被 `conversations`、`match_attempts` 等引用（這些外鍵沒有 cascade），刪除會失敗，腳本會停下並說明，不自動清掉隊友的對話資料。
+  - embedding 只用對外檔案（簡介、興趣、聊天風格、想找）組成的文字，不含 agent_profile（02 第 7 節）。B2 搜尋時若要比對，可以用 `shareableToText` 組同樣格式。
+  - seed 流程透過 `SeedDb` 介面寫入，測試用假資料庫，不碰共用 Supabase。
+  - stub 狀態只存在記憶體；沒用 `startConversation` 建過的 ID，`getTranscript` 回固定假紀錄（B 的 S0 測試依賴這點）。
+- **改了哪些檔案**：`server/fixtures/seed-users.ts`、`server/fixtures/twin.ts`、`server/contracts/twin.ts`（只改內部，簽名不變）、`server/twin/seed.ts`、`scripts/seed.ts`、`tests/twin/{seed-users,seed,contract-stub}.test.ts`。
+- **踩到的坑／注意事項**：種子用戶名字用簡體（07C 表格的「阿凱」在資料裡是「阿凯」）。`users` 沒有穩定 key 欄位，資料庫 id 每次 seed 都會變；`seed-an` 這類 key 只給 fixtures／stub 用。B 的 `server/fixtures/social.ts` 也用了 `seed-lin`（林小山），和這裡的 `seed-lin`（小林）是不同假資料，互不影響。
+  - **Realtime 訂閱要等伺服器回 `system` 訊息 `Subscribed to PostgreSQL`（extension = postgres_changes、status = ok）才算開始監聽資料表**；只看 `subscribe()` 的 `SUBSCRIBED` 就寫入，事件會漏掉（第一次測試就是這樣）。C4 聊天室訂閱時要注意。
+  - 一開始 seed 連不上 LLM，是因為 `.env.local` 的 `LLM_BASE_URL` 還是 placeholder，不是網路問題；換成 OpenAI Next 平台後就能用。平台偶爾回 503，`server/lib/llm` 的重試大多擋得住，擋不住時重跑即可。
+- **驗證**：vitest 全過、`npm run build` 成功。雲端 Supabase 上實跑：`npm run seed` 新增 10 位；再跑一次刪 10 位、新增 10 位，總數仍是 10；`user_profiles` 的 shareable、agent_profile、embedding（1024 維）都不是 NULL（唯讀查詢確認）。Realtime：用 service role 訂閱 `messages` 新增事件，建測試對話、寫一則訊息後即時收到，測完刪除（一次性腳本放在本機 `.local/`，已刪）。
+- **還沒做完／待辦**：Realtime 只用 service role 測過；前端用 anon key＋登入身分（RLS）的訂閱在 C4 聊天室一起驗。模型選擇（MODEL_*）由 B 決定，目前 Jerry 本機用 kimi-k3／deepseek-v4-pro／qwen-flash／text-embedding-3-small。
