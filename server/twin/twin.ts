@@ -122,7 +122,7 @@ async function writeReplyLogs(
     task_id: log.conv.task_id ?? undefined,
   }
   if (log.askHuman) {
-    await deps.writeLog({ ...base, action: '需要问本人', reason: '分身遇到档案没写的事，回复要问本人' })
+    await deps.writeLog({ ...base, action: '需要问本人', reason: '对方问到个人信息或要约定时间地点，回复要问本人' })
   }
   await deps.writeLog({ ...base, action: '代聊发言', reason: log.reason, detail: log.detail })
 }

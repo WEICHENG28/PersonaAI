@@ -212,7 +212,7 @@ describe('twinReply', () => {
     h = harness({ recent: [message(1, ZHE)], llmOut: { message: '这个我要问一下本人哦', ask_human: true } })
     await createTwinReply(h.deps)('conv-1', AN)
     expect(h.logs.map((l) => l.action)).toEqual(['需要问本人', '代聊发言'])
-    expect(h.logs[0]!.reason).toBe('分身遇到档案没写的事，回复要问本人')
+    expect(h.logs[0]!.reason).toBe('对方问到个人信息或要约定时间地点，回复要问本人')
   })
 
   it('有收尾指示時傳進 Prompt', async () => {
