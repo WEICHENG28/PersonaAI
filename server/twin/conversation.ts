@@ -11,7 +11,9 @@ import { TwinError, twinReply, type ConversationStatus, type TwinConversation, t
 
 /** endConversation 收尾時給分身的額外規則（Prompt 5 的 extra_instruction）。 */
 export const CLOSING_INSTRUCTION =
-  '- 这是你在这段对话里的最后一则消息：简短、礼貌地道别，不要再提问，不要约下次见面，也不要说你们不合适或评价对方。'
+  '- 【这一则是结束语，优先于上面「接住对方、偶尔反问」的规则】最多两句：先简短回应对方上一句，' +
+  '再明确道别（例如「今天先聊到这，很高兴认识你」），一定要有道别的话；' +
+  '不要再提问，不要约下次见面，也不要说你们不合适或评价对方。'
 
 /** 開場話題最多保留幾個字。 */
 const OPENING_TOPIC_MAX = 200
