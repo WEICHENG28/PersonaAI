@@ -26,6 +26,13 @@
 
 ## 共用與決策
 
+### 2026-10-30｜新增 09 Agent 數據結構文件｜Vincent（AI 協助）｜直接 commit main（骨架階段）
+- **做了什麼**：新增 `docs/09_Agent數據結構.md`：5 個無狀態 Agent 的 JSON 狀態結構藍圖 — user_memory（興趣＋信心＋權重＋證據指標）、user_memory_view（它記得的事·只讀視圖）、shareable_profile（信封式衍生的大廳卡片）、agent_profile/task/chat_session/match_result/agent_log，附信心值五規則、權重規則、每 Agent 的讀寫契約表。
+- **為什麼**：使用者要的後端記憶形態（JSON 檔、信心度＋權重、可視結構、AI 衍生對外檔案）需要一份單一文檔讓後端與各線 AI 直接抄結構；兩個方案經 MC 確認：信封式對外更新、AI 自動推導權重、每 5 則整合。
+- **改了哪些檔案**：僅新增此文件，零代碼改動。
+
+---
+
 ### 2026-10-30｜卡片內距修復＋寬屏展開＋雙欄｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：`.card` 統一 `padding: 24px`（此前無 padding，CardHead 標題貼容器邊緣）；桌機 `--container` 展開至近全窗（min(100vw-80px, 1600px)）、landing 用 1760px 寬版；AI 朋友／我的檔案／設置頁改桌機雙欄；設置頁右欄新增「賬號·登出」卡；設計規範 md 補 Hum 鐵則（第 0 節）與布局規則。
 - **為什麼**：使用者回報側欄卡內容貼邊（候選人卡因自帶 padding 無此問題）→ 根因是 `.card` 基類缺 padding；寬屏需求＝資訊頁展開、內容頁雙欄消化寬度。
