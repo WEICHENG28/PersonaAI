@@ -127,6 +127,12 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-30｜A2 AI 朋友聊天（含首次見面、任務辨識）｜Vincent（AI 協助）｜分支 a/A2-friend-chat｜Closes #5
+- **做了什麼**：`server/prompts/01_friend.ts`（Prompt 1 逐字＋`renderFriendSystem`／`friendReplySchema`）；`server/friend/chat.ts`（`ensureFriendRow` 冪等、`friendIntro`、`friendChat` 主流程：存訊息→組上下文→llmJson→存回覆→shared_event_ids→task_intent 接 B 的 `createTaskFromText`＋task_card→writeLog、`getFriendMessages`）；`server/routes/friend.ts` 加 `POST /api/friend/{intro,chat}`、`GET /api/friend/messages`；`tests/friend/chat.test.ts` 12 測。
+- **為什麼**：07A A2 規格；LLM 失敗統一 `FriendChatError`（前端顯示「阿澈剛剛恍神了」不白屏）；B 解析失敗不中斷聊天只記日誌。前端頁面接 API 留給下一批（mock demo 頁已可點）。
+- **驗證**：tsc 過；vitest 59/59（chat 12：zod 邊界、system 渲染、普通對話、task_card、shared_event、B 失敗降級、新用戶建行、intro 冪等）。
+- **坑**：測試裡 Supabase mock 要按表分 chain，`from(name)` 每次返回同一引用才能讓 insert/select 共享狀態。A3（記憶）未做，上下文記憶先留鉤子。
+
 ### 2026-10-30｜A1 阿澈人設與事件庫｜Vincent（AI 協助）｜分支 a/A1-persona｜Closes #4
 - **做了什麼**：`server/friend/persona.ts`（ACHE 人設、EVENTS 六事件帶 unlockStage/severity/observe、LIFE_UPDATES 四階段近況、`pickNextEvent`/`getLifeUpdate` 純函式）；`tests/friend/persona.test.ts` 覆蓋解鎖規則、不重複、強度排序、id 唯一、階段越界。
 - **為什麼**：07A A1 規格逐字落地（簡體文 UI 文案）；放 `server/friend/` 而非 `lib/friend/`，路徑照 docs/10 §3 換算表。
