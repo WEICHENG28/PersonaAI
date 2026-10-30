@@ -37,6 +37,9 @@ vi.mock('../../server/social/task', () => ({
   })),
 }))
 vi.mock('../../server/lib/log', () => ({ writeLog: vi.fn(async () => {}) }))
+vi.mock('../../server/friend/memory', () => ({
+  extractMemories: vi.fn(async () => 0),
+}))
 
 import { llmJson } from '../../server/lib/llm'
 import { createTaskFromText } from '../../server/social/task'

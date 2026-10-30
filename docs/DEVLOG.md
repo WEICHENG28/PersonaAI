@@ -127,6 +127,12 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-30｜A3 記憶擷取與「它記得的事」｜Vincent（AI 協助）｜分支 a/A3-memory｜Closes #6
+- **做了什麼**：`server/prompts/02_memory.ts`（Prompt 2 逐字＋schema）；`server/friend/memory.ts`（`isDuplicateMemory` 必測去重、`extractMemories` MODEL_FAST→去重→寫入、`listMemories` 未刪除、`deleteMemory` 軟刪、`markNotLikeMe`）；`server/routes/friend.ts` 加 `GET /api/memory`、`DELETE /api/memory/:id`、`POST /api/memory/:id/not-like-me`；A2 的 `friendChat` 第 6 步接上背景 `extractMemories`（不等待、失敗只記日誌）；CONFIG 加 `MEMORY_LIMIT: 50`。
+- **為什麼**：07A A3 規格；記憶背景抽取不阻塞回覆；confidence 由 DB check constraint 0–1 夾住。
+- **驗證**：tsc 過；vitest 73/73（memory 14 測：去重六情形、渲染、寫入/過濾/空批/夾值、list/delete/not-like-me）。
+- **坑**：chat.test 裡要 mock `./memory` 模組，否則背景鉤子打到未 mock 的表噴錯（不影響斷言但噴 console）。
+
 ### 2026-10-30｜A2 AI 朋友聊天（含首次見面、任務辨識）｜Vincent（AI 協助）｜分支 a/A2-friend-chat｜Closes #5
 - **做了什麼**：`server/prompts/01_friend.ts`（Prompt 1 逐字＋`renderFriendSystem`／`friendReplySchema`）；`server/friend/chat.ts`（`ensureFriendRow` 冪等、`friendIntro`、`friendChat` 主流程：存訊息→組上下文→llmJson→存回覆→shared_event_ids→task_intent 接 B 的 `createTaskFromText`＋task_card→writeLog、`getFriendMessages`）；`server/routes/friend.ts` 加 `POST /api/friend/{intro,chat}`、`GET /api/friend/messages`；`tests/friend/chat.test.ts` 12 測。
 - **為什麼**：07A A2 規格；LLM 失敗統一 `FriendChatError`（前端顯示「阿澈剛剛恍神了」不白屏）；B 解析失敗不中斷聊天只記日誌。前端頁面接 API 留給下一批（mock demo 頁已可點）。

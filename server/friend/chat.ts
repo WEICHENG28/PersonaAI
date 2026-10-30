@@ -1,7 +1,7 @@
 /**
  * A2：AI 朋友聊天。擁有者：A。
  * 依賴：A1 persona（已併）、B0 llm（已併）、B1 createTaskFromText（已併，內部 LLM 失敗會拋 TaskError）。
- * A3（記憶擷取）尚未做：流程第 6 步先留鉤子，介面已定義。
+ * A3（記憶擷取）已併：流程第 6 步背景執行 extractMemories。
  */
 import { z } from 'zod'
 import { getServiceClient } from '../lib/supabase'
@@ -11,6 +11,7 @@ import { writeLog } from '../lib/log'
 import { createTaskFromText } from '../../server/social/task'
 import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend'
 import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona'
+import { extractMemories } from './memory'
 
 export interface FriendRow {
   story_stage: number
@@ -178,6 +179,11 @@ export async function friendChat(userId: string, text: string) {
     action: '回应用户',
     reason: reply.shared_event_id ? `分享事件 ${reply.shared_event_id}` : '接住用户的话题',
     detail: taskId ? { taskId } : undefined,
+  })
+
+  // 6. 背景（不等待）：A3 记忆撷取。失败只记日志，不影响回复。
+  void extractMemories(userId, body.text).catch((err) => {
+    console.error('[friend] extractMemories failed', err)
   })
 
   return { reply: reply.reply, taskId, sharedEventId: reply.shared_event_id }
