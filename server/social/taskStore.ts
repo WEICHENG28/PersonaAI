@@ -37,16 +37,21 @@ export function setTaskStore(store: TaskStore | null): void {
 
 let memory: TaskStore | null = null
 
+/** 記憶體模式下，任務 API 和社交 Agent 迴圈（agentStore）共用同一份任務。 */
+export const sharedMemoryTasks = new Map<string, AgentTask>()
+
 export function getTaskStore(): TaskStore {
   if (override) return override
   const db = getAdminDb()
   if (db) return supabaseStore(db)
-  memory ??= createMemoryTaskStore()
+  memory ??= createMemoryTaskStore(undefined, sharedMemoryTasks)
   return memory
 }
 
-export function createMemoryTaskStore(readiness: UserReadiness = { socialAgentEnabled: true, shareableConfirmed: true }): TaskStore {
-  const tasks = new Map<string, AgentTask>()
+export function createMemoryTaskStore(
+  readiness: UserReadiness = { socialAgentEnabled: true, shareableConfirmed: true },
+  tasks: Map<string, AgentTask> = new Map(),
+): TaskStore {
   let seq = 0
   return {
     async insert(task) {
