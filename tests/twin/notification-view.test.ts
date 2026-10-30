@@ -5,6 +5,8 @@ import {
   notificationLink,
   notificationTitle,
   NOTIFY_TEXT,
+  PANEL_EDGE,
+  panelPlacement,
   timeLabel,
   unreadCount,
   withRead,
@@ -100,5 +102,22 @@ describe('timeLabel', () => {
     expect(timeLabel(new Date(2026, 9, 31, 9, 5).toISOString(), now)).toBe('09:05')
     expect(timeLabel(new Date(2026, 9, 30, 9, 5).toISOString(), now)).toBe('10月30日')
     expect(timeLabel('not a date', now)).toBe('')
+  })
+})
+
+describe('panelPlacement', () => {
+  it('桌機：面板在鈴鐺下方、右緣對齊鈴鐺', () => {
+    expect(panelPlacement({ bottom: 60, right: 900 }, 1280)).toEqual({ top: 72, right: 380, width: 380 })
+  })
+
+  it('手機：鈴鐺不在最右邊時往右推，左右都留邊、不超出畫面', () => {
+    const p = panelPlacement({ bottom: 56, right: 150 }, 375)
+    expect(p.width).toBe(375 - PANEL_EDGE * 2)
+    expect(p.right).toBe(PANEL_EDGE)
+    expect(375 - p.right - p.width).toBeGreaterThanOrEqual(PANEL_EDGE)
+  })
+
+  it('鈴鐺貼著右邊：至少留 PANEL_EDGE', () => {
+    expect(panelPlacement({ bottom: 40, right: 1280 }, 1280).right).toBe(PANEL_EDGE)
   })
 })

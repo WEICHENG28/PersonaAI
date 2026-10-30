@@ -1,14 +1,11 @@
 /* C7 通知铃铛：顶栏 knob ＋往下展开的纸卡。只用 tokens.css 的 token 和既有类（.knob／.card／.btn／.chip）。拥有者：C。 */
-.notif-bell {
-  position: relative;
-}
+/* 顶栏在手机上很挤，铃铛文字不要折行 */
+.notif-bell .knob { white-space: nowrap; }
 
+/* 面板用 portal 挂在 body（顶栏的 clip-path 会裁掉里面的东西），top／right／width 由 JS 依铃铛位置算 */
 .notif-bell__panel {
-  position: absolute;
-  top: calc(100% + var(--space-sm));
-  right: 0;
+  position: fixed;
   z-index: 400;
-  width: min(380px, calc(100vw - var(--space-xl)));
   max-height: min(70vh, 560px);
   overflow-y: auto;
   display: grid;

@@ -74,3 +74,22 @@ export function withResponse(list: readonly NotificationView[], id: string, resp
 export function withRead(list: readonly NotificationView[], id: string): NotificationView[] {
   return list.map((n) => (n.id === id ? { ...n, read: true } : n))
 }
+
+/** 面板最宽多少、离视窗边缘与铃铛多远（px）。 */
+export const PANEL_MAX_WIDTH = 380
+export const PANEL_EDGE = 16
+export const PANEL_GAP = 12
+
+export interface PanelPlacement {
+  top: number
+  right: number
+  width: number
+}
+
+/** 面板放在铃铛下方、右缘对齐铃铛；放不下时往右推，左右都至少留 PANEL_EDGE。 */
+export function panelPlacement(anchor: { bottom: number; right: number }, viewportWidth: number): PanelPlacement {
+  const width = Math.max(0, Math.min(PANEL_MAX_WIDTH, viewportWidth - PANEL_EDGE * 2))
+  const alignRight = viewportWidth - anchor.right
+  const right = Math.max(PANEL_EDGE, Math.min(alignRight, viewportWidth - width - PANEL_EDGE))
+  return { top: Math.round(anchor.bottom + PANEL_GAP), right: Math.round(right), width }
+}

@@ -24,6 +24,8 @@ export interface NotificationsState {
   busyId: string | null
   respond(n: NotificationView, response: HumanResponse): Promise<RespondView | null>
   markRead(n: NotificationView): Promise<void>
+  /** 重新读一次（打开面板时用，Realtime 漏掉事件也不会一直是旧的）。 */
+  reload(): Promise<void>
 }
 
 function messageOf(err: unknown): string {
@@ -97,5 +99,5 @@ export function useNotifications(enabled: boolean): NotificationsState {
     }
   }, [])
 
-  return { list, loadError, errors, busyId, respond, markRead }
+  return { list, loadError, errors, busyId, respond, markRead, reload }
 }
