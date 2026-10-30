@@ -216,6 +216,20 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-30｜C1 分身回覆 twinReply｜Jerry（AI 協助）｜Closes #21
+- **做了什麼**：`twinReply(conversationId, speakerUserId)`（`server/twin/twin.ts`）：取說話者的對外檔案＋說話風格 → Prompt 5（`MODEL_CHAT`、0.8）→ `guardText` → 寫入 `messages`（`is_ai = true`、`guard_rewritten`）→ 寫日誌（`代聊发言`；第一則 reason 是「开场话题：…」；`ask_human` 時另寫一筆 `需要问本人`）。Prompt 5 在 `server/prompts/05_twin.ts`，Supabase 讀寫在 `server/twin/store.ts`。
+- **為什麼這樣做**：
+  - 外部依賴（資料庫、A 的檔案、守門、LLM、日誌）集中在 `TwinDeps`，用 `createTwinReply(deps)` 組出來；測試和開發腳本換成假的，不用碰共用 Supabase。對外用的 `twinReply` 用預設依賴。
+  - 檔案與風格只透過 `server/contracts/friend.ts` 拿（不碰 `user_profiles`、不拿 `agent_profile`）。A 的 stub 目前對每個人都回同一份假檔案，**A4 換成真的之前，真實對話裡兩個分身風格會一樣**；開發腳本改用 `server/fixtures/seed-users.ts` 驗風格。
+  - `guardText` 先接 `server/contracts/twin.ts`（C2 前是原樣回傳的 stub），C2 完成後自動生效。
+  - 多加了三個檢查：說話者不是對話成員、該方 controller 是 human、說話者沒有對外檔案 → 丟 `TwinError`，不呼叫 LLM、不寫入。沒有風格設定時用預設風格（中等句長、emoji 1）。
+  - 第三個參數 `options.extraInstruction` 給 C3 收尾用（Prompt 5 的 `{{extra_instruction}}`）。
+  - Prompt 5 照 07C 翻成簡體，另外補了三處（實測後）：句長與 emoji 程度加上文字說明（只寫「1/3」時，emoji 1 的小安幾乎每句都帶 emoji）；「不編造」清單加上「住址」；被問到個資時也說「要问一下本人」並設 `ask_human`（原本只會婉拒，不符合驗收「會說要問本人」）。
+- **改了哪些檔案**：`server/twin/twin.ts`、`server/twin/store.ts`、`server/prompts/05_twin.ts`、`tests/twin/twin-reply.test.ts`。
+- **踩到的坑／注意事項**：Prompt 填值用 `replace` 的函式寫法，避免內容裡的 `$` 被當成替換語法。最近 12 則用 `created_at` 由新到舊取再反轉。
+- **驗證**：vitest 全過、`npm run build` 成功。開發腳本（只存在本機、記憶體模式、真的 LLM）讓小安和阿哲聊 8 輪：小安短句、幾乎不用 emoji、語氣溫和；阿哲長句、每則多個 emoji、一次丟好幾個話題。插入「你住哪里？」「你读哪所学校？」，小安都回「要问一下本人」，沒有編造（跑 3 次都一樣）。
+- **還沒做完／待辦**：寫入真的 `messages` 表要等 C3 建立對話後一起驗（`is_ai` 寫死為 true，有單元測試）。風格要等 A4 的 `getShareableProfile`／`getStyleProfile` 真實作才會在正式流程生效。
+
 ### 2026-10-30｜C0 種子用戶、seed 腳本、twin contracts stub｜Jerry（AI 協助）｜PR #48、Closes #20
 - **做了什麼**：10 位種子用戶資料（`server/fixtures/seed-users.ts`）；`npm run seed`（`server/twin/seed.ts` 流程＋`scripts/seed.ts` 用 A0b 的 `server/lib/supabase.ts` 連 Supabase）；`server/contracts/twin.ts` stub 改成記住輪數、依輪數產生假訊息。
 - **為什麼這樣做**：
