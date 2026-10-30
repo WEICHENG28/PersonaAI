@@ -311,6 +311,11 @@
   - `ChatBubble` 沒有「對方本人」樣式，對方本人的訊息用左側氣泡、不掛 AI 標示來區分；不新增 CSS。
 - **改了哪些檔案**：`server/twin/chatRoom.ts`（新）、`server/twin/chatRoomStore.ts`（新）、`server/routes/twin.ts`、`src/lib/api/twin.ts`（新）、`src/features/twin/components/{chatRoomView.ts,useChatRoom.ts,LiveChatRoom.tsx}`（新）、`src/features/twin/ProxyChatPage.tsx`、`src/routes.tsx`（**共用檔，只加 `chat/:id` 一行**）、`tests/twin/{chat-room,chat-room-routes,chat-room-view}.test.ts`（新，32 項）。
 - **驗證**：vitest 全部通過、`tsc -b`、`npm run build` 通過。真的 Supabase 只讀檢查（`.local/check-c4.ts`，不寫入）：C3 測試對話 `e3ea687e-…` a 方看到對方「阿哲」、b 方看到「小安」，10 則都是 AI；外人（子晴）讀聊天室與判定都是 403；status 回 `verdict: null`（資料庫還沒有 `match_scores`）。後端實跑：沒登入、假 token 都回 401。
+- **真的 Supabase 端到端實測**（Jerry 同意後，`.local/c4-e2e.ts`，資料留著）：匿名登入 c-test1（`c11185a6-…`）、c-test2（`bb7747ca-…`），c-test1 確認對外檔案。
+  - 對話 1 `364c39f7-ccf2-4aa1-a5af-144aa71d4e01`（c-test1 分身 ↔ 小安分身，開場＋3 輪）：c-test1 用 anon key＋登入 JWT 訂閱，**經 RLS 即時收到開場後的 6/6 則**；c-test2 訂閱同一段收到 0 則。聊天室 API 回對方「小安」、雙方都是分身、7 則都是 AI。c-test2 讀聊天室／判定、發言都是 403；c-test1（分身在聊）發言 409。
+  - 跑 B 的評審兩次（第 2、3 輪）寫入 `match_scores`（方向分數 83），`/status` 只回 `{"value":"suitable","trend":"flat"}`，沒有數字；小安那邊看到的是小安自己的視角。
+  - 對話 2 `76f1570c-72a6-41b9-a123-80e00e46b0d3`（c-test1 本人 ↔ 小安分身）：本人發言後小安分身回覆，Realtime 即時收到 2 則；超過 1000 字回 400。
+  - 沒有在瀏覽器看畫面（這個環境沒有瀏覽器工具）。
 - **踩到的坑／注意事項**：
   - 畫面文字放在 `chatRoomView.ts` 的 `CHAT_TEXT`：08 第 6 節要求文字放 `messages/strings.json`，但那是 A 的檔案；之後要搬過去再和 A 說。
   - 本人和分身聊時 `round_count` 不會增加（只有 `runTwinRounds` 會加），C5 換算「第 n 輪」時要注意。
