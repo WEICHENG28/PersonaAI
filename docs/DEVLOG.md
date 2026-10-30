@@ -26,6 +26,15 @@
 
 ## 共用與決策
 
+### 2026-10-30｜前端 demo 部署到 GitHub Pages｜Peter（AI 協助）
+- **做了什麼**：新增 `.github/workflows/pages.yml`：`main` 有新提交就把前端（mock 模式，不需要後端）建置並部署到 https://weicheng28.github.io/PersonaAI/ ，給產品規劃的成員看介面。為了讓網站在 `/PersonaAI/` 底下能跑，改了 A 的兩個檔案各一行：`src/main.tsx` 的路由加 `basename: import.meta.env.BASE_URL`、`src/components/ui/RiveAvatar.tsx` 的 Rive 檔路徑前面加 `BASE_URL`（本機開發 BASE_URL 是 `/`，行為不變）。
+- **為什麼這樣做**：GitHub Pages 的專案網址多一層 `/PersonaAI/`，絕對路徑 `/riv/...`、路由 `/friend` 都會找不到；SPA 直接打開子頁面時 Pages 回 404，所以建置後把 `index.html` 複製成 `404.html`。
+- **給 A**：之後新增的靜態檔路徑請用 `import.meta.env.BASE_URL + '...'`，不要寫死 `/` 開頭；頁面跳轉用 react-router 的 `navigate`／`Link`，不要用 `<a href="/...">`。
+- **踩到的坑**：在 Git Bash 執行 `vite build --base=/PersonaAI/` 會被改寫成 Windows 路徑，本機要先 `export MSYS_NO_PATHCONV=1`；GitHub 的 Linux runner 沒這問題。
+- **驗證**：`tsc -b`、vitest 28/28；本機 `vite preview --base=/PersonaAI/`：首頁、`/PersonaAI/friend`、Rive 檔都回 200。
+
+---
+
 ### 2026-10-30｜落地頁大改版：Hero 留白＋Rive 三角＋細節區擴充｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：`LandingPage.tsx` 全面擴寫 — hero 副標新增；三角色卡各配 Rive（robot/fish/birdie，96px）取代 emoji；每張角色卡加 3 條清單式細節；新增三個 detail section（判定檔位、記憶掌控、大廳導覽，各 3 張小卡）；flow/stats/CTA 補副標。`landing.css`：hero `line-height: 1.06→1.35`、`margin-block: var(--space-xl)`、`padding-block: 2xl/3xl`（上下大留白）；新增 `.landing-sec__sub`、`.role-card__list`（accent 圓點）、`.detail-card`（radius-stock）樣式。
 - **為什麼**：使用者要求標題垂直間距加大、首區上下留白、內容大幅擴充但每格保持精簡（1-2 短句）、禁 emoji 改用三個 Rive。
