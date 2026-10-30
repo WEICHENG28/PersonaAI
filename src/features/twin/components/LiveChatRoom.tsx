@@ -30,7 +30,7 @@ export function LiveChatRoom({ conversationId }: LiveChatRoomProps) {
     return (
       <div className="page">
         {state.loadError ? (
-          <Card>
+          <Card className="stack">
             <h1>{CHAT_TEXT.loadFailedTitle}</h1>
             <p>{state.loadError}</p>
             <Button onClick={() => navigate('/friend')}>{CHAT_TEXT.back}</Button>
