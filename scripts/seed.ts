@@ -1,17 +1,12 @@
 // npm run seed：把 server/fixtures/seed-users.ts 的 10 位種子用戶寫進 Supabase（docs/07C C0）。擁有者：C。
 // ⚠️ 會先刪除所有舊的種子用戶。三人共用資料庫：只由 C 執行，跑之前先在群組說（docs/07 第 0.8 節）。
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { existsSync } from 'node:fs'
 import { embed } from '../server/lib/llm'
+import { getServiceClient } from '../server/lib/supabase'
 import { runSeed, type SeedDb } from '../server/twin/seed'
 
 const FK_VIOLATION = '23503'
-
-function requireEnv(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`缺少環境變數 ${name}（見 .env.example）`)
-  return value
-}
 
 function supabaseSeedDb(db: SupabaseClient): SeedDb {
   return {
@@ -38,11 +33,7 @@ function supabaseSeedDb(db: SupabaseClient): SeedDb {
 
 async function main(): Promise<void> {
   if (existsSync('.env.local')) process.loadEnvFile('.env.local')
-  // TODO(A0b 之後)：改用 server/lib/supabase.ts 的共用 client
-  const db = createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
-    auth: { persistSession: false },
-  })
-  const summary = await runSeed(supabaseSeedDb(db), embed)
+  const summary = await runSeed(supabaseSeedDb(getServiceClient()), embed)
   const lines = summary.inserted.map((u) => `  ${u.display_name}（${u.key}）→ ${u.user_id}`)
   process.stdout.write(`[seed] 刪除舊的種子用戶 ${summary.deleted} 位，新增 ${summary.inserted.length} 位：\n${lines.join('\n')}\n`)
 }
