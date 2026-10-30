@@ -174,6 +174,19 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B2 搜尋大廳＋B 線接上 A0b 登入｜Peter（AI 協助）｜Closes #32
+- **做了什麼**：
+  - `server/social/lobby.ts`：`searchLobby`（篩已開社交 Agent＋已確認對外檔案、排除自己與 excludeIds、目的交集；friend 不篩）、`cosineSimilarity`、`rankCandidates`（興趣命中條件加 0.1）、`parseVector`（pgvector 字串）；寫日誌「搜索大厅：… → 找到 N 位」；contract `searchLobby` 換成真的。
+  - 接上 A0b：`server/social/user.ts` 用 A 的 `requireAuth` 驗 JWT，再用 `users.auth_id` 查 `users.id`；`server/social/db.ts` 改用 A 的 `getServiceClient()`（刪掉 B 自己的 client）；B 路由先驗身分再執行；前端 `src/lib/api/social.ts` 帶 `Authorization: Bearer`。
+  - 07 §0.2：Supabase 改記為 Peter 建立。
+- **為什麼這樣做**：向量服務失敗、或候選人還沒有向量時，退回興趣關鍵字排序並把原因寫進日誌，任務不會卡住（02 第 4 節異常處理）。種子用戶只有 10 位，相似度在程式端算。agent_tasks 的 user_id 是 `users.id`，A 的 `requireAuth` 回的是 auth id，所以要多查一次。
+- **改了哪些檔案**：`server/social/{lobby,user,db}.ts`、`server/routes/social.ts`、`server/contracts/social.ts`、`src/lib/api/social.ts`、`tests/social/{lobby,user,server}.test.ts`、`docs/07_開發分工.md`。
+- **踩到的坑**：`src/lib/api/social.ts` 在 Windows checkout 是 CRLF，用 node 字串取代會對不上，改用編輯器工具。
+- **驗證**：`tsc -b`；vitest 120/120（B 線新增 cosine、排序與加分、目的篩選、embed 失敗退回、auth_id→users.id、401／403）；`npm run build`。另外對雲端 Supabase **唯讀**跑一次 `searchLobby`（日誌改成不寫入）：查得到 C 的種子用戶，「喜欢登山＋运动伙伴」回小安、阿哲、子晴（Peter 的 `.env.local` 還沒有 LLM 金鑰，所以走關鍵字排序）。
+- **還沒做完／待辦**：填好 `MODEL_EMBED` 後用真向量再驗一次排序。
+
+---
+
 ### 2026-10-30｜B1 一句話任務解析＋任務確認卡｜Peter（AI 協助）｜Closes #31
 - **做了什麼**：
   - 後端：Prompt 14（`server/prompts/14_task.ts`，restatement 改成簡體）；`server/social/task.ts` 的 `createTaskFromText`（解析→寫 `agent_tasks` pending_confirm→寫日誌）、`changeTaskStatus`（confirm／pause／resume／cancel）；API `POST /api/tasks`、`GET /api/tasks/:id`、`POST /api/tasks/:id/{confirm,pause,resume,cancel}`；contract `createTaskFromText` 換成真的。

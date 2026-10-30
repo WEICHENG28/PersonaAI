@@ -1,5 +1,5 @@
-/// <reference types="vite/client" />
 // B 線的前端 API（docs/10 第 3 節）。VITE_API_MODE=http 打後端 /api，其他情況用本機 mock。擁有者：B。
+import { supabase } from '../supabase'
 
 export type TaskPurpose = 'friend' | 'study' | 'sport' | 'hobby'
 export type TaskStatus = 'pending_confirm' | 'running' | 'done' | 'paused' | 'failed' | 'cancelled'
@@ -54,13 +54,17 @@ export function updateTask(id: string, action: TaskAction): Promise<TaskView> {
   return useHttp ? request('POST', `/api/tasks/${id}/${action}`) : mock.update(id, action)
 }
 
-// TODO(A0b)：登入做好後，在這裡帶上 Authorization: Bearer <Supabase JWT>
+/** 帶上登入的 Supabase JWT（A0b），後端用它認出是誰。 */
 async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  const token = (await supabase.auth.getSession()).data.session?.access_token
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (body) headers['content-type'] = 'application/json'
   let res: Response
   try {
     res = await fetch(path, {
       method,
-      headers: body ? { 'content-type': 'application/json' } : undefined,
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     })
   } catch {
