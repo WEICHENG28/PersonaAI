@@ -4,7 +4,8 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { isAuthFailure, requireAuth } from '../lib/auth'
 import { initUserProfile } from '../lib/profile'
-import { friendChat, friendIntro, getFriendMessages, nextMeet, FriendChatError, NextMeetError } from '../friend/chat'
+import { friendChat, friendIntro, getFriendMessages, FriendChatError } from '../friend/chat'
+import { nextMeet, NextMeetError } from '../friend/nextMeet'
 import { deleteMemory, listMemories, markNotLikeMe, memoryIdSchema, MemoryError } from '../friend/memory'
 import {
   extractProfile,

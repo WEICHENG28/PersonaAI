@@ -148,6 +148,13 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-30｜A5 模拟下次见面 + A6 报告回传｜Vincent（AI 协助）｜分支 a/A5-next-meet
+- **做了什么**：`server/friend/nextMeet.ts`（`nextMeet`：story_stage+1→更新 life_state→写 life_update 消息→recall 最新记忆→读 notifications 表未读 friend_report→Prompt 8 逐筆产生朋友口吻回报→设已读→writeLog；`NextMeetError`）；`server/prompts/08_report.ts`（Prompt 8 逐字＋`reportReplySchema`＋`renderReportSystem`）；`server/routes/friend.ts` 加 `POST /api/friend/next-meet`；`server/contracts/friend.ts` 实现 `deliverReport`（写 notifications 表，无 DB 靜默跳过）；`src/lib/api/friend.ts` 加 `triggerNextMeet`；`src/features/friend/FriendPage.tsx` 接「下次见面」按钮（http 打 API，mock 由 demo store 处理）。
+- **为什么**：07A A5/A6 规格。report 存入 notifications（type=friend_report），下次见面时统一由 Prompt 8 产生，简化 B/A 的接口：B 只调 `deliverReport`，不需要知道朋友说话方式。recall 记忆未调 Prompt 1（规格注明「简化可用模板」），直接模板化拼句。
+- **验证**：tsc 过；vitest 306/306（nextMeet 10 测：pickNextEvent 解锁规则/不重复/null、getLifeUpdate 边界、nextMeet stage+1/life_update 写入/DB 错误抛 NextMeetError）。
+- **坑**：`server/contracts/friend.ts` 被误放入前端 API 层代码（supabase 客户端 import / apiCall / triggerNextMeet 等），导致 tsc 报 7 个错误；修复方式：恢复 contracts 为纯后端四函数，`triggerNextMeet` 移回 `src/lib/api/friend.ts`；`server/routes/friend.ts` 的 import 从 `chat` 改为 `nextMeet`。
+- **还没做完／待办**：recall 记忆问话目前用模板，未来可接 Prompt 1 产生更自然的问句；`deliverReport` 无 DB 时静默跳过（测试环境不影响）；http 模式「下次见面」后需刷新消息列表（目前需手动刷新）。
+
 ### 2026-10-30｜A4 用戶檔案擷取與確認｜Vincent（AI 協助）｜分支 a/A4-profile｜Closes #7
 - **做了什麼**：`server/prompts/03_profile.ts`（Prompt 3 逐字＋`profileExtractSchema`：big_five 五項必填、score 0–100／confidence 0–1／style 枚舉）；`server/friend/profile.ts`（`extractProfile`：用戶訊息最新 60 則 role=user＋上一版→MODEL_REASON→upsert `user_profiles`，shareable 內容有變時 `shareable_confirmed` 歸 false、`card` 清 null 讓 C 重產卡片、`embed(shareableToText)` 失敗不致命；`getShareableView` 絕不回 agent_profile；`updateShareable` 用戶編輯＋確認；`shouldExtractProfile`）；A2 `friendChat` 背景：用戶訊息數是 `PROFILE_EXTRACT_EVERY`（6）倍數時觸發；`server/routes/friend.ts` 加 `GET /api/profile`、`PUT /api/profile/shareable`、`POST /api/profile/extract`；`server/contracts/friend.ts` 換真實作（讀 `user_profiles`，無 DB 設定回退 fixtures——與 B 的 `searchLobby` 記憶體模式同款）；`src/lib/api/friend.ts` 加 `fetchProfile`／`saveShareable`／`requestExtractProfile`；`ProfilePage.tsx` http 模式接真 API（查看／編輯四欄位／確認／手動重新擷取），mock 模式照舊 demo store。
 - **為什麼**：07A A4 規格。contracts 保留 fixtures 回退是為了 B 的 `tests/social/server.test.ts`（無 DB 環境斷言非 null）不紅；「無資料回 null」才是真實行為，等 B 全接上後可拿掉回退。embedding 失敗只降級大廳排序，不擋檔案保存。

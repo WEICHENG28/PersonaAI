@@ -1,171 +1,58 @@
-/**
- * A 线 API 层（docs/10 §3）：同一函数依 VITE_API_MODE 回传 mock 或打 /api。
- * A0b 先接：登录/注册/登出 + profile/init。
- */
-import { supabase, isHttpMode } from '../../src/lib/supabase'
-import type { User } from './types'
-import type { TaskReport, ShareableProfile, AgentProfile, StyleProfile } from '../../shared/types'
+// A 提供的跨線函式（docs/07 第 6 節）。擁有者：A。簽名是共用約定，改前三人同意。
+// A4 起改為真實作：讀 user_profiles（service role）。
+// 沒有 DB 設定（本機測試／mock 模式）時回退 fixtures，
+// 行為與 B 的 searchLobby 記憶體模式一致（server/social/db.ts 的做法）。
+import type { AgentProfile, ShareableProfile, StyleProfile, TaskReport } from '../../shared/types'
 import { getServiceClient } from '../lib/supabase'
-import { getProfileRow } from '../friend/profile'
-import { fakeShareable, fakeAgentProfile, fakeStyle } from '../fixtures/friend'
+import { fakeAgentProfile, fakeShareable } from '../fixtures/friend'
 
-/** 匿名登录：不用邮箱密码，只带昵称（需在 Supabase 开启 Allow anonymous sign-ins）。 */
-export async function loginAnonymously(nickname: string): Promise<User> {
-  const { data, error } = await supabase.auth.signInAnonymously({
-    options: { data: { display_name: nickname } },
-  })
-  if (error) throw new AuthError(error.message)
-  const authUser = data.user
-  if (!authUser) throw new AuthError('登录未返回用户')
-  return toUser(authUser.id, '', nickname)
-}
+type ProfileCol = 'shareable_profile' | 'agent_profile'
 
-/** 注册：Supabase Auth signUp（meta 带昵称）。 */
-export async function register(email: string, password: string, nickname: string): Promise<User> {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { display_name: nickname } },
-  })
-  if (error) throw new AuthError(error.message)
-  const authUser = data.user
-  if (!authUser) throw new AuthError('注册未返回用户')
-  return toUser(authUser.id, authUser.email ?? email, nickname)
-}
-
-/** 登录：Supabase Auth signInWithPassword。 */
-export async function login(email: string, password: string): Promise<User> {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw new AuthError(error.message)
-  const authUser = data.user
-  if (!authUser) throw new AuthError('登录未返回用户')
-  const nickname = (authUser.user_metadata?.display_name as string | undefined) ?? email.split('@')[0] ?? '朋友'
-  return toUser(authUser.id, authUser.email ?? email, nickname)
-}
-
-/** 登出。 */
-export async function logout(): Promise<void> {
-  const { error } = await supabase.auth.signOut()
-  if (error) throw new AuthError(error.message)
-}
-
-/** 目前登录者（重整后还原 session 用）；无 session 回 null。 */
-export async function currentUser(): Promise<User | null> {
-  const { data } = await supabase.auth.getUser()
-  const authUser = data.user
-  if (!authUser) return null
-  const email = authUser.email ?? ''
-  const nickname = (authUser.user_metadata?.display_name as string | undefined) ?? email.split('@')[0] ?? '朋友'
-  return toUser(authUser.id, email, nickname)
-}
-
-/** 登录后调一次：确保 users 表有行（幂等）。 */
-export async function initProfile(): Promise<void> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  if (!token) return
-  const res = await fetch('/api/profile/init', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  })
-  if (!res.ok) {
-    console.warn('[friend] profile/init 失败', res.status)
+async function readProfileColumn<T>(userId: string, column: ProfileCol): Promise<T | null> {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  const db = getServiceClient()
+  const { data, error } = await db
+    .from('user_profiles')
+    .select(column)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) {
+    console.error(`[contracts/friend] 读取 ${column} 失败`, error.message)
+    return null
   }
+  return (data as Record<string, T | null> | null)?.[column] ?? null
 }
 
-export interface ShareableView {
-  shareable: { intro: string; interests: string[]; chat_style: string; looking_for: string } | null
-  confirmed: boolean
-  exists: boolean
+/** 對外檔案（給大廳／分身用）。無資料時回 null；無 DB 設定回 fixtures。 */
+export async function getShareableProfile(userId: string): Promise<ShareableProfile | null> {
+  const fallback = !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY
+  const value = await readProfileColumn<ShareableProfile>(userId, 'shareable_profile')
+  if (value) return value
+  return fallback ? { ...fakeShareable } : null
 }
 
-export interface ShareableInput {
-  intro: string
-  interests: string[]
-  chat_style: string
-  looking_for: string
+/** 含 Big Five，只有 B 可以呼叫；不可傳給分身或前端。 */
+export async function getAgentProfile(userId: string): Promise<AgentProfile | null> {
+  const fallback = !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY
+  const value = await readProfileColumn<AgentProfile>(userId, 'agent_profile')
+  if (value) return structuredClone(value)
+  return fallback ? structuredClone(fakeAgentProfile) : null
 }
 
-async function apiCall<T>(path: string, init?: RequestInit): Promise<T> {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  })
-  const body = (await res.json().catch(() => null)) as { ok: boolean; data?: T; error?: string } | null
-  if (!res.ok || !body?.ok) throw new ProfileApiError(body?.error ?? '出了点问题，再试一次？')
-  return body.data as T
-}
-
-/** GET /api/profile：对外档案与确认状态（不含 Big Five）。mock 模式回 null（页面用 demo store）。 */
-export async function fetchProfile(): Promise<ShareableView | null> {
-  if (!isHttpMode) return null
-  return apiCall<ShareableView>('/api/profile')
-}
-
-/** PUT /api/profile/shareable：修改并确认。 */
-export async function saveShareable(input: ShareableInput): Promise<ShareableView> {
-  return apiCall<ShareableView>('/api/profile/shareable', {
-    method: 'PUT',
-    body: JSON.stringify(input),
-  })
-}
-
-/** POST /api/profile/extract：手动撷取（Prompt 3 重新生成）。 */
-export async function requestExtractProfile(): Promise<ShareableView> {
-  return apiCall<ShareableView>('/api/profile/extract', { method: 'POST' })
-}
-
-export class ProfileApiError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'ProfileApiError'
-  }
-}
-
-function toUser(id: string, email: string, nickname: string): User {
-  return { id, email, nickname }
-}
-
-/** Auth 相关错误（讯息已转成给用户看的简体中文）。 */
-export class AuthError extends Error {
-  constructor(message: string) {
-    super(toZh(message))
-    this.name = 'AuthError'
-  }
-}
-
-/** Supabase 英文错误 → 简体中文给用户看。 */
-function toZh(message: string): string {
-  if (/invalid login credentials/i.test(message)) return '邮箱或密码不正确'
-  if (/user already registered|already been registered/i.test(message)) return '这个邮箱已经注册过了'
-  if (/password should be at least/i.test(message)) return '密码至少要 6 个字符'
-  if (/email not confirmed/i.test(message)) return '邮箱尚未验证，请查收邮件'
-  if (/anonymous sign-ins are disabled/i.test(message)) return '暂时无法直接开始：请在 Supabase 开启匿名登录'
-  return '出了点问题，再试一次？'
-}
-
-/** POST /api/friend/next-meet：模拟时间经过，阿澈分享新近况并回报任务结果。 */
-export async function triggerNextMeet(): Promise<void> {
-  if (!isHttpMode) {
-    console.log('[friend] mock 模式：模拟下次见面由 demo store 处理')
-    return
-  }
-  await apiCall<null>('/api/friend/next-meet', { method: 'POST' })
+/** 只回 agent_profile.style（給分身模仿用）。 */
+export async function getStyleProfile(userId: string): Promise<StyleProfile | null> {
+  const agent = await getAgentProfile(userId)
+  return agent ? { ...agent.style } : null
 }
 
 /**
- * A6：deliverReport - 新增 friend_report 通知，下次见面时由 AI 朋友回报。
- * B 的任务完成后呼叫。
+ * A6：deliverReport（07 第 6 節）。
+ * B 任務完成後呼叫：新增 notifications（type friend_report），
+ * 下次見面（POST /api/friend/next-meet）時由 Prompt 8 產生朋友口吻回報。
  */
 export async function deliverReport(userId: string, report: TaskReport): Promise<void> {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.log('[deliverReport] 无 DB 设定，跳过通知写入')
+    // 無 DB 設定（測試／mock 模式）靜默跳過
     return
   }
   const db = getServiceClient()
@@ -180,33 +67,3 @@ export async function deliverReport(userId: string, report: TaskReport): Promise
   }
 }
 
-/**
- * A4：對外檔案讀取（B 的 planner 與 C 的卡片生成會用）。
- * 無 DB 設定時回 fixtures；有 DB 但庫中無值回 null。
- */
-export async function getShareableProfile(userId: string): Promise<ShareableProfile | null> {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return fakeShareable
-  }
-  const row = await getProfileRow(userId)
-  return row?.shareable_profile ?? null
-}
-
-export async function getAgentProfile(userId: string): Promise<AgentProfile | null> {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return fakeAgentProfile
-  }
-  const row = await getProfileRow(userId)
-  if (!row?.agent_profile) return null
-  return JSON.parse(JSON.stringify(row.agent_profile))
-}
-
-export async function getStyleProfile(userId: string): Promise<StyleProfile | null> {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return fakeStyle
-  }
-  const row = await getProfileRow(userId)
-  return row?.agent_profile?.style ?? null
-}
-
-export { isHttpMode }
