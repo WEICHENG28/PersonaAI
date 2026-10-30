@@ -218,6 +218,15 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B7 工作日誌面板｜Peter（AI 協助）｜Closes #16
+- **做了什麼**：`GET /api/logs`（自己的日誌、新的在前、可依 `task_id` 篩選、預設 50 筆）；`agentStore.listLogs`；前端 `getLogs`、`subscribeLogs`（Supabase Realtime 訂 `agent_logs` 的 INSERT）；`AgentLogPanel` 改版：http 模式自己載入＋即時加入新日誌（依 id 去重、最多保留 200 筆），不同 Agent 用不同顏色標籤（AI 朋友梨黃、社交 Agent 墨色、分身灰、評審薄荷、隱私守門珊瑚），多個任務時可篩選，有對話的日誌可以「看这场对话」跳到 `/chat/<id>`；mock 模式照舊顯示傳進來的 demo 日誌。
+- **為什麼這樣做**：面板被 A 的 `FriendPage`、`SettingsPage` 引用，`logs` 參數改成選填、mock 行為不變，A 不用改。Realtime 不加 user 篩選，靠資料表權限（`own` policy）只收到自己的日誌，前端不需要知道 `users.id`。
+- **改了哪些檔案**：`server/social/agentStore.ts`、`server/routes/social.ts`、`src/lib/api/social.ts`、`src/components/AgentLogPanel.tsx`、`tests/social/logs.test.ts`。
+- **驗證**：`tsc -b`；vitest 341/341（只回自己的、新的在前、不含 user_id、任務篩選、筆數、參數錯誤 400）；`npm run build`；雲端唯讀跑 `listLogs` 語法正確。**Realtime 即時更新沒有實測**（要登入真實帳號跑任務才會產生日誌），請 Peter 實跑主線時打開開發者開關確認。
+- **還沒做完／待辦**：A 的頁面在 http 模式還會傳 demo 日誌進來（目前會被忽略，不影響）。
+
+---
+
 ### 2026-10-30｜B6 歷史嘗試＋重啟對話｜Peter（AI 協助）｜Closes #35
 - **做了什麼**：
   - 迴圈寫歷史改成 `recordAttempts`：我方一筆；對方不是種子用戶時也幫對方寫一筆（對方視角的判定與大綱）；不合適原因先過 C 的 `guardText`（守的是被描述的一方）。代聊結束時雙方都記「不合適」（只有一方覺得合適就是「匹配不雙向」）；通知本人時各記自己視角的結果。

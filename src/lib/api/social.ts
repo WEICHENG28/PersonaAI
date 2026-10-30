@@ -45,6 +45,46 @@ const useHttp = import.meta.env.VITE_API_MODE === 'http'
 /** http 模式才有真的歷史資料；mock 模式頁面用 demo store。 */
 export const historyFromApi = useHttp
 
+/** 工作日誌一筆（B7）。agent：friend／social／twin／judge／guard。 */
+export interface LogEntry {
+  id: string
+  task_id: string | null
+  conversation_id: string | null
+  agent: 'friend' | 'social' | 'twin' | 'judge' | 'guard'
+  action: string
+  reason: string | null
+  created_at: string
+}
+
+export function getLogs(taskId?: string): Promise<LogEntry[]> {
+  return request('GET', `/api/logs?limit=50${taskId ? `&task_id=${encodeURIComponent(taskId)}` : ''}`)
+}
+
+/**
+ * 訂閱新的工作日誌（Supabase Realtime）。資料表的權限只讓登入者讀到自己的日誌。
+ * 回傳取消訂閱的函式。
+ */
+export function subscribeLogs(onInsert: (log: LogEntry) => void): () => void {
+  const channel = supabase
+    .channel(`agent_logs-${Math.random().toString(36).slice(2)}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agent_logs' }, (payload) => {
+      const row = payload.new as LogEntry & { user_id?: string }
+      onInsert({
+        id: row.id,
+        task_id: row.task_id,
+        conversation_id: row.conversation_id,
+        agent: row.agent,
+        action: row.action,
+        reason: row.reason,
+        created_at: row.created_at,
+      })
+    })
+    .subscribe()
+  return () => {
+    void supabase.removeChannel(channel)
+  }
+}
+
 export type AttemptResult = 'mutual' | 'one_way' | 'unsuitable' | 'ongoing'
 export type ReasonType = 'not_mutual' | 'condition_mismatch' | 'friction'
 

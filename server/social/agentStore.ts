@@ -1,6 +1,6 @@
 // 社交 Agent 迴圈要讀寫的資料。有 Supabase 就用資料庫，沒有就用記憶體（本機開發、測試）。擁有者：B。
 // 注意：conversations 是 C 的表，這裡只「讀」狀態（是否結束、我方是否已接手）；寫入一律透過 C 的 contracts。
-import type { AgentTask, AttemptResult, Controller, MatchTier, Outline, Preferences, ReasonType } from '../../shared/types'
+import type { AgentName, AgentTask, AttemptResult, Controller, MatchTier, Outline, Preferences, ReasonType } from '../../shared/types'
 import { getAdminDb } from './db'
 import { sharedMemoryTasks } from './taskStore'
 
@@ -39,6 +39,17 @@ export interface HistoryItem extends AttemptRecord {
   created_at: string
 }
 
+/** 工作日誌一筆（給開發者面板看）。 */
+export interface LogItem {
+  id: string
+  task_id: string | null
+  conversation_id: string | null
+  agent: AgentName
+  action: string
+  reason: string | null
+  created_at: string
+}
+
 /** match_scores 一列（每個視角一列；只給後台用，前端讀不到）。 */
 export interface ScoreRow {
   conversation_id: string
@@ -71,6 +82,8 @@ export interface AgentStore {
   listAttempts(userId: string, limit: number): Promise<HistoryItem[]>
   getAttempt(id: string): Promise<HistoryItem | null>
   markReopened(id: string, at: Date): Promise<void>
+  /** 這位用戶的工作日誌，新的在前；可依任務篩選。 */
+  listLogs(userId: string, opts: { taskId?: string; limit: number }): Promise<LogItem[]>
   notifyMatch(userId: string, payload: Record<string, unknown>): Promise<void>
   /** 請求對方本人上線（格式同 C7：{ conversationId, fromName }）。 */
   notifyRequestHuman(userId: string, payload: { conversationId: string; fromName: string }): Promise<void>
@@ -152,6 +165,14 @@ export class MemoryAgentStore implements AgentStore {
   async getAttempt(id: string) {
     const a = this.attempts.find((x) => x.id === id)
     return a ? structuredClone(a) : null
+  }
+  logs: (LogItem & { user_id: string })[] = []
+  async listLogs(userId: string, opts: { taskId?: string; limit: number }) {
+    return this.logs
+      .filter((l) => l.user_id === userId && (!opts.taskId || l.task_id === opts.taskId))
+      .slice(-opts.limit)
+      .reverse()
+      .map(({ user_id: _u, ...rest }) => rest)
   }
   async markReopened(id: string, at: Date) {
     const a = this.attempts.find((x) => x.id === id)
@@ -242,6 +263,12 @@ function supabaseStore(db: Db): AgentStore {
     async getAttempt(id) {
       const row = (await one(db.from('match_attempts').select(HISTORY_COLUMNS).eq('id', id).maybeSingle())) as unknown as HistoryRow | null
       return row ? toHistoryItem(row) : null
+    },
+    async listLogs(userId, opts) {
+      let q = db.from('agent_logs').select('id,task_id,conversation_id,agent,action,reason,created_at').eq('user_id', userId)
+      if (opts.taskId) q = q.eq('task_id', opts.taskId)
+      const rows = await one(q.order('created_at', { ascending: false }).limit(opts.limit))
+      return (rows ?? []) as unknown as LogItem[]
     },
     async markReopened(id, at) {
       await one(db.from('match_attempts').update({ reopened_at: at.toISOString() }).eq('id', id))
