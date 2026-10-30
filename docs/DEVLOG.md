@@ -181,6 +181,13 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B3 修正：對方本人接手時迴圈放手｜Peter（AI 協助）｜分支 b/B3-side-b-takeover
+- **做了什麼**：`ConversationState` 加上 `sideBController`（Supabase 版多讀 `side_b_controller`，記憶體版預設 `twin`）；`advanceChat` 改成任一方是本人就清掉 `active_conversation_id`、寫日誌、回 `chat_cleared`，不再呼叫 `runTwinRounds`。日誌分成「你已接手」和「对方本人已接手」。
+- **為什麼這樣做**：C3（#62）的 `runTwinRounds` 會跳過本人在聊的那一方。原本迴圈只看 a 方，對方按「我來聊」後，我方分身會一次連發 4 則、不等對方回話，聊夠輪數後還會拿這種對話去判定。
+- **改了哪些檔案**：`server/social/{agentStore,runner}.ts`、`tests/social/runner.test.ts`。
+- **踩到的坑／注意事項**：無。
+- **還沒做完／待辦**：對方本人接手後，這場對話要不要記一筆 `match_attempts`、算不算進 `progress`，規格沒寫，等三人決定；目前只放手、換下一位，不記錄也不計數。
+
 ### 2026-10-30｜B4 規劃器（LLM 挑人與決策）｜Peter（AI 協助）｜Closes #15
 - **做了什麼**：Prompt 4（`server/prompts/04_planner.ts`，簡體）；`server/social/planner.ts`：`pick`（輸入任務、用戶偏好與後台檔案 Big Five、候選人對外檔案，回挑誰、理由、開場話題）、`decide`（輸入檔位、雙方判定、輪數，回下一步與理由）、`cleanReason`；`runnerDeps.ts` 換成真的規劃器；迴圈的 `decide` 改成回 `{ action, reason }`，程式規則和規劃器一致時，日誌用規劃器寫的理由；`UserSettings` 加上 `preferences`。
 - **為什麼這樣做**：

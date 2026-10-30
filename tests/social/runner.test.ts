@@ -165,9 +165,19 @@ describe('runTaskStep', () => {
 
   it('本人已接手 → 清掉進行中的對話，不再代聊', async () => {
     put(chatting())
-    store.conversations.set('conv-1', { status: 'active', sideAController: 'human' })
+    store.conversations.set('conv-1', { status: 'active', sideAController: 'human', sideBController: 'twin' })
     expect(await runTaskStep('t1', deps)).toBe('chat_cleared')
     expect(deps.runTwinRounds).not.toHaveBeenCalled()
+  })
+
+  it('對方本人接手（b 方是 human）→ 不再呼叫 runTwinRounds，清掉進行中的對話', async () => {
+    put(chatting())
+    store.conversations.set('conv-1', { status: 'active', sideAController: 'twin', sideBController: 'human' })
+    expect(await runTaskStep('t1', deps)).toBe('chat_cleared')
+    expect(deps.runTwinRounds).not.toHaveBeenCalled()
+    expect(deps.evaluate).not.toHaveBeenCalled()
+    expect(store.tasks.get('t1')?.active_conversation_id).toBeNull()
+    expect(store.attempts).toHaveLength(0)
   })
 
   it('達到完成條件 → 任務完成並交給 AI 朋友回報', async () => {
