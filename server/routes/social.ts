@@ -4,6 +4,8 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { LlmError } from '../lib/llm'
 import { TaskError, changeTaskStatus, createTaskFromText, getOwnTask, type TaskAction } from '../social/task'
+import { runTaskStepSafely } from '../social/runner'
+import { defaultRunnerDeps } from '../social/runnerDeps'
 import { requireUserId } from '../social/user'
 
 export const socialRoutes = new Hono()
@@ -23,6 +25,16 @@ for (const action of ['confirm', 'pause', 'resume', 'cancel'] as const satisfies
     respond(c, (userId) => changeTaskStatus(userId, c.req.param('id'), action)),
   )
 }
+
+/** 開發用：不開 worker，手動推進任務一步（07B 的 B3）。 */
+socialRoutes.post('/tasks/:id/step', (c) =>
+  respond(c, async (userId) => {
+    const id = c.req.param('id')
+    await getOwnTask(userId, id)
+    const outcome = await runTaskStepSafely(id, defaultRunnerDeps())
+    return { outcome, task: await getOwnTask(userId, id) }
+  }),
+)
 
 /**
  * 先確認登入者，再執行 run。
