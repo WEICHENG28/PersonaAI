@@ -27,7 +27,8 @@ import {
 interface DemoState {
   // ── 用户 ──
   user: { id: string; email: string; nickname: string } | null
-  login: (email: string, nickname: string) => void
+  /** id 可选：http 模式传 auth user id，mock 预设 u-demo */
+  login: (email: string, nickname: string, id?: string) => void
   logout: () => void
 
   // ── 朋友线 ──
@@ -130,7 +131,7 @@ function beatId(b: FriendBeat) {
 
 export const useDemoStore = create<DemoState>((set, get) => ({
   user: null,
-  login: (email, nickname) => set({ user: { id: 'u-demo', email, nickname } }),
+  login: (email, nickname, id = 'u-demo') => set({ user: { id, email, nickname } }),
   logout: () => {
     clearTimers()
     set(initialSlice())

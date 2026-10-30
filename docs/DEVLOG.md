@@ -110,6 +110,14 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-30｜A0b 真實登入與 Supabase｜Vincent（AI 協助）｜分支 a/A0b-real-auth｜Closes #44
+- **做了什麼**：前端 `src/lib/supabase.ts`＋`src/lib/api/friend.ts`（`VITE_API_MODE=http|mock`）；LoginPage／Settings 接 Supabase Auth（mock 假登录保留）；后端 `server/lib/{supabase,auth,profile}.ts`、`POST /api/profile/init`（JWT＋users 表幂等）；`tests/friend/auth.test.ts`。
+- **为什么**：S0 已合；Jerry C0 Realtime／seed 等 A 的 `server/lib/supabase.ts`（见 #20／#48）。本机 Supabase 开发，不碰云端共用库。
+- **改了哪些文件**：`src/lib/supabase.ts`、`src/lib/api/friend.ts`、`LoginPage`、`SettingsPage`、`useDemoStore.login` 可选 id、`server/lib/*`、`server/routes/friend.ts`、`tests/friend/auth.test.ts`、`src/vite-env.d.ts`。
+- **验证**：tsc 过；vitest 16/16；本机注册→`profile/init` created:true→再调 created:false→users 有行；Vite `/api` 代理通。
+- **坑**：`supabase status -o env` 的值带引号，写进 `.env.local` 会导致 PostgREST「No suitable key」；service_role JWT 必须与 status 完全一致。`.env.local` 不 commit。`VITE_API_MODE=http` 会让 vitest 里 B 的 mock API 测打挂 → `vitest.config.ts` 强制 `VITE_API_MODE=mock`。
+- **待办**：云端 Supabase 专案（三人共用）仍需手动建；本机验 http 时临时把 `.env.local` 的 `VITE_API_MODE` 改成 `http`。
+
 ### 2026-10-30｜A0 專案骨架、登入、共用元件、設計 token｜Vincent（AI 協助）｜直接 commit main（骨架階段）
 - **做了什麼**：Next.js 14（App Router、TS strict、Tailwind）專案骨架：登入／註冊（Supabase Auth＋`/api/profile/init` 冪等初始化三張表）、`middleware.ts`（next-intl＋Supabase session＋未登入導向）、Hum 主題 token 寫入 `app/globals.css`（含深色模式）、`components/ui/`（Button、Card、Modal、Avatar、AiBadge、ChatBubble、RiveAvatar、LanguageSwitcher、NavBar、SubmitButton）、五個頁面骨架（friend／lobby／history／profile／settings）、`lib/env.ts`（zod 驗證，缺值即報明確錯誤）、`lib/types.ts`＋`lib/config.ts`（07 §5／§6 逐字）、`supabase/migrations/0001_init.sql`（07 §4 逐字）、A 線 contracts stub＋fixtures，另建 B／C 線最小 stub 讓三人可同時開工。
 - **為什麼這樣做**：走 M1「stub 先行」策略（07 §6）；登入用 server actions 回傳 `{ ok, error }`（錯誤即值）；初始化三張表集中在 `lib/profile/init.ts` 單一寫入者、重複呼叫安全。三語與 Rive 的決策見「共用與決策」。
@@ -121,6 +129,22 @@
 ---
 
 ## B：社交 Agent 線（Peter）
+
+### 2026-10-30｜B1 一句話任務解析＋任務確認卡｜Peter（AI 協助）｜Closes #31
+- **做了什麼**：
+  - 後端：Prompt 14（`server/prompts/14_task.ts`，restatement 改成簡體）；`server/social/task.ts` 的 `createTaskFromText`（解析→寫 `agent_tasks` pending_confirm→寫日誌）、`changeTaskStatus`（confirm／pause／resume／cancel）；API `POST /api/tasks`、`GET /api/tasks/:id`、`POST /api/tasks/:id/{confirm,pause,resume,cancel}`；contract `createTaskFromText` 換成真的。
+  - 前端：`src/lib/api/social.ts`（`createTask`／`getTask`／`updateTask`，`VITE_API_MODE=http` 打後端，否則 mock）、`src/features/social/components/TaskConfirmCard.tsx`（props `{ taskId, onStarted?, onCancelled? }`）。
+- **為什麼這樣做**：
+  - 模型漏給或給超出範圍的數字時，用 `normalizeParsed` 照 Prompt 14 規則補正（人數上限 10、合適人數預設 min(count,2)、最多代聊 count×2），不完全依賴模型。
+  - A0b（Supabase client、登入）還沒做，所以 `agent_tasks` 讀寫放在 `server/social/taskStore.ts`：有 Supabase 就寫資料庫，沒有就用記憶體；`server/social/db.ts` 是暫用的 client，`log.ts` 也改用它。沒接資料庫時以固定的 `dev-user` 身分執行；有資料庫但沒登入就回「请先登录」，避免假身分寫進正式資料。
+  - 狀態轉換寫成表（只允許合法轉換）；開始／繼續前檢查 `social_agent_enabled` 與 `shareable_confirmed`。
+- **改了哪些檔案**：`server/prompts/14_task.ts`、`server/social/{task,taskStore,db,user}.ts`、`server/routes/social.ts`、`server/contracts/social.ts`、`server/lib/log.ts`、`src/lib/api/social.ts`、`src/features/social/components/TaskConfirmCard.tsx`、`tests/social/{task,task-api}.test.ts`。
+- **給 A**：AI 朋友聊天頁的 mock 任務彈窗（`FriendPage.tsx` 的 `TaskConfirmModal`）可以換成 `createTask(text)` ＋ `<TaskConfirmCard taskId=… />`（A2）。
+- **踩到的坑**：`src/vite-env.d.ts` 沒有 `vite/client` 型別，所以 `import.meta.env` 沒型別；在 `src/lib/api/social.ts` 開頭加 `/// <reference types="vite/client" />`，沒改 A 的檔案。
+- **驗證**：`tsc -b` 通過；vitest 28/28，含驗收 1（登山任務解析為 sport／喜欢登山／3 人／2 位合適／最多 6 場，LLM 用 mock）與驗收 2（未確認對外檔案按開始回 403 與中文提示）；`npm run build` 成功。確認卡還沒放進任何頁面，畫面要等 A2 接上才看得到。
+- **還沒做完／待辦**：用真實模型跑一次驗收 1（等 `MODEL_*` 與金鑰）；A0b 後把 `db.ts`、`user.ts` 換成 A 的共用版本，前端 `request()` 帶上登入 token。
+
+---
 
 ### 2026-10-30｜B0 LLM 封裝、工作日誌、設定常數｜Peter（AI 協助）｜Closes #14
 - **做了什麼**：`server/lib/config.ts`（07 §6 CONFIG 逐字）；`server/lib/llm/`：`llmText`／`llmJson`／`embed`、`LlmError { role, reason, attempts }`、`extractJson`；`server/lib/log.ts`：`writeLog`（寫 `agent_logs`，失敗只記 console）。contracts stub 在 S0 已完成。
