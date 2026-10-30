@@ -148,6 +148,17 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-30｜A7 设定页 + A8 记忆编辑 + A9 娱乐标签｜Vincent（AI 协助）｜分支 a/A7-settings｜Closes #10 #11 #12
+- **做了什么**：
+  - **A7**：`server/friend/settings.ts`（`getSettings`/`updateSettings`/`settingsUpdateSchema`；开 social_agent 前检查 shareable_confirmed）；`GET /api/settings` + `PUT /api/settings`；`SettingsPage.tsx` http 模式接线（mount 时 fetchSettings，各按钮点击后 httpSave，禁用期间 disabled）。
+  - **A8**：`server/friend/memory.ts` 新增 `editMemory`（content 修改，source=user_edited，confidence=1；内容空白或找不到回 false）+ `memoryContentSchema`；`PATCH /api/memory/:id`；ProfilePage `MemoriesSection` 加「编辑」按钮，展开 textarea + 保存/取消。
+  - **A9**：`server/prompts/12_fun.ts`（Prompt 12 逐字 + `funLabelSchema` 含 report 必须「（仅供娱乐）」开头 + MBTI 格式正则）；`server/friend/funLabels.ts`（`generateFunLabels`/`getFunLabels`/`setUserMbti`；无 shareable_profile 拋 FunLabelsError）；`GET /api/profile/fun`、`POST /api/profile/fun`、`PUT /api/profile/fun/mbti`；ProfilePage 末尾加 `FunLabelsSection`（AI 猜 MBTI、原因、报告 + 用户自填 MBTI + 对照说明；mock 模式不显示）。
+  - `src/lib/api/friend.ts` 加 fetchSettings/saveSettings/editMemory/fetchFunLabels/generateFunLabels/setUserMbti 等前端函数。
+- **为什么**：07A A7/A8/A9 规格。A9 是 P2 功能，mock 模式下不显示节省占位。settings 采 load-on-mount + per-field save（点击立即保存），避免用户忘记提交。
+- **验证**：tsc 0 error；vitest 329/329（settings 9 测：schema 边界、updateSettings 冪等、social_agent 前置检查；funLabels 14 测：schema 所有 MBTI 格式、renderFunSystem、memoryContentSchema、editMemory 主流程/空白/找不到、generateFunLabels 主流程/无档案拋错）。
+- **坑**：`settings.ts` 中 Supabase `.select()` 回传值型别是内部 `GenericStringError` 不与 `Record<string,unknown>` 兼容，需 `as unknown as`。`FunLabel` type 导出后未被 funLabels.ts 使用触发 TS6133，改为不导出 type。
+- **还没做完**：B 的 `<SocialSettings/>` 组件规格提到嵌入但 B 尚未产出，SettingsPage 保留空间待后续嵌入；A9 用户自填 MBTI 写入后 store 中的记忆列表不会自动刷新（http 模式编辑记忆后需手动刷新页面看到新 source）。
+
 ### 2026-10-30｜A5 模拟下次见面 + A6 报告回传｜Vincent（AI 协助）｜分支 a/A5-next-meet
 - **做了什么**：`server/friend/nextMeet.ts`（`nextMeet`：story_stage+1→更新 life_state→写 life_update 消息→recall 最新记忆→读 notifications 表未读 friend_report→Prompt 8 逐筆产生朋友口吻回报→设已读→writeLog；`NextMeetError`）；`server/prompts/08_report.ts`（Prompt 8 逐字＋`reportReplySchema`＋`renderReportSystem`）；`server/routes/friend.ts` 加 `POST /api/friend/next-meet`；`server/contracts/friend.ts` 实现 `deliverReport`（写 notifications 表，无 DB 靜默跳过）；`src/lib/api/friend.ts` 加 `triggerNextMeet`；`src/features/friend/FriendPage.tsx` 接「下次见面」按钮（http 打 API，mock 由 demo store 处理）。
 - **为什么**：07A A5/A6 规格。report 存入 notifications（type=friend_report），下次见面时统一由 Prompt 8 产生，简化 B/A 的接口：B 只调 `deliverReport`，不需要知道朋友说话方式。recall 记忆未调 Prompt 1（规格注明「简化可用模板」），直接模板化拼句。

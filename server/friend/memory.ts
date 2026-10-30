@@ -141,3 +141,37 @@ export async function markNotLikeMe(userId: string, memoryId: string): Promise<b
   }
   return ok
 }
+
+/** A8：编辑记忆内容（PATCH /api/memory/:id）。
+ *  编辑后 source 改为 user_edited、confidence 固定 1。
+ *  回传 false 表示找不到（已删除或不属于此用户）。
+ */
+export async function editMemory(
+  userId: string,
+  memoryId: string,
+  content: string,
+): Promise<MemoryRow | false> {
+  const db = getServiceClient()
+  const trimmed = content.trim()
+  if (!trimmed) return false
+
+  const { data, error } = await db
+    .from('friend_memories')
+    .update({ content: trimmed, source: 'user_edited', confidence: 1 })
+    .eq('id', memoryId)
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .select('id, content, source, confidence, created_at, deleted_at')
+    .single()
+  if (error || !data) return false
+
+  await writeLog({
+    user_id: userId,
+    agent: 'friend',
+    action: '编辑记忆',
+    reason: `用户修改：${trimmed.slice(0, 40)}`,
+  })
+  return data as MemoryRow
+}
+
+export const memoryContentSchema = z.string().min(1).max(200)

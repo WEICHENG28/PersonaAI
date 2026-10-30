@@ -6,7 +6,9 @@ import { isAuthFailure, requireAuth } from '../lib/auth'
 import { initUserProfile } from '../lib/profile'
 import { friendChat, friendIntro, getFriendMessages, FriendChatError } from '../friend/chat'
 import { nextMeet, NextMeetError } from '../friend/nextMeet'
-import { deleteMemory, listMemories, markNotLikeMe, memoryIdSchema, MemoryError } from '../friend/memory'
+import { deleteMemory, editMemory, listMemories, markNotLikeMe, memoryIdSchema, memoryContentSchema, MemoryError } from '../friend/memory'
+import { getSettings, updateSettings, settingsUpdateSchema, SettingsError } from '../friend/settings'
+import { generateFunLabels, getFunLabels, setUserMbti, userMbtiSchema, FunLabelsError } from '../friend/funLabels'
 import {
   extractProfile,
   getShareableView,
@@ -233,6 +235,131 @@ friendRoutes.post('/friend/next-meet', async (c) => {
   } catch (err) {
     console.error('[friend] next-meet', err)
     return c.json({ ok: false, error: err instanceof NextMeetError ? err.message : '模拟下次见面失败，请再试一次' }, 500)
+  }
+})
+
+/**
+ * PATCH /api/memory/:id
+ * A8：編輯記憶內容（source → user_edited，confidence = 1）。
+ */
+friendRoutes.patch('/memory/:id', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+
+  const memoryId = c.req.param('id')
+  const parsed = memoryIdSchema.safeParse(memoryId)
+  if (!parsed.success) return c.json({ ok: false, error: '无效的记忆 ID' }, 400)
+
+  const body = await c.req.json().catch(() => null)
+  const bodyParsed = z.object({ content: memoryContentSchema }).safeParse(body)
+  if (!bodyParsed.success) return c.json({ ok: false, error: '内容不能为空（最多 200 字）' }, 400)
+
+  try {
+    const userId = await appUserId(authed)
+    const result = await editMemory(userId, parsed.data, bodyParsed.data.content)
+    if (!result) return c.json({ ok: false, error: '找不到该记忆，或已被删除' }, 404)
+    return c.json({ ok: true, data: result })
+  } catch (err) {
+    console.error('[friend] memory patch', err)
+    return c.json({ ok: false, error: err instanceof MemoryError ? err.message : '编辑失败，请再试一次' }, 500)
+  }
+})
+
+/**
+ * GET /api/settings
+ * A7：讀取目前設定（含 shareable_confirmed）。
+ */
+friendRoutes.get('/settings', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+
+  try {
+    const userId = await appUserId(authed)
+    const data = await getSettings(userId)
+    return c.json({ ok: true, data })
+  } catch (err) {
+    console.error('[friend] settings get', err)
+    return c.json({ ok: false, error: err instanceof SettingsError ? err.message : '读取设定失败' }, 500)
+  }
+})
+
+/**
+ * PUT /api/settings
+ * A7：更新設定（zod 驗證，只更新傳入欄位）。
+ */
+friendRoutes.put('/settings', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+
+  const body = await c.req.json().catch(() => null)
+  const parsed = settingsUpdateSchema.safeParse(body)
+  if (!parsed.success) return c.json({ ok: false, error: '参数格式错误' }, 400)
+
+  try {
+    const userId = await appUserId(authed)
+    const data = await updateSettings(userId, parsed.data)
+    return c.json({ ok: true, data })
+  } catch (err) {
+    console.error('[friend] settings put', err)
+    return c.json({ ok: false, error: err instanceof SettingsError ? err.message : '更新设定失败，请再试一次' }, 500)
+  }
+})
+
+/**
+ * GET /api/profile/fun
+ * A9：讀取目前娛樂標籤。
+ */
+friendRoutes.get('/profile/fun', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+
+  try {
+    const userId = await appUserId(authed)
+    const data = await getFunLabels(userId)
+    return c.json({ ok: true, data })
+  } catch (err) {
+    console.error('[friend] fun get', err)
+    return c.json({ ok: false, error: '读取娱乐标签失败' }, 500)
+  }
+})
+
+/**
+ * POST /api/profile/fun
+ * A9：呼叫 Prompt 12 生成娛樂標籤（MODEL_FAST）。
+ */
+friendRoutes.post('/profile/fun', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+
+  try {
+    const userId = await appUserId(authed)
+    const data = await generateFunLabels(userId)
+    return c.json({ ok: true, data })
+  } catch (err) {
+    console.error('[friend] fun post', err)
+    return c.json({ ok: false, error: err instanceof FunLabelsError ? err.message : '生成娱乐标签失败，请再试一次' }, 500)
+  }
+})
+
+/**
+ * PUT /api/profile/fun/mbti
+ * A9：用戶自填 MBTI（不重跑 LLM）。
+ */
+friendRoutes.put('/profile/fun/mbti', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+
+  const body = await c.req.json().catch(() => null)
+  const parsed = userMbtiSchema.safeParse(body)
+  if (!parsed.success) return c.json({ ok: false, error: 'MBTI 格式不正确（例：INFP）' }, 400)
+
+  try {
+    const userId = await appUserId(authed)
+    const data = await setUserMbti(userId, parsed.data.user_mbti)
+    return c.json({ ok: true, data })
+  } catch (err) {
+    console.error('[friend] fun mbti put', err)
+    return c.json({ ok: false, error: err instanceof FunLabelsError ? err.message : '保存失败，请再试一次' }, 500)
   }
 })
 
