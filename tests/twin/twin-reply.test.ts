@@ -217,7 +217,14 @@ describe('twinReply', () => {
 
   it('有收尾指示時傳進 Prompt', async () => {
     await createTwinReply(h.deps)('conv-1', AN, { extraInstruction: '- 这是最后一则消息，请礼貌地结束对话。' })
-    expect((h.llm.mock.calls[0]![0] as { system: string }).system).toContain('礼貌地结束对话')
+    const call = h.llm.mock.calls[0]![0] as { system: string; messages: { content: string }[] }
+    expect(call.system).toContain('礼貌地结束对话')
+    expect(call.messages[0]!.content).toContain('这一则特别注意：这是最后一则消息，请礼貌地结束对话。')
+  })
+
+  it('沒有額外規則時，輪到你說話的提示不變', async () => {
+    await createTwinReply(h.deps)('conv-1', AN)
+    expect((h.llm.mock.calls[0]![0] as { messages: { content: string }[] }).messages[0]!.content).toBe('轮到你说下一则消息了，只输出 JSON。')
   })
 
   it('沒有對外檔案時不發言', async () => {

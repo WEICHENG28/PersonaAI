@@ -88,6 +88,12 @@ export type TwinReplyFn = (
   options?: TwinReplyOptions,
 ) => Promise<ChatMessage>
 
+/** 給模型的「輪到你說話」；有額外規則時也放進來，只放在 system 最後一條時模型常忽略（C3 收尾實測）。 */
+export function turnMessage(extraInstruction?: string): string {
+  const extra = extraInstruction?.trim().replace(/^-\s*/, '')
+  return extra ? `轮到你说下一则消息了。这一则特别注意：${extra}\n只输出 JSON。` : '轮到你说下一则消息了，只输出 JSON。'
+}
+
 /** 把最近訊息排成「我：…／对方：…」。 */
 export function formatRecentMessages(messages: readonly TwinMessageRow[], speakerUserId: string): string {
   if (messages.length === 0) return '（还没有消息，你是第一个说话的人）'
@@ -153,7 +159,7 @@ export function createTwinReply(deps: TwinDeps): TwinReplyFn {
     const reply = await deps.llmJson({
       role: 'chat',
       system,
-      messages: [{ role: 'user', content: '轮到你说下一则消息了，只输出 JSON。' }],
+      messages: [{ role: 'user', content: turnMessage(options.extraInstruction) }],
       temperature: TWIN_TEMPERATURE,
       schema: twinReplySchema,
     })
