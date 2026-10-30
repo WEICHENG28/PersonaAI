@@ -216,7 +216,13 @@ async function decideNext(task: AgentTask, conversationId: string, ev: Evaluatio
   if (decision.action === 'notify_user') {
     await recordAttempts(task, conversationId, targetId, ev, { ended: false, forced: null }, deps)
     await deps.markWaitingHuman(conversationId)
-    await deps.store.notifyMatch(task.user_id, { conversation_id: conversationId, task_id: task.id, mutual: result === 'mutual' })
+    // 通知格式照 07B 的 B8，由 C 的通知元件顯示「找到合适的人：{名字}」
+    await deps.store.notifyMatch(task.user_id, {
+      conversationId,
+      targetName: await deps.store.displayName(targetId),
+      mutual: result === 'mutual',
+      taskId: task.id,
+    })
     await deps.store.updateTask(task.id, { active_conversation_id: null, progress: { ...task.progress, suitable: task.progress.suitable + 1 } })
     await log(task, result === 'mutual' ? '双向合适，通知你' : '对你来说合适，通知你', plannerReason ?? `第 ${ev.round} 轮判定`, { conversation_id: conversationId })
     return 'notified'

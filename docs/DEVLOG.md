@@ -233,6 +233,16 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B8 效率統計＋任務結果回報｜Peter（AI 協助）｜Closes #36
+- **做了什麼**：`server/social/stats.ts`（`computeStats`：省下時間＝代聊場數 × 人工平均分鐘，附計算依據；`formatDuration`：120 →「约 2 小时」）；`buildReport` 從這個任務的歷史嘗試取合適名單（雙向／單向）與不合適原因（抽象說法、已過隱私守門），不含任何分數，交給 A 的 `deliverReport`；`match` 通知的內容改成 07B 規定的 `{ conversationId, targetName, mutual, taskId }`；前端 `StatsCard`（沿用 A 回報卡的 `stats-row`／`stat` 樣式）與 `formatDuration`。
+- **給 A（Vincent）**：`deliverReport` 收到的 `TaskReport` 現在有 `suitable`（名字、是否雙向、對話 ID）與 `unsuitable_reasons`，阿澈回報時可以直接用。`StatsCard` 可以放進回報卡或任務頁。
+- **給 C（Jerry）**：`match` 通知的 payload 是 `{ conversationId, targetName, mutual, taskId }`，通知鈴鐺顯示「找到合适的人：{targetName}」，連到 `/chat/<conversationId>/result`。
+- **改了哪些檔案**：`server/social/{stats,report,runner}.ts`、`src/features/social/{formatDuration.ts,components/StatsCard.tsx}`、`tests/social/{report,runner}.test.ts`。
+- **踩到的坑**：vitest 沒有設定 `@components` 等路徑別名，測試 import 含別名的元件會失敗，所以 `formatDuration` 獨立成不 import 任何別名的小檔案。
+- **驗證**：`tsc -b`；vitest 341/341（computeStats、formatDuration 前後端一致、buildReport 只取本任務且不含分數、match 通知格式）；`npm run build`。
+
+---
+
 ### 2026-10-30｜B7 工作日誌面板｜Peter（AI 協助）｜Closes #16
 - **做了什麼**：`GET /api/logs`（自己的日誌、新的在前、可依 `task_id` 篩選、預設 50 筆）；`agentStore.listLogs`；前端 `getLogs`、`subscribeLogs`（Supabase Realtime 訂 `agent_logs` 的 INSERT）；`AgentLogPanel` 改版：http 模式自己載入＋即時加入新日誌（依 id 去重、最多保留 200 筆），不同 Agent 用不同顏色標籤（AI 朋友梨黃、社交 Agent 墨色、分身灰、評審薄荷、隱私守門珊瑚），多個任務時可篩選，有對話的日誌可以「看这场对话」跳到 `/chat/<id>`；mock 模式照舊顯示傳進來的 demo 日誌。
 - **為什麼這樣做**：面板被 A 的 `FriendPage`、`SettingsPage` 引用，`logs` 參數改成選填、mock 行為不變，A 不用改。Realtime 不加 user 篩選，靠資料表權限（`own` policy）只收到自己的日誌，前端不需要知道 `users.id`。
@@ -355,6 +365,39 @@
 ---
 
 ## C：分身與大廳線（Jerry）
+
+### 2026-10-30｜C4 聊天室（即時訊息、本人發言、目前判定）｜Jerry（AI 協助）｜PR #67｜Closes #24
+- **做了什麼**：
+  - 後端（`server/twin/chatRoom.ts`、`chatRoomStore.ts`，路由在 `server/routes/twin.ts`）：
+    - `GET /api/conversations/:id`：我方與對方是誰、雙方由誰在聊、對話狀態、完整訊息（含 `guard_rewritten`）。
+    - `GET /api/conversations/:id/status`：只讀**我方視角**的 `match_scores` 最新兩筆，回 `verdict`（suitable／uncertain／unsuitable）和 `trend`（up／flat／down），**不回分數、輪數、理由**；還沒判定時 `verdict = null`。
+    - `POST /api/conversations/:id/messages`，`{ text }`（1–1000 字，zod）：我方是本人才能發（否則 409）、對話結束 409；寫入 `is_ai = false`；對方是分身且 active → `twinReply(id, 對方)`。
+    - 不是對話成員 403、id 不是 uuid 404、沒登入 401；回應一律 `{ ok, data }`／`{ ok, error }`（簡體）。
+  - 前端：`src/lib/api/twin.ts`（呼叫 /api、訂閱 `messages` Realtime）、`src/features/twin/components/`（`useChatRoom`、`LiveChatRoom`、純函數 `chatRoomView`）。`ProxyChatPage` 在 http 模式且網址是 `/chat/:id` 時顯示真資料；`/chat/lin` 與 mock 模式照舊跑 demo。
+  - 「我來聊」「請求真人」「查看結果」先顯示但停用（標「即将上线」），C5～C7 再接上。
+- **為什麼這樣做**：
+  - 多一個 `GET /api/conversations/:id`（07C 第 4 節沒列）：頁面要知道對方名字、我方 users.id（分辨左右氣泡）和初始訊息；走後端可以統一做成員檢查（403），不用前端自己查表。
+  - 走勢由後端比較最新兩筆方向分數（差距 ≤ 5 算持平，`TREND_FLAT_BAND`），只回結果文字的代碼，數字不出後端。
+  - 判定與「誰在聊」每 5 秒輪詢（`match_scores`、`conversations` 不在 Realtime publication）；訊息用 Realtime。
+  - Realtime 訂閱：C0 實測 `SUBSCRIBED` 時還沒開始監聽資料表，所以等伺服器 system 訊息（postgres_changes ok）後再讀一次訊息補漏；訂閱失敗或逾時改成每 4 秒輪詢。訂閱前先把登入者 JWT 交給 Realtime，避免剛打開頁面時以匿名身份訂閱被 RLS 擋掉。
+  - 本人發言後同步等對方分身回覆（畫面顯示輸入中），失敗時本人訊息照樣保留、回 `replyFailed`，並寫日誌「分身没有回上」（user_id 是分身的主人）。
+  - `ChatBubble` 沒有「對方本人」樣式，對方本人的訊息用左側氣泡、不掛 AI 標示來區分；不新增 CSS。
+- **改了哪些檔案**：`server/twin/chatRoom.ts`（新）、`server/twin/chatRoomStore.ts`（新）、`server/routes/twin.ts`、`src/lib/api/twin.ts`（新）、`src/features/twin/components/{chatRoomView.ts,useChatRoom.ts,LiveChatRoom.tsx}`（新）、`src/features/twin/ProxyChatPage.tsx`、`src/routes.tsx`（**共用檔，只加 `chat/:id` 一行**）、`tests/twin/{chat-room,chat-room-routes,chat-room-view}.test.ts`（新，32 項）。
+- **驗證**：vitest 全部通過、`tsc -b`、`npm run build` 通過。真的 Supabase 只讀檢查（`.local/check-c4.ts`，不寫入）：C3 測試對話 `e3ea687e-…` a 方看到對方「阿哲」、b 方看到「小安」，10 則都是 AI；外人（子晴）讀聊天室與判定都是 403；status 回 `verdict: null`（資料庫還沒有 `match_scores`）。後端實跑：沒登入、假 token 都回 401。
+- **真的 Supabase 端到端實測**（Jerry 同意後，`.local/c4-e2e.ts`，資料留著）：匿名登入 c-test1（`c11185a6-…`）、c-test2（`bb7747ca-…`），c-test1 確認對外檔案。
+  - 對話 1 `364c39f7-ccf2-4aa1-a5af-144aa71d4e01`（c-test1 分身 ↔ 小安分身，開場＋3 輪）：c-test1 用 anon key＋登入 JWT 訂閱，**經 RLS 即時收到開場後的 6/6 則**；c-test2 訂閱同一段收到 0 則。聊天室 API 回對方「小安」、雙方都是分身、7 則都是 AI。c-test2 讀聊天室／判定、發言都是 403；c-test1（分身在聊）發言 409。
+  - 跑 B 的評審兩次（第 2、3 輪）寫入 `match_scores`（方向分數 83），`/status` 只回 `{"value":"suitable","trend":"flat"}`，沒有數字；小安那邊看到的是小安自己的視角。
+  - 對話 2 `76f1570c-72a6-41b9-a123-80e00e46b0d3`（c-test1 本人 ↔ 小安分身）：本人發言後小安分身回覆，Realtime 即時收到 2 則；超過 1000 字回 400。
+  - 瀏覽器實測（本機 Chrome headless＋CDP，`.local/c4-cdp.ts`，帳號 c4-browser1／c4-browser2）：訊息逐輪自己出現、頁面沒重新載入（7/7 都有「AI 代聊中」）；頂部「和 小安 的对话」、「你的分身 · 代聊中／对方的分身」；輸入框停用；評審後判定顯示「合适 · 走势持平」、整頁沒有分數；另一個 browser context 登入後打開同一段顯示「打不开这段对话」；本人送出後出現輸入中，小安分身回覆。
+- **給 A 的兩個問題（不在 C4 範圍，C 沒改）**：
+  - `src/theme/layout.css` 的 `.chat` 是 flex column，`.bubble--twin`／`.bubble--human` 的 `justify-self: end` 在 flex 裡沒作用 → 我方訊息也靠左（demo 頁一樣）。改成 `align-self: flex-end`（對方那組 `align-self: flex-start`）就好。
+  - 登入狀態只存在 `useDemoStore`（沒有持久化），網址列直接開 `/chat/<id>` 或重新整理會被 `RequireAuth` 送回登入頁，再登入會變成新的匿名帳號（不是對話成員 → 403）。需要在啟動時用 `currentUser()` 從 Supabase session 還原。
+- **踩到的坑／注意事項**：
+  - 畫面文字放在 `chatRoomView.ts` 的 `CHAT_TEXT`：08 第 6 節要求文字放 `messages/strings.json`，但那是 A 的檔案；之後要搬過去再和 A 說。
+  - 本人和分身聊時 `round_count` 不會增加（只有 `runTwinRounds` 會加），C5 換算「第 n 輪」時要注意。
+- **還沒做完／待辦**：
+  - 用真實登入帳號在瀏覽器測（Realtime 經 RLS 收訊息、無痕視窗被擋）要 Jerry 操作。
+  - C8 言行異常（P1）還沒接在本人發言後。
 
 ### 2026-10-30｜C0 後續修正：seed 改成更新種子用戶、不刪除｜Jerry（AI 協助）｜分支 c/C0-seed-upsert
 - **做了什麼**：
