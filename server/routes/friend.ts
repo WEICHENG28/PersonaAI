@@ -1,10 +1,18 @@
 // A 緣 API 路由（/api 底下）。擁有者：A。
 // 回應格式：成功 { ok: true, data }，失敗 { ok: false, error: '给用户看的简体中文讯息' }。
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { isAuthFailure, requireAuth } from '../lib/auth'
 import { initUserProfile } from '../lib/profile'
 import { friendChat, friendIntro, getFriendMessages, FriendChatError } from '../friend/chat'
 import { deleteMemory, listMemories, markNotLikeMe, memoryIdSchema, MemoryError } from '../friend/memory'
+import {
+  extractProfile,
+  getShareableView,
+  updateShareable,
+  shareableUpdateSchema,
+  ProfileError,
+} from '../friend/profile'
 
 export const friendRoutes = new Hono()
 
@@ -150,6 +158,62 @@ friendRoutes.post('/memory/:id/not-like-me', async (c) => {
   } catch (err) {
     console.error('[friend] memory not-like-me', err)
     return c.json({ ok: false, error: '操作失败，请再试一次' }, 500)
+  }
+})
+
+/**
+ * GET /api/profile
+ * 对外档案与确认状态。绝不回 agent_profile（Big Five）。
+ */
+friendRoutes.get('/profile', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+  try {
+    const userId = await appUserId(authed)
+    const data = await getShareableView(userId)
+    return c.json({ ok: true, data })
+  } catch (err) {
+    console.error('[friend] profile get', err)
+    return c.json({ ok: false, error: err instanceof ProfileError ? err.message : '读取档案失败' }, 500)
+  }
+})
+
+/**
+ * PUT /api/profile/shareable
+ * 用户修改并确认对外档案（shareable_confirmed = true）。
+ */
+friendRoutes.put('/profile/shareable', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+  try {
+    const userId = await appUserId(authed)
+    const body = await c.req.json().catch(() => null)
+    const input = shareableUpdateSchema.parse(body)
+    const data = await updateShareable(userId, input)
+    return c.json({ ok: true, data })
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return c.json({ ok: false, error: '档案字段格式不对：介绍 40 字内、兴趣 1–12 项、风格与想找各 60 字内' }, 400)
+    }
+    console.error('[friend] profile shareable', err)
+    return c.json({ ok: false, error: err instanceof ProfileError ? err.message : '保存档案失败，请再试一次' }, 500)
+  }
+})
+
+/**
+ * POST /api/profile/extract
+ * 手动触发档案撷取（Prompt 3）。
+ */
+friendRoutes.post('/profile/extract', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+  try {
+    const userId = await appUserId(authed)
+    const data = await extractProfile(userId)
+    return c.json({ ok: true, data })
+  } catch (err) {
+    console.error('[friend] profile extract', err)
+    return c.json({ ok: false, error: err instanceof ProfileError ? err.message : '档案更新失败，稍后再试' }, 500)
   }
 })
 

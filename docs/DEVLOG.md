@@ -136,6 +136,13 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-30｜A4 用戶檔案擷取與確認｜Vincent（AI 協助）｜分支 a/A4-profile｜Closes #7
+- **做了什麼**：`server/prompts/03_profile.ts`（Prompt 3 逐字＋`profileExtractSchema`：big_five 五項必填、score 0–100／confidence 0–1／style 枚舉）；`server/friend/profile.ts`（`extractProfile`：用戶訊息最新 60 則 role=user＋上一版→MODEL_REASON→upsert `user_profiles`，shareable 內容有變時 `shareable_confirmed` 歸 false、`card` 清 null 讓 C 重產卡片、`embed(shareableToText)` 失敗不致命；`getShareableView` 絕不回 agent_profile；`updateShareable` 用戶編輯＋確認；`shouldExtractProfile`）；A2 `friendChat` 背景：用戶訊息數是 `PROFILE_EXTRACT_EVERY`（6）倍數時觸發；`server/routes/friend.ts` 加 `GET /api/profile`、`PUT /api/profile/shareable`、`POST /api/profile/extract`；`server/contracts/friend.ts` 換真實作（讀 `user_profiles`，無 DB 設定回退 fixtures——與 B 的 `searchLobby` 記憶體模式同款）；`src/lib/api/friend.ts` 加 `fetchProfile`／`saveShareable`／`requestExtractProfile`；`ProfilePage.tsx` http 模式接真 API（查看／編輯四欄位／確認／手動重新擷取），mock 模式照舊 demo store。
+- **為什麼**：07A A4 規格。contracts 保留 fixtures 回退是為了 B 的 `tests/social/server.test.ts`（無 DB 環境斷言非 null）不紅；「無資料回 null」才是真實行為，等 B 全接上後可拿掉回退。embedding 失敗只降級大廳排序，不擋檔案保存。
+- **驗證**：tsc 過；vitest 140/140（profile 33 測：渲染、schema 邊界、shareableToText／shareableChanged（interests 順序視為相同）、shouldExtractProfile、extractProfile 主流程（60 則截斷、無上一版歸 false、內容同保留確認、embed 失敗不致命）、updateShareable、contracts 回退／讀庫／深拷貝）。
+- **坑**：PostgREST 不能 select `agent_profile.style` 這種巢狀欄位路徑，`getStyleProfile` 改成讀整個 `agent_profile` 再取 style。`useDemoStore` 的 store 型別要用 `ReturnType<typeof useDemoStore.getState>`（直接 `ReturnType<typeof useDemoStore>` 在 zustand v5 會解成 unknown）。
+- **還沒做完／待辦**：`/profile` 頁「它記得的事」區塊 http 模式仍用 demo 資料（記憶 API 已有、接 UI 留下一批）；A9 娛樂標籤（`fun_labels`）屬 P2 未做。
+
 ### 2026-10-30｜A3 記憶擷取與「它記得的事」｜Vincent（AI 協助）｜分支 a/A3-memory｜Closes #6
 - **做了什麼**：`server/prompts/02_memory.ts`（Prompt 2 逐字＋schema）；`server/friend/memory.ts`（`isDuplicateMemory` 必測去重、`extractMemories` MODEL_FAST→去重→寫入、`listMemories` 未刪除、`deleteMemory` 軟刪、`markNotLikeMe`）；`server/routes/friend.ts` 加 `GET /api/memory`、`DELETE /api/memory/:id`、`POST /api/memory/:id/not-like-me`；A2 的 `friendChat` 第 6 步接上背景 `extractMemories`（不等待、失敗只記日誌）；CONFIG 加 `MEMORY_LIMIT: 50`。
 - **為什麼**：07A A3 規格；記憶背景抽取不阻塞回覆；confidence 由 DB check constraint 0–1 夾住。
