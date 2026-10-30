@@ -366,6 +366,34 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-31｜C5 代聊結果頁｜Jerry（AI 協助）｜PR #76｜Closes #25
+- **做了什麼**：
+  - 後端（`server/twin/result.ts`、`resultStore.ts`，路由在 `server/routes/twin.ts`）：
+    - `GET /api/conversations/:id/result`：我方視角判定（文字＋走勢，同 C4 的 `/status`）、`mutual`（我那筆 `match_attempts.result = 'mutual'`）、為什麼你們合（我方判定 suitable 才給，最多 3 點）、大綱（話題、契合點、摩擦點、對方亮點）、每則標好輪數的完整紀錄、`continueBlock`（不能讓分身繼續聊的原因，可以時是 null）。
+    - `POST /api/conversations/:id/continue`：對話是 `waiting_human` 先改回 active，再 `runTwinRounds(id, ROUNDS_PER_STEP)` 一次，跑完才回應。
+    - 不是成員 403、id 不是 uuid 404、沒登入 401；不能繼續聊（已結束、我已接手、對方本人在聊、到 `MAX_ROUNDS`、同一段正在跑）409；分身出錯 503（寫日誌）。
+  - 前端：`src/lib/api/twin.ts` 加 `getResult`／`continueTwin`；`src/features/twin/components/{LiveResult.tsx,useResult.ts,resultView.ts}`；`ResultPage` 在 http 模式且網址是 `/chat/:id/result` 時顯示真資料，`/chat/lin/result` 與 mock 模式照舊跑 demo。聊天室的「查看结果」改成連到結果頁（C4 時是停用）。
+  - 「本人接手」先停用、標「即将上线」（C6）；「先略过」回上一頁，直接打開網址時回 `/history`。
+- **為什麼這樣做**：
+  - **輪數照 07C 原本的「第 n 輪＝第 2n−1、2n 則」，沒有照 C3 待辦改成扣掉開場**：fit_points 的 `round` 是 B5 評審看逐輪紀錄時填的，而 B5 的 `formatTranscript` 就是用 `floor(i / 2) + 1` 標輪數（含開場、含本人訊息）。結果頁用同一套算法，點「第 n 輪」才會捲到評審說的那兩則。它和 `conversations.round_count`（分身跑了幾輪）不是同一個數字，結果頁不用 `round_count`。
+  - 隱私：`match_attempts` 只用 `user_id = 登入者` 查最新一筆；`match_scores` 只讀自己視角。對方那筆大綱、理由、任何分數都不讀；回應不含 reason／score 欄位。`reason_text`（自己的不合適原因）規格沒列，也不回。
+  - outline 是 LLM 產生的 jsonb，用 zod 讀：不是物件就當沒有；個別欄位格式壞掉就當空陣列，不讓整頁打不開。
+  - 「讓分身繼續聊」同步等 runTwinRounds 跑完（4 輪約一分鐘），畫面顯示「分身正在继续聊」，完成後重新讀取並展開完整紀錄。同一段對話在同一個後端程序裡同時只跑一次（雙方都可能按）。
+  - 判定沒有改從 `match_attempts` 推：判定來自 `match_scores`，和聊天室顯示的一致。
+  - `💞`：A 的 demo 徽章註明「无 emoji」，但 02 F5／07C 規定雙向合適要顯示「雙向合適 💞」，照規格加在徽章文字後面。
+  - 完整紀錄依輪分組，每組是直向 flex（行內 style，只用 `--space-sm` token），氣泡左右對齊才有作用，點某一輪時那兩則一起標亮。
+- **改了哪些檔案**：`server/twin/result.ts`（新）、`server/twin/resultStore.ts`（新）、`server/twin/chatRoom.ts`（`loadSides`／`toVerdictValue` 改成 export、錯誤多 503）、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/ResultPage.tsx`、`src/features/twin/components/{LiveResult.tsx,useResult.ts,resultView.ts}`（新）、`src/features/twin/components/LiveChatRoom.tsx`、`src/routes.tsx`（**共用檔，只加 `chat/:id/result` 一行**）、`tests/twin/{result,result-view}.test.ts`（新）、`tests/twin/chat-room-routes.test.ts`。
+- **驗證**：vitest 全部 407 項通過、`tsc -b`、`npm run build` 通過。
+  - 真的 Supabase **只讀**（`.local/check-c5.ts`，寫入函式換成會丟錯的假函式）：C4 測試對話 `2dfe880a-…` 兩邊都看到自己視角「合适・走势持平」、對方名字正確、7 則輪數 1,1,2,2,3,3,4、回應沒有 score／direction／reason；外人（阿哲）403。**資料庫目前沒有任何 `match_attempts`**，所以雙向合適、為什麼你們合、大綱還沒用真資料看過。
+  - 瀏覽器（本機 Chrome headless＋CDP，`.local/c5-cdp.ts`，`/api` 在瀏覽器裡攔截回假資料，不登入、不碰資料庫）14 項通過：聊天室「查看结果」能按並導到結果頁；有「双向合适 💞」；判定「对你来说：合适 · 走势上升」；為什麼你們合每點有「你在意的」＋表現＋第 n 輪；大綱四區；完整紀錄預設收起；整頁除了「第 n 轮」沒有數字；點「第 4 轮」→ 展開、捲到畫面內、那兩則標亮；我方在右、對方在左；每則都有 AI 標示；讓分身繼續聊只打一次 `/continue`、紀錄從 12 則變 16 則；先略过回到聊天室。
+- **踩到的坑／注意事項**：
+  - 「讓分身繼續聊」把 `waiting_human` 改回 active 後就一直是 active（規格沒說要改回等待本人）。如果這段對話還被 B 的任務推進中（`active_conversation_id` 還是它），和 worker 同時跑可能少算輪數（同 C3 的已知問題）；B 通知本人時已清掉 `active_conversation_id`，正常流程不會撞到。
+  - 同時只跑一次的鎖在後端記憶體裡，開多個後端程序時不共用。
+  - CDP 測試的攔截規則不能寫 `*/api/*`，會把 Vite 的 `/src/lib/api/*.ts` 原始碼也攔掉，畫面整個不會載入；Chrome 的 profile 放在 repo 裡會讓 Vite 監看檔案時 EBUSY 當掉，要放到 repo 外。
+- **還沒做完／待辦**：
+  - 用兩個真帳號（c-test1、c-test2）跑出一段雙向合適的對話（要寫資料庫，等 Jerry 同意），在兩個視窗確認「為什麼你們合」內容不同。
+  - 「本人接手」等 C6；畫面文字先放在 `resultView.ts` 的 `RESULT_TEXT`，之後和 C4 的一起搬到 `messages/strings.json`（A 的檔案）。
+
 ### 2026-10-30｜C4 聊天室（即時訊息、本人發言、目前判定）｜Jerry（AI 協助）｜PR #67｜Closes #24
 - **做了什麼**：
   - 後端（`server/twin/chatRoom.ts`、`chatRoomStore.ts`，路由在 `server/routes/twin.ts`）：
