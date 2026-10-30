@@ -1,6 +1,6 @@
 // 社交 Agent 迴圈要讀寫的資料。有 Supabase 就用資料庫，沒有就用記憶體（本機開發、測試）。擁有者：B。
 // 注意：conversations 是 C 的表，這裡只「讀」狀態（是否結束、我方是否已接手）；寫入一律透過 C 的 contracts。
-import type { AgentTask, AttemptResult, Controller, MatchTier, Outline, ReasonType } from '../../shared/types'
+import type { AgentTask, AttemptResult, Controller, MatchTier, Outline, Preferences, ReasonType } from '../../shared/types'
 import { getAdminDb } from './db'
 import { sharedMemoryTasks } from './taskStore'
 
@@ -8,6 +8,7 @@ export type TaskPatch = Partial<Pick<AgentTask, 'status' | 'progress' | 'active_
 
 export interface UserSettings {
   match_tier: MatchTier
+  preferences: Preferences
   daily_chat_limit: number
   manual_minutes_per_chat: number
 }
@@ -70,7 +71,7 @@ export class MemoryAgentStore implements AgentStore {
   attempts: AttemptRecord[] = []
   notifications: { userId: string; payload: Record<string, unknown> }[] = []
   autoChatsToday = 0
-  settings: UserSettings = { match_tier: 'mutual', daily_chat_limit: 10, manual_minutes_per_chat: 20 }
+  settings: UserSettings = { match_tier: 'mutual', preferences: { personality: 'similar', conditions: [] }, daily_chat_limit: 10, manual_minutes_per_chat: 20 }
 
   async getTask(id: string) {
     const t = this.tasks.get(id)
@@ -147,7 +148,7 @@ function supabaseStore(db: Db): AgentStore {
       await one(db.from('agent_tasks').update({ fail_count: 0 }).eq('id', id))
     },
     async userSettings(userId) {
-      const row = await one(db.from('users').select('match_tier,daily_chat_limit,manual_minutes_per_chat').eq('id', userId).single())
+      const row = await one(db.from('users').select('match_tier,preferences,daily_chat_limit,manual_minutes_per_chat').eq('id', userId).single())
       return row as unknown as UserSettings
     },
     async displayName(userId) {
