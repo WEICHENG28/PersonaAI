@@ -140,16 +140,7 @@ function HttpProfileSection({ memoriesSection }: { memoriesSection: React.ReactN
                 </label>
                 <label className="field">
                   <span>兴趣（用「、」分隔，最多 12 项）</span>
-                  <input
-                    className="input"
-                    value={draft.interests.join('、')}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        interests: e.target.value.split(/[、,，]/).map((x) => x.trim()).filter(Boolean),
-                      })
-                    }
-                  />
+                  <InterestsInput value={draft.interests} onChange={(interests) => setDraft({ ...draft, interests })} />
                 </label>
                 <label className="field">
                   <span>聊天风格（60 字内）</span>
@@ -378,13 +369,7 @@ function MockProfileSection() {
               </label>
               <label className="field">
                 <span>兴趣（逗号分隔）</span>
-                <input
-                  className="input"
-                  value={draft.interests.join('、')}
-                  onChange={(e) =>
-                    setDraft({ ...draft, interests: e.target.value.split(/[、,，]/).filter(Boolean) })
-                  }
-                />
+                <InterestsInput value={draft.interests} onChange={(interests) => setDraft({ ...draft, interests })} />
               </label>
               <label className="field">
                 <span>聊天风格</span>
@@ -575,4 +560,30 @@ function FunLabelsSection() {
       )}
     </Card>
   )
+}
+
+/**
+ * 兴趣输入框：框里保留用户实际打的字（包含结尾的「、」），只在背后拆成兴趣列表。
+ * 之前直接用 interests.join('、') 当 value，打下「、」的瞬间会被当成空项删掉，所以打不出分隔符。
+ * 可以用「、」、逗号或空格分隔。
+ */
+function InterestsInput({ value, onChange }: { value: string[]; onChange: (interests: string[]) => void }) {
+  const [text, setText] = useState(() => value.join('、'))
+  return (
+    <input
+      className="input"
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value)
+        onChange(splitInterests(e.target.value))
+      }}
+    />
+  )
+}
+
+export function splitInterests(text: string): string[] {
+  return text
+    .split(/[、,，s]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
 }
