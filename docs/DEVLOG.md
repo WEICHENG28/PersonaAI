@@ -245,6 +245,22 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-30｜C2 隱私守門 guardText｜Jerry（AI 協助）｜Closes #22
+- **做了什麼**：`guardText(text, ownerUserId)`（`server/twin/guard.ts`）：先用純函式 `maskByRules` 把個資換成「（已隐藏）」，再用 Prompt 13（`MODEL_FAST`、temperature 0，`server/prompts/13_guard.ts`）檢查與改寫；有改寫回 `{ ok: false, text, issues }` 並寫日誌（`agent: 'guard'`、`改写分身消息`、reason = issues 用「、」串起來）。`server/contracts/twin.ts` 的 `guardText` 改呼叫它（簽名不變），C1 的 `twinReply` 和 B 自動生效。
+- **為什麼這樣做**：
+  - 規則照 `.local/c-prep` 草稿：個資格式以大陸為準（1 開頭 11 碼手機、+86、座機區號、18 位身份證含 X、微信／QQ／微博／小红书／抖音／B站／LINE、`@帳號`、門牌與「小区＋栋＋单元＋室」地址），簡繁字形都認。`hits` 轉成 issues「包含手机号」等。
+  - **交給 LLM 的是遮蔽後的版本**，個資不送出去；LLM 的改寫版再過一次規則，避免改寫時又帶出個資。
+  - `ok` 的意思是「原文不用改」：規則擋到或 LLM 判定洩漏 → `ok = false`（C1 用它設 `guard_rewritten`）。LLM 說沒問題時，就算帶了 rewritten 也不採用。LLM 判定洩漏但沒給改寫 → 「这个我之后再跟你说」。
+  - LLM 或讀對外檔案失敗：只送出規則處理後的版本，寫一筆 `隐私检查失败` 日誌（detail 有錯誤原因）。**日誌都不記原文**，避免 `agent_logs` 留下個資。
+  - 只在有改寫或失敗時寫日誌，通過的訊息不寫（每則分身訊息都會過守門，全寫太吵）。
+  - Prompt 13 照 07C 翻成簡體，實測後補了四點：「（已隐藏）」不算洩漏、改寫時原樣保留；判斷方法（有專有名稱、號碼帳號、具體日期幾點、私事才算洩漏，「住在山上」「郊区」這類籠統說法不算）；改寫只換掉洩漏的部分（例「清华读研二」→「在读研究生」）；範例 issue 只是格式。原版會把「我住在山上很安静」判成洩漏住址，而且幾乎每則都整句換成「这个我之后再跟你说」。
+- **改了哪些檔案**：`server/twin/guard.ts`、`server/prompts/13_guard.ts`、`server/contracts/twin.ts`、`tests/twin/guard.test.ts`（47 項）、`tests/twin/contract-stub.test.ts`（拿掉 guardText 原樣回傳的 stub 測試）。
+- **踩到的坑／注意事項**：
+  - temperature 0 的 fast 模型仍有變動：Prompt 調整前「我住在山上很安静」4 次有 2～3 次被誤判，調整後 4／4 正確。之後換 `MODEL_FAST` 要重跑邊界句。
+  - 守門只檢查**分身**的訊息。本人自己發的訊息（C4）照規格不過守門，所以兩位本人接手後可以互換聯絡方式。
+  - 分身的 Prompt 5 本來就會拒絕給個資，所以正常對話中守門很少需要改寫；實測要直接丟含個資的句子給 `guardText` 才看得到改寫。
+- **還沒做完／待辦**：無。
+
 ### 2026-10-30｜C1 分身回覆 twinReply｜Jerry（AI 協助）｜Closes #21
 - **做了什麼**：`twinReply(conversationId, speakerUserId)`（`server/twin/twin.ts`）：取說話者的對外檔案＋說話風格 → Prompt 5（`MODEL_CHAT`、0.8）→ `guardText` → 寫入 `messages`（`is_ai = true`、`guard_rewritten`）→ 寫日誌（`代聊发言`；第一則 reason 是「开场话题：…」；`ask_human` 時另寫一筆 `需要问本人`）。Prompt 5 在 `server/prompts/05_twin.ts`，Supabase 讀寫在 `server/twin/store.ts`。
 - **為什麼這樣做**：
