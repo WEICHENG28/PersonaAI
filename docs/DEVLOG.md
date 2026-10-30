@@ -174,6 +174,35 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-30｜B3 社交 Agent 迴圈 runTaskStep＋worker｜Peter（AI 協助）｜Closes #33
+- **做了什麼**：
+  - `server/social/runner.ts`：`runTaskStep`（守門 → 規劃挑人開聊 → 讓分身聊 → 滿 8 輪判定 → 決策：繼續／通知本人／結束記歷史）、`runTaskStepSafely`（每步包 try/catch，連續失敗 `TASK_MAX_FAILS` 次暫停任務，成功一步歸零）。每一步都寫工作日誌並附理由。
+  - `server/social/guards.ts`：`isTaskDone`、`reachedDailyLimit`、`isNotifiable`、`attemptResult`、`unsuitableReason`、`decideGuard`（B4 的程式規則優先，LLM 建議不同時以程式為準並在日誌註明）。
+  - `server/social/agentStore.ts`：迴圈要讀寫的資料（任務、用戶設定、今日代聊數、對話狀態、`match_attempts`、`notifications` 的 match 通知），有 Supabase 用資料庫，沒有用記憶體（和任務 API 共用同一份任務）。
+  - `server/social/report.ts`：任務結束時的回報（代聊場數 × 人工平均分鐘，附計算依據；合適名單等細節留給 B8），交給 A 的 `deliverReport`。
+  - `scripts/worker.ts`：每 2 秒推進所有 running 任務，同一任務上一步沒跑完就跳過；`POST /api/tasks/:id/step` 可手動推進一步。
+- **為什麼這樣做**：所有依賴（搜尋、挑人、評審、決策、C 的對話函式、回報）都用 `RunnerDeps` 注入，測試時換成假的；預設值在 `runnerDeps.ts`。**B4 規劃器、B5 評審還沒做**，先用暫代版本：挑人選相似度最高的；評審一律回「不確定」（不會產生假的配對結果），迴圈會聊到 `MAX_ROUNDS` 後以「聊得不夠深」結束。B4／B5 做好後只要換 `runnerDeps.ts`。
+- **給 C（Jerry）**：迴圈需要知道「對話是否已結束、我方是否已接手」，目前直接**唯讀** `conversations` 的 `status`、`side_a_controller`（`agentStore.conversationState`）。如果 C 想把它包成 contract（例如 `getConversationState`），我再改成呼叫 contract。寫入一律走 C 的 contracts。
+- **改了哪些檔案**：`server/social/{runner,runnerDeps,guards,agentStore,report,taskStore}.ts`、`server/routes/social.ts`、`scripts/worker.ts`、`tests/social/{runner,step-api}.test.ts`。
+- **踩到的坑**：記憶體模式下任務 API 和迴圈原本各有一份任務資料，迴圈會找不到剛建的任務，改成共用 `sharedMemoryTasks`。`taskStore.ts` 在 Windows checkout 是 CRLF，用 node 字串取代會失敗，改用編輯器。
+- **驗證**：`tsc -b`；vitest 142/142（任務守門、decideGuard 四種狀況、開聊、未滿 8 輪不判定、合適就通知、不合適就結束並記錄、本人接手、每日上限、大廳沒人、發起失敗重試、連續失敗暫停、API 建任務→確認→推進一步）；`npm run build`。用真實模型（只呼叫模型、不寫資料庫）：B1 驗收 1 通過（sport／喜欢登山／3 人／2 位／最多 6 場），但**任務解析要約 10 秒**；向量 1024 維約 0.7 秒；雲端大廳用真向量排序回阿哲 0.737、小安 0.715、子晴 0.645。**worker 沒有實際啟動**（共用資料庫，要 Peter 開）。
+- **還沒做完／待辦**：B4（LLM 挑人與決策）、B5（評審 3 次共識）、B6（歷史完整欄位）、B8（回報合適名單與原因）。任務解析 10 秒偏慢，之後可以考慮改用 `MODEL_FAST` 或先在前端顯示「Agent 正在理解」。
+
+---
+
+### 2026-10-30｜B2 搜尋大廳＋B 線接上 A0b 登入｜Peter（AI 協助）｜Closes #32
+- **做了什麼**：
+  - `server/social/lobby.ts`：`searchLobby`（篩已開社交 Agent＋已確認對外檔案、排除自己與 excludeIds、目的交集；friend 不篩）、`cosineSimilarity`、`rankCandidates`（興趣命中條件加 0.1）、`parseVector`（pgvector 字串）；寫日誌「搜索大厅：… → 找到 N 位」；contract `searchLobby` 換成真的。
+  - 接上 A0b：`server/social/user.ts` 用 A 的 `requireAuth` 驗 JWT，再用 `users.auth_id` 查 `users.id`；`server/social/db.ts` 改用 A 的 `getServiceClient()`（刪掉 B 自己的 client）；B 路由先驗身分再執行；前端 `src/lib/api/social.ts` 帶 `Authorization: Bearer`。
+  - 07 §0.2：Supabase 改記為 Peter 建立。
+- **為什麼這樣做**：向量服務失敗、或候選人還沒有向量時，退回興趣關鍵字排序並把原因寫進日誌，任務不會卡住（02 第 4 節異常處理）。種子用戶只有 10 位，相似度在程式端算。agent_tasks 的 user_id 是 `users.id`，A 的 `requireAuth` 回的是 auth id，所以要多查一次。
+- **改了哪些檔案**：`server/social/{lobby,user,db}.ts`、`server/routes/social.ts`、`server/contracts/social.ts`、`src/lib/api/social.ts`、`tests/social/{lobby,user,server}.test.ts`、`docs/07_開發分工.md`。
+- **踩到的坑**：`src/lib/api/social.ts` 在 Windows checkout 是 CRLF，用 node 字串取代會對不上，改用編輯器工具。
+- **驗證**：`tsc -b`；vitest 120/120（B 線新增 cosine、排序與加分、目的篩選、embed 失敗退回、auth_id→users.id、401／403）；`npm run build`。另外對雲端 Supabase **唯讀**跑一次 `searchLobby`（日誌改成不寫入）：查得到 C 的種子用戶，「喜欢登山＋运动伙伴」回小安、阿哲、子晴（Peter 的 `.env.local` 還沒有 LLM 金鑰，所以走關鍵字排序）。
+- **還沒做完／待辦**：填好 `MODEL_EMBED` 後用真向量再驗一次排序。
+
+---
+
 ### 2026-10-30｜B1 一句話任務解析＋任務確認卡｜Peter（AI 協助）｜Closes #31
 - **做了什麼**：
   - 後端：Prompt 14（`server/prompts/14_task.ts`，restatement 改成簡體）；`server/social/task.ts` 的 `createTaskFromText`（解析→寫 `agent_tasks` pending_confirm→寫日誌）、`changeTaskStatus`（confirm／pause／resume／cancel）；API `POST /api/tasks`、`GET /api/tasks/:id`、`POST /api/tasks/:id/{confirm,pause,resume,cancel}`；contract `createTaskFromText` 換成真的。

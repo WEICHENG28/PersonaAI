@@ -19,7 +19,7 @@ describe('S0 後端骨架', () => {
 
   it('三條線的 contracts stub 都能呼叫', async () => {
     expect(await getShareableProfile('u1')).not.toBeNull()
-    expect(await searchLobby('u1', { excludeIds: ['seed-lin'] })).toHaveLength(1)
+    expect(await searchLobby('u1', { limit: 2 })).toHaveLength(2)
     expect((await getTranscript('c9'))[0]?.conversation_id).toBe('c9')
   })
 })
