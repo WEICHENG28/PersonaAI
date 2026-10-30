@@ -278,7 +278,7 @@
 
 .bubble--friend,
 .bubble--other-twin {
-  justify-self: start;
+  align-self: flex-start;
   background: var(--grain), var(--fibre), var(--bubble-friend);
   color: var(--color-ink);
   border-bottom-left-radius: 6px;
@@ -286,7 +286,7 @@
 
 .bubble--twin,
 .bubble--human {
-  justify-self: end;
+  align-self: flex-end;
   background: var(--grain), var(--fibre), var(--bubble-human);
   color: var(--color-ink);
   border-bottom-right-radius: 6px;
