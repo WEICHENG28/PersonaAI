@@ -1,13 +1,13 @@
 // B4｜規劃器：用 LLM 挑下一位、決定代聊下一步（docs/07B 的 B4、Prompt 4）。擁有者：B。
 // LLM 的輸出一律驗證；無效或沒回應時退回程式規則，任務不會卡住。
-import type { AgentProfile, AgentTask, Evaluation, LobbyCandidate, ShareableProfile } from '../../shared/types'
-import { CONFIG } from '../lib/config'
-import { LlmError, llmJson } from '../lib/llm'
-import { DECIDE_SYSTEM, PICK_SYSTEM, decideSchema, pickSchema } from '../prompts/04_planner'
-import type { AgentStore } from './agentStore'
-import type { DecideAction } from './guards'
-import type { PickResult } from './runner'
-import { PURPOSE_LABEL } from './task'
+import type { AgentProfile, AgentTask, Evaluation, LobbyCandidate, ShareableProfile } from '../../shared/types.js'
+import { CONFIG } from '../lib/config.js'
+import { LlmError, llmJson } from '../lib/llm/index.js'
+import { DECIDE_SYSTEM, PICK_SYSTEM, decideSchema, pickSchema } from '../prompts/04_planner.js'
+import type { AgentStore } from './agentStore.js'
+import type { DecideAction } from './guards.js'
+import type { PickResult } from './runner.js'
+import { PURPOSE_LABEL } from './task.js'
 
 export interface PlannerContext {
   store: AgentStore

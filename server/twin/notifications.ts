@@ -3,9 +3,9 @@
 // POST /api/notifications/:id/read：「找到合适的人」點開後設為已讀。friend_report 由 A 的「下次見面」說完才設已讀，
 // request_human 回應時就設已讀，所以這兩種不能從這裡設。
 import { z } from 'zod'
-import type { AnomalyChoice } from './anomaly'
-import { ChatRoomError } from './chatRoom'
-import type { HumanResponse, NotificationRow, NotificationType, RequestHumanStore } from './requestHuman'
+import type { AnomalyChoice } from './anomaly.js'
+import { ChatRoomError } from './chatRoom.js'
+import type { HumanResponse, NotificationRow, NotificationType, RequestHumanStore } from './requestHuman.js'
 
 /** 鈴鐺最多列幾則。 */
 export const NOTIFICATION_LIST_LIMIT = 20

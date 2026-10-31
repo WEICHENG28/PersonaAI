@@ -3,7 +3,7 @@
 // 本機開發仍用 npm run server（server/index.ts），兩邊共用同一份 app。
 // 注意：社交 Agent 的背景迴圈（npm run worker）是長時間執行的程式，不能放在 Vercel，要另外在一台電腦上跑。
 import { handle } from 'hono/vercel'
-import { app } from '../server/app'
+import { app } from '../server/app.js'
 
 const handler = handle(app)
 

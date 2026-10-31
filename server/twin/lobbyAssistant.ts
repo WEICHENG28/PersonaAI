@@ -2,10 +2,10 @@
 // 從 PR #88（c/twin-quality）搬來，改成和 C9 共用卡片（lobby.ts 的 cardViewOf）。
 // 像交辦任務（「帮我找」「帮我约」）→ B 的 createTaskFromText；其他問題 → searchLobby → Prompt 11 → 回答＋候選人小卡片。
 // 回答與卡片都不能出現分數數字：Prompt 禁止 → 有就重問一次 → 還有就拿掉。
-import type { AgentTask, LobbyCandidate, LobbyQuery, ShareableProfile } from '../../shared/types'
-import type { LlmJsonOptions } from '../lib/llm'
-import { lobbyAssistantSchema, renderLobbyAssistantSystem } from '../prompts/11_lobby_assistant'
-import { ChatRoomError } from './chatRoom'
+import type { AgentTask, LobbyCandidate, LobbyQuery, ShareableProfile } from '../../shared/types.js'
+import type { LlmJsonOptions } from '../lib/llm/index.js'
+import { lobbyAssistantSchema, renderLobbyAssistantSystem } from '../prompts/11_lobby_assistant.js'
+import { ChatRoomError } from './chatRoom.js'
 
 export const ASSISTANT_SEARCH_LIMIT = 5
 /** 先多搜幾位，問題裡點名的人才找得到（「小安和子晴谁比较适合我？」）。 */

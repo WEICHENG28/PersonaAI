@@ -1,7 +1,7 @@
 // 後端進入點：npm run server。前端 dev server 會把 /api 代理到這裡（vite.config.ts）。
 import { serve } from '@hono/node-server'
 import { existsSync } from 'node:fs'
-import { app } from './app'
+import { app } from './app.js'
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 

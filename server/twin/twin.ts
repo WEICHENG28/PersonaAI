@@ -9,13 +9,13 @@ import type {
   GuardResult,
   ShareableProfile,
   StyleProfile,
-} from '../../shared/types'
-import { getShareableProfile, getStyleProfile } from '../contracts/friend'
-import { guardText } from './guard'
-import { llmJson, type LlmJsonOptions } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { renderTwinSystem, twinReplySchema } from '../prompts/05_twin'
-import { supabaseTwinStore } from './store'
+} from '../../shared/types.js'
+import { getShareableProfile, getStyleProfile } from '../contracts/friend.js'
+import { guardText } from './guard.js'
+import { llmJson, type LlmJsonOptions } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { renderTwinSystem, twinReplySchema } from '../prompts/05_twin.js'
+import { supabaseTwinStore } from './store.js'
 
 /** 帶入 Prompt 的最近訊息數（07C C1 第 2 點）。 */
 export const TWIN_RECENT_LIMIT = 12

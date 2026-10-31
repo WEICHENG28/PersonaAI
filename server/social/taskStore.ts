@@ -1,6 +1,6 @@
 // agent_tasks 的讀寫。有 Supabase 就寫資料庫，沒有就用記憶體（本機開發、測試）。
-import type { AgentTask, DoneCondition, Purpose, TaskStatus } from '../../shared/types'
-import { getAdminDb } from './db'
+import type { AgentTask, DoneCondition, Purpose, TaskStatus } from '../../shared/types.js'
+import { getAdminDb } from './db.js'
 
 export interface NewTask {
   user_id: string

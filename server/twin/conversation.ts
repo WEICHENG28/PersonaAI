@@ -3,11 +3,11 @@
 // 一輪＝雙方分身各說一次，從「上一則發言者的對方」開始輪流；哪方是本人就跳過該方。
 // 外部依賴（資料庫、twinReply、日誌、時間）都放在 ConversationDeps，測試可以換成假的。
 import { z } from 'zod'
-import type { AgentLogInput, ChatMessage, Controller, StartConversationInput } from '../../shared/types'
-import { CONFIG } from '../lib/config'
-import { writeLog } from '../lib/log'
-import { supabaseConversationStore } from './store'
-import { TwinError, twinReply, type ConversationStatus, type TwinConversation, type TwinReplyFn } from './twin'
+import type { AgentLogInput, ChatMessage, Controller, StartConversationInput } from '../../shared/types.js'
+import { CONFIG } from '../lib/config.js'
+import { writeLog } from '../lib/log.js'
+import { supabaseConversationStore } from './store.js'
+import { TwinError, twinReply, type ConversationStatus, type TwinConversation, type TwinReplyFn } from './twin.js'
 
 /** endConversation 收尾時給分身的額外規則（Prompt 5 的 extra_instruction）。 */
 export const CLOSING_INSTRUCTION =

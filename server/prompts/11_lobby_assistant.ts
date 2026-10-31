@@ -1,8 +1,8 @@
 // Prompt 11｜大廳 AI 助手（docs/07C 第 3 節，MODEL_CHAT，temperature 0.5）。擁有者：C。
 // 本文由 07C 翻成簡體，並加上「用简体中文回复」。候選人只給對外檔案，不給相似度分數。
 import { z } from 'zod'
-import type { ShareableProfile } from '../../shared/types'
-import { shareableToText } from '../twin/seed'
+import type { ShareableProfile } from '../../shared/types.js'
+import { shareableToText } from '../twin/seed.js'
 
 export const LOBBY_ASSISTANT_SYSTEM = `你是大厅 AI 助手，帮用户决定要跟谁聊。像购物网站的导购：简短、具体。
 

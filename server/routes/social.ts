@@ -2,16 +2,16 @@
 // 回應格式：成功 { ok: true, data }，失敗 { ok: false, error: '给用户看的简体中文讯息' }。
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
-import { LlmError } from '../lib/llm'
-import { TaskError, changeTaskStatus, createTaskFromText, getOwnTask, type TaskAction } from '../social/task'
-import { startConversation } from '../contracts/twin'
-import { getAgentStore } from '../social/agentStore'
-import { listHistory, reopenAttempt } from '../social/history'
-import { runTaskStepSafely } from '../social/runner'
-import { computeStats } from '../social/stats'
-import { getTaskStore } from '../social/taskStore'
-import { defaultRunnerDeps } from '../social/runnerDeps'
-import { requireUserId } from '../social/user'
+import { LlmError } from '../lib/llm/index.js'
+import { TaskError, changeTaskStatus, createTaskFromText, getOwnTask, type TaskAction } from '../social/task.js'
+import { startConversation } from '../contracts/twin.js'
+import { getAgentStore } from '../social/agentStore.js'
+import { listHistory, reopenAttempt } from '../social/history.js'
+import { runTaskStepSafely } from '../social/runner.js'
+import { computeStats } from '../social/stats.js'
+import { getTaskStore } from '../social/taskStore.js'
+import { defaultRunnerDeps } from '../social/runnerDeps.js'
+import { requireUserId } from '../social/user.js'
 
 export const socialRoutes = new Hono()
 

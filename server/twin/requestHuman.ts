@@ -5,9 +5,9 @@
 // 之後照常輕聊；decline → 拒絕的人的分身收尾、結束。動作失敗時把回應改回未回應，讓用戶可以重按。
 // 外部依賴（資料庫、C6 接手、分身、結束對話、日誌、計時）都放在 RequestHumanDeps，測試可以換成假的。
 import { z } from 'zod'
-import type { AgentLogInput } from '../../shared/types'
-import { ChatRoomError, loadSides, type ChatRoomStore } from './chatRoom'
-import type { TakeoverView } from './handoff'
+import type { AgentLogInput } from '../../shared/types.js'
+import { ChatRoomError, loadSides, type ChatRoomStore } from './chatRoom.js'
+import type { TakeoverView } from './handoff.js'
 
 /** 種子用戶被請求真人後，幾毫秒自動回應（07C C7）。 */
 export const SEED_RESPONSE_DELAY_MS = 3000

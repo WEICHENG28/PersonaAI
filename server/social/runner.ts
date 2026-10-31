@@ -1,10 +1,10 @@
 // B3｜社交 Agent 工作循環：目標 → 規劃 → 執行 → 評估 → 決策 → 回報（02 第 4 節、07B 的 B3）。擁有者：B。
 // 每呼叫一次 runTaskStep 推進一步；worker（scripts/worker.ts）或 POST /api/tasks/:id/step 會呼叫它。
-import type { AgentTask, Evaluation, GuardResult, LobbyCandidate, LobbyQuery, ReasonType, StartConversationInput, TaskReport, TaskStatus } from '../../shared/types'
-import { CONFIG } from '../lib/config'
-import { writeLog } from '../lib/log'
-import type { AgentStore } from './agentStore'
-import { attemptResult, decideGuard, isTaskDone, reachedDailyLimit, unsuitableReason, type DecideAction } from './guards'
+import type { AgentTask, Evaluation, GuardResult, LobbyCandidate, LobbyQuery, ReasonType, StartConversationInput, TaskReport, TaskStatus } from '../../shared/types.js'
+import { CONFIG } from '../lib/config.js'
+import { writeLog } from '../lib/log.js'
+import type { AgentStore } from './agentStore.js'
+import { attemptResult, decideGuard, isTaskDone, reachedDailyLimit, unsuitableReason, type DecideAction } from './guards.js'
 
 export interface PickResult {
   target: LobbyCandidate | null

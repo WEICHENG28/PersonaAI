@@ -1,6 +1,6 @@
 // 社交 Agent 的程式規則（docs/07B 的 B3、B4、B5）：純函式，方便測試；LLM 的決定要經過這裡把關。擁有者：B。
-import type { AgentTask, AttemptResult, MatchTier, ReasonType, VerdictValue } from '../../shared/types'
-import { CONFIG } from '../lib/config'
+import type { AgentTask, AttemptResult, MatchTier, ReasonType, VerdictValue } from '../../shared/types.js'
+import { CONFIG } from '../lib/config.js'
 
 /** 完成條件：合適人數、代聊場數、期限任一達到就算完成。 */
 export function isTaskDone(task: AgentTask, now: Date): boolean {

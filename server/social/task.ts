@@ -1,9 +1,9 @@
 // B1｜一句話任務解析與任務狀態（docs/07B 的 B1、02 F12）。擁有者：B。
-import type { AgentTask, ParsedTask, Purpose, TaskStatus } from '../../shared/types'
-import { llmJson } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { TASK_PROMPT_SYSTEM, parsedTaskSchema, taskPromptUser, type RawParsedTask } from '../prompts/14_task'
-import { getTaskStore } from './taskStore'
+import type { AgentTask, ParsedTask, Purpose, TaskStatus } from '../../shared/types.js'
+import { llmJson } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { TASK_PROMPT_SYSTEM, parsedTaskSchema, taskPromptUser, type RawParsedTask } from '../prompts/14_task.js'
+import { getTaskStore } from './taskStore.js'
 
 const MAX_COUNT = 10
 const DEFAULT_COUNT = 3

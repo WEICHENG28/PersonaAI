@@ -4,11 +4,11 @@
  * API：GET /api/memory（未刪除）、DELETE /api/memory/[id]（設 deleted_at）。
  */
 import { z } from 'zod'
-import { getServiceClient } from '../lib/supabase'
-import { llmJson } from '../lib/llm'
-import { CONFIG } from '../lib/config'
-import { writeLog } from '../lib/log'
-import { extractedMemoriesSchema, renderMemorySystem } from '../prompts/02_memory'
+import { getServiceClient } from '../lib/supabase.js'
+import { llmJson } from '../lib/llm/index.js'
+import { CONFIG } from '../lib/config.js'
+import { writeLog } from '../lib/log.js'
+import { extractedMemoriesSchema, renderMemorySystem } from '../prompts/02_memory.js'
 
 export interface MemoryRow {
   id: string

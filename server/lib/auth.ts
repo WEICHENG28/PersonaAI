@@ -2,7 +2,7 @@
  * 后端 JWT 验证（A0b）。从 Authorization: Bearer <jwt> 取出 auth.users。
  */
 import type { Context } from 'hono'
-import { getServiceClient } from './supabase'
+import { getServiceClient } from './supabase.js'
 
 export type AuthedUser = {
   authId: string

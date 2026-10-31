@@ -4,15 +4,15 @@
  * A3（記憶擷取）已併：流程第 6 步背景執行 extractMemories。
  */
 import { z } from 'zod'
-import { getServiceClient } from '../lib/supabase'
-import { llmJson } from '../lib/llm'
-import { CONFIG } from '../lib/config'
-import { writeLog } from '../lib/log'
-import { createTaskFromText } from '../../server/social/task'
-import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend'
-import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona'
-import { extractMemories } from './memory'
-import { extractProfile, shouldExtractProfile } from './profile'
+import { getServiceClient } from '../lib/supabase.js'
+import { llmJson } from '../lib/llm/index.js'
+import { CONFIG } from '../lib/config.js'
+import { writeLog } from '../lib/log.js'
+import { createTaskFromText } from '../../server/social/task.js'
+import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend.js'
+import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona.js'
+import { extractMemories } from './memory.js'
+import { extractProfile, shouldExtractProfile } from './profile.js'
 
 export interface FriendRow {
   story_stage: number

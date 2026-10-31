@@ -1,10 +1,10 @@
 // C7 請求真人與通知鈴鐺的 Supabase 實作（requestHuman.ts 的 RequestHumanStore、notifications.ts 的 NotificationStore）。擁有者：C。
 // 用 A0b 的 service role client，只在後端使用；每個查詢都限定通知的主人。
-import { getServiceClient } from '../lib/supabase'
-import { supabaseChatRoomStore } from './chatRoomStore'
-import type { AnomalyChoice } from './anomaly'
-import type { NotificationStore } from './notifications'
-import type { NotificationRow, RequestHumanStore } from './requestHuman'
+import { getServiceClient } from '../lib/supabase.js'
+import { supabaseChatRoomStore } from './chatRoomStore.js'
+import type { AnomalyChoice } from './anomaly.js'
+import type { NotificationStore } from './notifications.js'
+import type { NotificationRow, RequestHumanStore } from './requestHuman.js'
 
 const NOTIFICATION_COLUMNS = 'id, user_id, type, payload, response, read_at, created_at'
 

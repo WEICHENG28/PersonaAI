@@ -1,8 +1,8 @@
 // 後端 app：組合三條線的路由。擁有者：B（S0）。新增路由寫在 server/routes/<線>.ts，不用改這裡。
 import { Hono } from 'hono'
-import { friendRoutes } from './routes/friend'
-import { socialRoutes } from './routes/social'
-import { twinRoutes } from './routes/twin'
+import { friendRoutes } from './routes/friend.js'
+import { socialRoutes } from './routes/social.js'
+import { twinRoutes } from './routes/twin.js'
 
 export const app = new Hono().basePath('/api')
 

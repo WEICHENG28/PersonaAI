@@ -1,14 +1,14 @@
 // 所有 LLM 呼叫都必須經過這裡（docs/07 第 6 節、07B 的 B0）：統一重試、逾時、JSON 驗證。
 // 不要在其他地方 new OpenAI。
 import type { z } from 'zod'
-import type { ModelRole } from '../../../shared/types'
-import { CONFIG } from '../config'
-import { getLlmClient, type ChatMessage } from './client'
-import { llmEnv, modelFor } from './env'
-import { extractJson } from './json'
+import type { ModelRole } from '../../../shared/types.js'
+import { CONFIG } from '../config.js'
+import { getLlmClient, type ChatMessage } from './client.js'
+import { llmEnv, modelFor } from './env.js'
+import { extractJson } from './json.js'
 
-export { extractJson } from './json'
-export { setLlmClient, type LlmClient } from './client'
+export { extractJson } from './json.js'
+export { setLlmClient, type LlmClient } from './client.js'
 
 export type LlmMessage = { role: 'user' | 'assistant'; content: string }
 

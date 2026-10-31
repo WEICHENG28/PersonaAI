@@ -26,6 +26,14 @@
 
 ## 共用與決策
 
+### 2026-10-31｜修正：Vercel 上 /api 全部 FUNCTION_INVOCATION_FAILED｜Peter（AI 協助）
+- **問題**：#89 部署後，Vercel 上連 `/api/health` 都回 500（`FUNCTION_INVOCATION_FAILED`）。Vercel 把每個 TS 檔各自編成 Node ESM，ESM 的相對 import 必須寫副檔名，`import { app } from '../server/app'` 會找不到模組（本機用 tsc 照 Vercel 方式編譯後實際重現：`ERR_MODULE_NOT_FOUND ... server\app`）。本機的 tsx／vitest／Vite 會自動補，所以一直沒發現。
+- **修正**：`server/`、`shared/`、`api/` 所有相對 import／export 補上 `.js`（例如 `'./routes/friend'` → `'./routes/friend.js'`、資料夾 → `'/index.js'`），共 64 個檔案、259 處，**只改 import 路徑、沒改任何邏輯**。TypeScript、tsx、vitest、Vite 都認得 `.js` 對到 `.ts`。新增測試 `tests/social/esm-imports.test.ts`：之後有人寫了沒副檔名的相對 import，`npm test` 會失敗並列出位置。
+- **給 A、C（重要）**：這次改到了大家的 `server/` 檔案（只有 import 那幾行）。請先合入最新 main 再繼續開發；**之後在 `server/`、`shared/`、`api/` 新增 import 一律寫 `.js` 結尾**（`'../lib/supabase.js'`），不然測試會擋、Vercel 上會整個掛掉。前端 `src/` 不受影響。
+- **驗證**：用 tsc 照 Vercel 方式編成 ESM 後直接 import `api/index.js` 並送請求：`/api/health` 200、`/api/tasks`／`/api/settings`／`/api/conversations/x` 未登入 401；`tsc -b`、vitest 574/574、`npm run build`、本機 tsx 跑後端正常。
+
+---
+
 ### 2026-10-31｜後端部署到 Vercel（/api 改成 Vercel Function）｜Peter（AI 協助）
 - **問題**：Peter 把專案接上 Vercel 後，多數功能顯示「出了点问题」。原因是 Vercel 只部署了前端靜態頁，`/api/*` 沒有後端在回應，`vercel.json` 還把 `/api` 也導回首頁；登入能用只是因為它直接連 Supabase。
 - **做法**：新增 `api/index.ts`，用 `hono/vercel` 把 `server/app.ts`（同一份後端）包成 Vercel Function；`vercel.json` 把 `/api/*` 轉給它（其他路徑仍回 `index.html`），函式最長執行 60 秒。本機開發照舊 `npm run server`。`tsconfig.server.json` 加入 `api`。
