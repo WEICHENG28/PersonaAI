@@ -60,6 +60,23 @@
 }
 
 .friend-chat { display: grid; grid-template-rows: auto minmax(240px, 52svh) auto; padding: 0; }
+
+/* 手机：聊天区高度扣掉顶栏、页头和底栏，输入框不会被底栏盖住（UX #9） */
+@media (max-width: 63.99rem) {
+  .friend-chat { grid-template-rows: auto minmax(200px, calc(100svh - 400px)) auto; }
+  .friend-chat--proxy { grid-template-rows: auto minmax(180px, calc(100svh - 520px)) auto auto; }
+}
+
+/* 聊天室里的系统提示（以下由双方分身代聊、本人接手、分身已接回） */
+.chat-note {
+  align-self: center;
+  padding: var(--space-3xs) var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-2);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}
 .friend-chat__head { border-radius: var(--radius-card) var(--radius-card) 0 0; }
 
 .friend-chat__head {
@@ -69,7 +86,8 @@
   padding: var(--space-md);
   border-bottom: var(--rule-hair) solid var(--color-rule);
 }
-.friend-chat__head strong { display: block; font-size: var(--text-md); }
+.friend-chat__head strong,
+.friend-chat__title { display: block; font-size: var(--text-md); }
 .friend-chat__head span { font-size: var(--text-xs); color: var(--color-muted); }
 .friend-chat__head .chip { margin-left: auto; }
 
@@ -113,6 +131,7 @@
 .mem p { font-size: var(--text-sm); }
 .mem footer { display: flex; flex-wrap: wrap; gap: var(--space-2xs); align-items: center; }
 .mem footer .chip { min-height: 22px; padding: 0 var(--space-sm); font-size: 11px; }
+.mem-undo { font-size: var(--text-xs); color: var(--color-ink-2); }
 .mem-del {
   margin-left: auto;
   border: 0;
@@ -131,7 +150,8 @@
 .grow {
   height: 10px;
   border-radius: var(--radius-pill);
-  background: color-mix(in oklab, var(--color-mint) 40%, var(--color-paper));
+  /* 轨道用中性底色，只有填满的部分是绿色（UX #30） */
+  background: var(--color-paper-3);
   overflow: hidden;
   position: relative;
 }
@@ -147,6 +167,21 @@
 .task-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin: var(--space-md) 0 0; }
 .task-grid dt { font: 500 var(--text-xs)/1 var(--font-body); color: var(--color-muted); }
 .task-grid dd { margin: var(--space-2xs) 0 0; font: 600 var(--text-md)/1.3 var(--font-body); color: var(--color-ink); }
+
+.task-form__note { display: block; margin-top: var(--space-sm); }
+
+/* 页头右侧放一个动作（档案页的设置入口） */
+.page-head--row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
+
+/* 行内确认（取代 window.confirm） */
+.confirm-inline {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-stock);
+  background: var(--fibre), var(--color-paper-2);
+  font-size: var(--text-sm);
+}
 
 /* 提示 inline */
 .hint-inline { font-style: normal; font-size: var(--text-xs); color: var(--color-muted); font-weight: 500; }
@@ -224,6 +259,18 @@
 .verdict-final { display: grid; gap: var(--space-sm); justify-items: start; }
 .score b { font: 600 var(--text-3xl)/1 var(--font-display); }
 .score span { font-size: var(--text-xs); color: var(--color-muted); margin-left: var(--space-2xs); }
+.score { cursor: help; }
+.score-help {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-3);
+  color: var(--color-ink-2);
+  font: 600 10px/1 var(--font-body);
+  text-decoration: none;
+}
 
 .trend-row { display: flex; gap: var(--space-sm); }
 .trend-cell {

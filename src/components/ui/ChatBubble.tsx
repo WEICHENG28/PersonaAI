@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { Chip } from './Button'
+import { t } from '@i18n/t'
 
 export type Speaker = 'friend' | 'twin' | 'human' | 'other-twin'
 
 interface ChatBubbleProps {
   speaker: Speaker
   children: ReactNode
-  /** AI 代聊贴纸（proxy chat 用） */
+  /** AI 标记（每则 AI 讯息只挂一个小「AI」，UX #31） */
   aiChatting?: boolean
   /** 隐私改写标记 */
   privacyRewrite?: boolean
@@ -36,7 +37,7 @@ export function ChatBubble({
       <div className="bubble__body">{children}</div>
       {(aiChatting || privacyRewrite) && (
         <div className="bubble__marks">
-          {aiChatting && <Chip tone="ink">AI 代聊中</Chip>}
+          {aiChatting && <Chip tone="ink">{t('common.aiBadge')}</Chip>}
           {privacyRewrite && <Chip tone="mint">{privacyTip ?? '隐私改写'}</Chip>}
         </div>
       )}

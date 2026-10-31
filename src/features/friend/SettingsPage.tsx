@@ -79,7 +79,7 @@ export function SettingsPage() {
     }
     setSaveError(null)
     if (isHttpMode) { void httpSave({ social_agent_enabled: !socialAgent }) }
-    else { s.toggleSetting('socialAgent') }
+    else { s.setSocialAgent(!socialAgent) }
   }
 
   const setGear = (v: 'one-way' | 'mutual') => {

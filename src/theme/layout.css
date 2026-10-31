@@ -1,6 +1,8 @@
 /* ── 版面（行动优先）：375px 先设计，64rem 起桌机版 ── */
 
 .app-shell {
+  /* 手机底部 tab 拦高度（tab 56px + 上下内距），给内容与吐司让位用 */
+  --tabbar-h: 76px;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -26,9 +28,19 @@
   padding-top: calc(var(--bar-h) + var(--space-lg));
 }
 
-/* 有导航的页：手机让出底部 tab 拦高度 */
+/* 有导航的页：手机让出底部 tab 拦高度＋safe area（UX #9） */
 .app-main.has-nav {
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0));
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--space-lg));
+}
+
+/* 只在手机／只在桌机显示（同一个动作在两种版面各放一处时用） */
+.only-desktop,
+.btn.only-desktop { display: none; }
+@media (min-width: 64rem) {
+  .only-mobile,
+  .btn.only-mobile { display: none; }
+  .only-desktop,
+  .btn.only-desktop { display: inline-flex; }
 }
 
 /* ── 宽度切换：桌机顶栏放 nav；手机顶栏极简（wordmark + 阿澈），nav 在底拦 ── */
@@ -196,7 +208,8 @@
 .toasts {
   position: fixed;
   right: var(--space-md);
-  bottom: calc(92px + env(safe-area-inset-bottom, 0));
+  /* 手机：在底栏和聊天输入列上方，不盖住输入框（UX #9） */
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 84px);
   z-index: 500;
   display: grid;
   gap: var(--space-sm);

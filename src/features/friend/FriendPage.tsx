@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
-import { Card, CardHead } from '@components/ui/Card'
+import { Card } from '@components/ui/Card'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { Modal } from '@components/ui/Modal'
 import { useDemoStore } from '@store/useDemoStore'
@@ -10,15 +10,17 @@ import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
-import {
-  triggerNextMeet,
-  isHttpMode,
-  callFriendIntro,
-  callFriendChat,
-  getFriendMessages,
-  fetchSettings,
-  type FriendMessage,
-} from '@lib/api/friend'
+import { isHttpMode } from '@lib/api/friend'
+import { FriendSidebar } from './FriendSidebar'
+import { TaskConfirmModal } from './TaskConfirmModal'
+import { TaskReport } from './TaskReport'
+import { useHttpFriendChat } from './useHttpFriendChat'
+
+interface Bubble {
+  id: string
+  speaker: 'human' | 'friend'
+  text: string
+}
 
 /** 画面 2-4：AI 朋友聊天 + 记忆侧栏 + 任务确认 + 回报
  *  http 模式：消息来自 GET /api/friend/messages；发送走 POST /api/friend/chat；
@@ -27,167 +29,64 @@ import {
  */
 export function FriendPage() {
   const s = useDemoStore()
+  const http = useHttpFriendChat()
   const navigate = useNavigate()
   const [draft, setDraft] = useState('')
   const [taskDraftOpen, setTaskDraftOpen] = useState(false)
   const [taskText, setTaskText] = useState('帮我找 3 个喜欢登山的人聊聊')
-  const [nextMeetLoading, setNextMeetLoading] = useState(false)
 
-  // http 模式专用状态
-  const [httpMessages, setHttpMessages] = useState<FriendMessage[]>([])
-  const [httpTyping, setHttpTyping] = useState(false)
-  const [httpError, setHttpError] = useState<string | null>(null)
-  // http 模式：后端建的待确认任务 ID（显示 B 的 TaskConfirmCard）；工作日志面板开关用后端 dev_mode
-  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
-  const [httpDevMode, setHttpDevMode] = useState(false)
-
-  // 消息数量用于自动滚动（mock 或 http 模式均适用）
-  const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
-  const chatRef = useAutoScrollBottom<HTMLDivElement>(msgCount)
-
-  // http 模式：挂载时拉消息 + 首次见面
+  // mock：进入朋友页、还没有讯息时阿澈先打招呼（UX #5）
+  const { friendIntro } = s
   useEffect(() => {
-    if (!isHttpMode) return
-    const init = async () => {
-      try {
-        await callFriendIntro()   // 幂等，intro_done 时直接 ok
-      } catch { /* 非致命 */ }
-      try {
-        const msgs = await getFriendMessages()
-        setHttpMessages(msgs)
-      } catch (e) {
-        console.error('[FriendPage] loadMessages', e)
-      }
-      try {
-        // 工作日志面板的开关用后端设定（demo store 的 devMode 在 http 模式不代表后端）
-        const settings = await fetchSettings()
-        setHttpDevMode(settings?.dev_mode ?? false)
-      } catch { /* 面板默认不显示 */ }
-    }
-    void init()
-  }, [])
+    if (!isHttpMode) friendIntro()
+  }, [friendIntro])
 
-  const send = useCallback(async () => {
+  const bubbles: Bubble[] = isHttpMode
+    ? http.messages.map((m) => ({ id: m.id, speaker: m.role === 'user' ? 'human' : 'friend', text: m.content }))
+    : s.friendMessages.map((m) => ({ id: m.id, speaker: m.speaker === 'human' ? 'human' : 'friend', text: m.text }))
+  const typing = isHttpMode ? http.typing : s.friendTyping
+  const userCount = isHttpMode ? http.messages.filter((m) => m.role === 'user').length : s.userReplyCount
+  const chatRef = useAutoScrollBottom<HTMLDivElement>(bubbles.length)
+
+  // UX #7：mock 只在代聊结束、还没看过回报时出现；http 要有任务代聊过
+  const showNextMeet = isHttpMode ? http.hasTaskRun : s.proxyDone && !s.reportSeen && !s.reportReady
+
+  const send = () => {
     const text = draft.trim()
     if (!text) return
     setDraft('')
-
-    if (!isHttpMode) {
-      s.sendFriendMessage(text)
-      return
-    }
-
-    // http 模式：乐观添加用户消息，再打 API
-    const tempId = `tmp-${Date.now()}`
-    setHttpMessages((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        role: 'user' as const,
-        kind: 'chat',
-        content: text,
-        meta: {},
-        created_at: new Date().toISOString(),
-      },
-    ])
-    setHttpTyping(true)
-    setHttpError(null)
-
-    try {
-      const result = await callFriendChat(text)
-      // 拉最新消息（包含 AI 回复）
-      const msgs = await getFriendMessages()
-      setHttpMessages(msgs)
-      // task_intent：后端已建真任务（pending_confirm），显示 B 的确认卡
-      if (result.taskId) {
-        setPendingTaskId(result.taskId)
-      }
-    } catch (e: unknown) {
-      setHttpError(e instanceof Error ? e.message : '阿澈刚刚恍神了，再说一次？')
-      // 移除乐观消息
-      setHttpMessages((prev) => prev.filter((m) => m.id !== tempId))
-    } finally {
-      setHttpTyping(false)
-    }
-  }, [draft, s])
-
-  const canAssignTask = s.userReplyCount >= 5
+    if (isHttpMode) void http.send(text)
+    else s.sendFriendMessage(text)
+  }
 
   const openReport = () => {
     s.dismissReport()
     navigate('/chat/lin/result')
   }
 
-  const handleNextMeet = async () => {
-    setNextMeetLoading(true)
-    try {
-      if (isHttpMode) {
-        await triggerNextMeet()
-        // HTTP 模式：後端已寫入 DB，前端可以透過 Realtime 或重新 fetch 拿到新訊息
-        // 暫時用 alert 提示（A5 完整實現需要前端訂閱 Realtime 或輪詢）
-        alert('模擬下次見面成功！新訊息已送達（重新整理頁面查看）')
-      } else {
-        // Mock 模式：用 demo store
-        s.nextMeet()
-      }
-    } catch (err) {
-      console.error('[nextMeet] 失敗', err)
-      alert(err instanceof Error ? err.message : '模擬下次見面失敗，請再試一次')
-    } finally {
-      setNextMeetLoading(false)
-    }
-  }
-
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{t('friend.title')}</h1>
-        <p>
-          {t('friend.subtitle')} · <Chip tone="well">{t('friend.demoTag')}</Chip>
-        </p>
-      </div>
-
       <div className="friend-layout">
-        {/* 聊天主栏 */}
+        {/* 聊天主栏（页标题拿掉，只留聊天头，UX #28） */}
         <Card className="friend-chat">
           <div className="friend-chat__head">
             <RiveAvatar name="robot" size={44} />
             <div>
-              <strong>{t('friend.title')}</strong>
-              <span>{(isHttpMode ? httpTyping : s.friendTyping) ? t('friend.typing') : t('friend.subtitle')}</span>
+              <h1 className="friend-chat__title">{t('friend.title')}</h1>
+              <span>{typing ? t('friend.typing') : t('friend.subtitle')}</span>
             </div>
-            {s.reportReady && <Chip tone="pear">{t('friend.hasNews')}</Chip>}
+            {!isHttpMode && s.reportReady ? <Chip tone="pear">{t('friend.hasNews')}</Chip> : !isHttpMode && <Chip tone="well">{t('friend.demoTag')}</Chip>}
           </div>
 
           <div className="chat" ref={chatRef}>
-            {isHttpMode ? (
-              <>
-                {httpMessages.length === 0 && !httpTyping && (
-                  <p className="empty">{t('friend.empty')}</p>
-                )}
-                {httpMessages.map((m) => (
-                  <ChatBubble key={m.id} speaker={m.role === 'user' ? 'human' : 'friend'}>
-                    {m.content}
-                  </ChatBubble>
-                ))}
-                {httpTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
-                {httpError && (
-                  <p style={{ color: 'var(--c-err)', fontSize: '0.85em', padding: '0.5rem 0' }}>
-                    {httpError}
-                  </p>
-                )}
-              </>
-            ) : (
-              <>
-                {s.friendMessages.length === 0 && <p className="empty">{t('friend.empty')}</p>}
-                {s.friendMessages.map((m) => (
-                  <ChatBubble key={m.id} speaker={m.speaker}>
-                    {m.text}
-                  </ChatBubble>
-                ))}
-                {s.friendTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
-              </>
-            )}
+            {bubbles.length === 0 && !typing && <p className="empty">{t('friend.empty')}</p>}
+            {bubbles.map((m) => (
+              <ChatBubble key={m.id} speaker={m.speaker}>
+                {m.text}
+              </ChatBubble>
+            ))}
+            {typing && <div className="typing-dot" aria-label={t('friend.typing')} />}
+            {isHttpMode && http.error && <p className="login-error" role="alert">{http.error}</p>}
           </div>
 
           <div className="chat-input">
@@ -196,261 +95,78 @@ export function FriendPage() {
               placeholder={t('friend.inputPlaceholder')}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void send()}
-              disabled={isHttpMode ? httpTyping : s.friendTyping}
+              onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && send()}
+              disabled={typing}
             />
-            <Button
-              small
-              onClick={() => void send()}
-              disabled={!draft.trim() || (isHttpMode ? httpTyping : s.friendTyping)}
-            >
+            <Button small onClick={send} disabled={!draft.trim() || typing}>
               {t('friend.send')}
             </Button>
           </div>
         </Card>
 
-        {/* 侧栏：它记得的事 + 任务入口 */}
-        <div className="friend-side stack">
-          <Card>
-            <CardHead title={t('friend.memoriesTitle')} sub={t('friend.memoriesHint')} />
-            {s.memories.length === 0 ? (
-              <p className="empty">{t('profile.memoriesEmpty')}</p>
-            ) : (
-              <ul className="mem-list">
-                {s.memories.map((m) => (
-                  <li key={m.id} className="mem">
-                    <p>{m.content}</p>
-                    <footer>
-                      <Chip tone="well">{m.source}</Chip>
-                      <Chip tone={m.confidence === 'high' ? 'mint' : 'paper'}>
-                        {t('profile.confidence')}：
-                        {m.confidence === 'high'
-                          ? t('profile.confHigh')
-                          : m.confidence === 'mid'
-                            ? t('profile.confMid')
-                            : t('profile.confLow')}
-                      </Chip>
-                      <button className="mem-del" onClick={() => s.deleteMemory(m.id)}>
-                        {t('profile.deleteMemory')}
-                      </button>
-                    </footer>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          {/* 任务区 */}
-          <Card>
-            <CardHead
-              title={
-                s.task
-                  ? `${t('friend.taskCard')} · ${s.task.status === 'running'
-                    ? t('task.statusRunning')
-                    : s.task.status === 'done'
-                      ? t('task.statusDone')
-                      : t('task.statusPaused')
-                  }`
-                  : t('friend.taskCard')
-              }
-            />
-            {s.task ? (
-              <div className="task-mini">
-                <p>
-                  {t('task.goal')}：{s.task.goal} · {t('task.condition')}：{s.task.condition} ·{' '}
-                  {t('task.count')}：{s.task.count} {t('report.statUnit')}
-                </p>
-                <p className="task-mini__done">
-                  {t('task.doneWhen')}：{s.task.doneWhen}
-                </p>
-                <div
-                  className="grow"
-                  style={{ ['--g' as string]: String(s.task.progress / s.task.count) }}
-                />
-                <p className="task-mini__progress">
-                  {t('task.progress')}：
-                  {t('task.progressOf', { done: s.task.progress, total: s.task.count })}
-                </p>
-                {s.proxyMessages.length === 0 && (
-                  <Button small variant="secondary" block onClick={s.startProxy}>
-                    开始执行（demo 加速）
-                  </Button>
-                )}
-                {s.proxyDone && (
-                  <Button small block onClick={() => navigate('/chat/lin/result')}>
-                    {t('proxyChat.resultLink')}
-                  </Button>
-                )}
-              </div>
-            ) : canAssignTask ? (
-              <div className="task-entry">
-                <p>试试跟阿澈说：「{taskText}」</p>
-                <Button small variant="secondary" block onClick={() => setTaskDraftOpen(true)}>
-                  生成{t('friend.taskCard')}
-                </Button>
-              </div>
-            ) : (
-              <p className="empty">
-                跟阿澈多聊几句（还差 {5 - s.userReplyCount} 则），就能交办任务。
-              </p>
-            )}
-          </Card>
-
-          {/* 模拟下次见面 */}
-          {canAssignTask && !s.reportReady && !s.task && (
-            <Button small variant="secondary" block onClick={handleNextMeet} disabled={nextMeetLoading}>
-              {nextMeetLoading ? '处理中…' : t('friend.nextMeet')}
-              <em className="hint-inline">{t('friend.nextMeetHint')}</em>
-            </Button>
-          )}
-        </div>
+        <FriendSidebar
+          userCount={userCount}
+          taskText={taskText}
+          onOpenTaskDraft={() => setTaskDraftOpen(true)}
+          showNextMeet={showNextMeet}
+          nextMeetLoading={isHttpMode && http.nextMeetLoading}
+          onNextMeet={() => (isHttpMode ? void http.nextMeet() : s.nextMeet())}
+        />
       </div>
 
-      {/* 回报卡片（模拟下次见面后出现） */}
-      <Modal
-        open={s.reportReady}
-        onClose={s.dismissReport}
-        title={t('report.title')}
-        sub={t('report.friendTone')}
-        sheet="pear"
-        footer={
-          <>
-            <Button variant="secondary" onClick={s.dismissReport}>
-              {t('report.dismiss')}
-            </Button>
-            <Button onClick={openReport}>{t('report.seeResult')}</Button>
-          </>
-        }
-      >
-        <TaskReport />
-      </Modal>
+      {/* 回报卡片（mock：代聊结束后「模拟下次见面」才出现） */}
+      {!isHttpMode && (
+        <Modal
+          open={s.reportReady}
+          onClose={s.dismissReport}
+          title={t('report.title')}
+          sub={t('report.friendTone')}
+          sheet="pear"
+          demo
+          footer={
+            <>
+              <Button variant="secondary" onClick={s.dismissReport}>
+                {t('report.dismiss')}
+              </Button>
+              <Button onClick={openReport}>{t('report.seeResult')}</Button>
+            </>
+          }
+        >
+          <TaskReport />
+        </Modal>
+      )}
 
       {/* Agent 工作日志（http 用后端 dev_mode；mock 用 demo store 的 devMode） */}
-      {(isHttpMode ? httpDevMode : s.settings.devMode) && <AgentLogPanel logs={s.taskLogs} />}
+      {(isHttpMode ? http.devMode : s.settings.devMode) && <AgentLogPanel logs={s.taskLogs} />}
 
       {/* http 模式：B 的真任务确认卡（确认后导向 /tasks/<id>） */}
-      {isHttpMode && pendingTaskId && (
-        <Modal
-          open
-          onClose={() => setPendingTaskId(null)}
-          title={t('friend.taskCard')}
-          sub="Agent 理解的任务如下，确认后开始执行"
-        >
+      {isHttpMode && http.pendingTaskId && (
+        <Modal open onClose={http.clearPendingTask} title={t('friend.taskCard')} sub="Agent 理解的任务如下，确认后开始执行">
           <TaskConfirmCard
-            taskId={pendingTaskId}
+            taskId={http.pendingTaskId}
             onStarted={(task) => {
-              setPendingTaskId(null)
+              http.clearPendingTask()
               navigate(`/tasks/${task.id}`)
             }}
-            onCancelled={() => setPendingTaskId(null)}
+            onCancelled={http.clearPendingTask}
           />
         </Modal>
       )}
 
-      {/* mock 模式：demo 任务确认卡 */}
+      {/* mock 模式：demo 任务确认卡（确认时就自动开始代聊） */}
       {!isHttpMode && (
         <TaskConfirmModal
           open={taskDraftOpen}
           text={taskText}
           onText={setTaskText}
           onCancel={() => setTaskDraftOpen(false)}
-          onConfirm={() => {
-            s.createTask({
-              goal: '运动伙伴',
-              condition: '喜欢登山',
-              count: 3,
-              doneWhen: '找到 2 位双向合适就停',
-            })
+          onConfirm={(parsed) => {
+            s.createTask(parsed)
             setTaskDraftOpen(false)
             s.startProxy()
           }}
         />
       )}
     </div>
-  )
-}
-
-function TaskReport() {
-  const avgMin = useDemoStore((s) => s.settings.avgManualMin)
-  return (
-    <div className="report stack">
-      <p className="report__lead">
-        「你不在的时候我帮你看了一下，今天聊了 6 个人，有 2 个跟你很合。其中一个也喜欢爬山，要不要看看？」
-      </p>
-      <div className="stats-row">
-        <div className="stat">
-          <b>20</b>
-          <span>{t('report.statScanned')}</span>
-        </div>
-        <div className="stat">
-          <b>6</b>
-          <span>{t('report.statChatted')}</span>
-        </div>
-        <div className="stat stat--mint">
-          <b>2</b>
-          <span>{t('report.statFit')}</span>
-        </div>
-      </div>
-      <p className="report__calc">
-        {t('report.calcNote', { sessions: 6, hours: Math.max(1, Math.round((6 * avgMin) / 60)) })}
-        <em>{t('report.calcNoteAdjust')}</em>
-      </p>
-    </div>
-  )
-}
-
-function TaskConfirmModal({
-  open,
-  text,
-  onText,
-  onCancel,
-  onConfirm,
-}: {
-  open: boolean
-  text: string
-  onText: (v: string) => void
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  return (
-    <Modal
-      open={open}
-      onClose={onCancel}
-      title={t('task.title')}
-      sub={t('task.subtitle')}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onCancel}>
-            {t('task.cancel')}
-          </Button>
-          <Button onClick={onConfirm}>{t('task.confirm')}</Button>
-        </>
-      }
-    >
-      <div className="task-form">
-        <label className="field">
-          <span>一句话交办</span>
-          <input className="input" value={text} onChange={(e) => onText(e.target.value)} />
-        </label>
-        <dl className="task-grid">
-          <div>
-            <dt>{t('task.goal')}</dt>
-            <dd>运动伙伴</dd>
-          </div>
-          <div>
-            <dt>{t('task.condition')}</dt>
-            <dd>喜欢登山</dd>
-          </div>
-          <div>
-            <dt>{t('task.count')}</dt>
-            <dd>3 人</dd>
-          </div>
-          <div>
-            <dt>{t('task.doneWhen')}</dt>
-            <dd>找到 2 位双向合适就停</dd>
-          </div>
-        </dl>
-      </div>
-    </Modal>
   )
 }

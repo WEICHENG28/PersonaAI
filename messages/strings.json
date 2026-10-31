@@ -48,7 +48,8 @@
     "openReport": "看看是关于什么",
     "memoriesTitle": "它记得的事",
     "memoriesHint": "只存你明确分享过、对聊天有帮助的事",
-    "demoTag": "演示模式"
+    "demoTag": "演示模式",
+    "taskRunningTitle": "找人任务"
   },
   "task": {
     "title": "任务确认卡",
@@ -78,7 +79,7 @@
     "viaSelf": "你本人",
     "viaOtherTwin": "对方的分身",
     "privacyRewrite": "隐私改写",
-    "privacyRewriteTip": "这句话原本带出具体地点，已由隐私守门 Agent 改写",
+    "privacyRewriteTip": "这句话含有可能识别你的信息，已由隐私守门改写",
     "round": "第 {{n}} 轮",
     "verdictPanel": "即时判定面板",
     "verdictPending": "判定中…",
@@ -88,7 +89,11 @@
     "trendDown": "走势下降",
     "liveTag": "直播中",
     "takeOver": "我来了，本人接手",
-    "resultLink": "查看结果页"
+    "resultLink": "查看结果页",
+    "selfInControl": "你本人接手中",
+    "notStarted": "代聊还没开始。到 AI 朋友页交办任务，或在大厅派分身去聊。",
+    "twinsBelow": "以下由双方分身代聊",
+    "takeOverShort": "本人接手"
   },
   "result": {
     "mutualBadge": "双向合适",
@@ -113,8 +118,9 @@
     "takeOver": "本人接手",
     "continueTwin": "让分身继续聊",
     "skip": "先略过",
-    "score": "方向分数",
-    "scoreNote": "系统内部基准，仅示意"
+    "score": "你这边的合适度",
+    "scoreNote": "分数只用来判断走势，不代表对方怎么想",
+    "stillRunning": "代聊还在进行，结果会随对话更新"
   },
   "handoff": {
     "title": "接手卡片",
@@ -134,7 +140,7 @@
     "statFit": "位双向合适",
     "statUnit": "人",
     "statSession": "场",
-    "calcNote": "代聊 {{sessions}} 场 × 人工平均 20 分钟 = 帮你省下约 {{hours}} 小时",
+    "calcNote": "代聊 {{sessions}} 场 × 人工平均 {{avg}} 分钟 = 帮你省下{{saved}}",
     "calcNoteAdjust": "人工平均时间是系统预设值，可以在设置里调整",
     "seeResult": "看看这个人",
     "dismiss": "知道了",
@@ -201,7 +207,10 @@
     "confirmShareNote": "确认后分身与大厅才会使用这份资料",
     "confirmed": "已确认对外使用",
     "styleTitle": "说话风格（分身模仿用）",
-    "styleNote": "分身只模仿句长、语气和 emoji 习惯，不使用你的原句"
+    "styleNote": "分身只模仿句长、语气和 emoji 习惯，不使用你的原句",
+    "pending": "待确认",
+    "waitDraft": "聊几句后生成草稿",
+    "mbtiBadge": "仅供娱乐"
   },
   "settings": {
     "title": "设置",

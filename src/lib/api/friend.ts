@@ -231,6 +231,17 @@ export interface MemoryRow {
   deleted_at: string | null
 }
 
+/** GET /api/memory：「它记得的事」（未删除，新→旧）。mock 模式回空阵列（页面用 demo store）。 */
+export async function fetchMemories(): Promise<MemoryRow[]> {
+  if (!isHttpMode) return []
+  return apiCall<MemoryRow[]>('/api/memory')
+}
+
+/** DELETE /api/memory/:id：软删除一条记忆。 */
+export async function deleteMemory(id: string): Promise<void> {
+  await apiCall<null>(`/api/memory/${id}`, { method: 'DELETE' })
+}
+
 /** PATCH /api/memory/:id：编辑记忆内容（source→user_edited, confidence=1）。 */
 export async function editMemory(id: string, content: string): Promise<MemoryRow> {
   return apiCall<MemoryRow>(`/api/memory/${id}`, {

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { Chip } from './Button'
+import { t } from '@i18n/t'
 
 interface ModalProps {
   open: boolean
@@ -11,10 +12,12 @@ interface ModalProps {
   footer?: ReactNode
   sheet?: 'pear' | 'paper'
   wide?: boolean
+  /** 只有 mock 模式的示范弹窗才挂「Demo」标签（UX #13） */
+  demo?: boolean
 }
 
 /** Hum 卡片式弹窗：纸卡 + 梨黄 sticker 头 */
-export function Modal({ open, onClose, title, sub, children, footer, sheet = 'paper', wide }: ModalProps) {
+export function Modal({ open, onClose, title, sub, children, footer, sheet = 'paper', wide, demo = false }: ModalProps) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -40,7 +43,7 @@ export function Modal({ open, onClose, title, sub, children, footer, sheet = 'pa
             {title && <h2 className="modal__title">{title}</h2>}
             {sub && <p className="modal__sub">{sub}</p>}
           </div>
-          <Chip tone="well">Demo</Chip>
+          {demo && <Chip tone="well">{t('common.demoBadge')}</Chip>}
         </header>
         <div className="modal__body">{children}</div>
         {footer && <footer className="modal__foot">{footer}</footer>}
