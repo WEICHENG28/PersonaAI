@@ -3,14 +3,16 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   listNotifications,
   markNotificationRead,
+  respondAnomaly,
   respondNotification,
   subscribeNotifications,
   TwinApiError,
+  type AnomalyChoice,
   type HumanResponse,
   type NotificationView,
   type RespondView,
 } from '@lib/api/twin'
-import { NOTIFY_TEXT, withRead, withResponse } from './notificationView'
+import { NOTIFY_TEXT, withChoice, withRead, withResponse } from './notificationView'
 
 /** Realtime 断线时，多久重新读一次通知。 */
 const FALLBACK_POLL_MS = 15000
@@ -24,6 +26,8 @@ export interface NotificationsState {
   busyId: string | null
   respond(n: NotificationView, response: HumanResponse): Promise<RespondView | null>
   markRead(n: NotificationView): Promise<void>
+  /** C8 言行异常提醒的选择；成功回 true。 */
+  choose(n: NotificationView, choice: AnomalyChoice): Promise<boolean>
   /** 重新读一次（打开面板时用，Realtime 漏掉事件也不会一直是旧的）。 */
   reload(): Promise<void>
 }
@@ -99,5 +103,24 @@ export function useNotifications(enabled: boolean): NotificationsState {
     }
   }, [])
 
-  return { list, loadError, errors, busyId, respond, markRead, reload }
+  const choose = useCallback(
+    async (n: NotificationView, choice: AnomalyChoice): Promise<boolean> => {
+      setBusyId(n.id)
+      setError(n.id, null)
+      try {
+        await respondAnomaly(n.id, choice)
+        setList((prev) => withChoice(prev, n.id, choice))
+        return true
+      } catch (err) {
+        setError(n.id, messageOf(err))
+        await reload()
+        return false
+      } finally {
+        setBusyId(null)
+      }
+    },
+    [reload],
+  )
+
+  return { list, loadError, errors, busyId, respond, markRead, choose, reload }
 }

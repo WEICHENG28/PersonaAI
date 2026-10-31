@@ -18,13 +18,15 @@ export const CLOSING_INSTRUCTION =
 /** 開場話題最多保留幾個字。 */
 const OPENING_TOPIC_MAX = 200
 
-const END_REASON_TEXT: Record<EndReason, string> = {
+// anomaly 不寫結束日誌（見 endConversation），所以沒有文字
+const END_REASON_TEXT: Record<Exclude<EndReason, 'anomaly'>, string> = {
   unsuitable: '判断不太合适，礼貌结束',
   done: '任务完成，结束代聊',
   declined: '对方婉拒，礼貌结束',
 }
 
-export type EndReason = 'unsuitable' | 'done' | 'declined'
+/** 前三種是跨線契約（server/contracts/twin.ts）的；anomaly 只有 C8 內部用。 */
+export type EndReason = 'unsuitable' | 'done' | 'declined' | 'anomaly'
 
 export interface EndOptions {
   /** 指定由誰的分身收尾（例如 C7 拒絕時由拒絕的人）；不是分身時照輪到的順序。 */
@@ -216,6 +218,9 @@ async function endConversation(
   if (conv.status === 'ended') return
   await sendClosing(deps, conv, options.closerUserId)
   await deps.store.updateConversation(conversationId, { status: 'ended', ended_at: deps.now().toISOString() })
+  // C8：結束日誌固定寫給 side_a，被標記的人可能就是他，寫了等於告訴他被提醒（07C C8「不公開」）。
+  // 被提醒的人那邊由 anomaly.ts 自己寫「言行异常提醒：选择结束对话」。
+  if (reason === 'anomaly') return
   await deps.writeLog({ ...baseLog(conv), action: '结束代聊', reason: END_REASON_TEXT[reason] })
 }
 

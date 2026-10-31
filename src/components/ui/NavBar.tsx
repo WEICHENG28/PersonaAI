@@ -3,11 +3,13 @@ import { RiveAvatar } from './RiveAvatar'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { NotificationBell } from '@features/twin/components/NotificationBell'
+import { GearIcon } from './Icons'
 
 const TABS = [
   { to: '/friend', key: 'nav.friend' as const, match: /^\/(friend|chat)/ },
   { to: '/lobby', key: 'nav.lobby' as const, match: /^\/lobby/ },
   { to: '/history', key: 'nav.history' as const, match: /^\/history/ },
+  { to: '/tasks', key: 'nav.tasks' as const, match: /^\/tasks/ },
 ]
 
 /**
@@ -104,7 +106,7 @@ function ProfileKnob() {
   )
 }
 
-/** 设置按钮（顶栏右端，⚙ 图标） */
+/** 设置按钮（顶栏右端，齿轮 SVG 图标） */
 function SettingsKnob() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -116,7 +118,7 @@ function SettingsKnob() {
       title="设置"
       aria-label="设置"
     >
-      <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>⚙</span>
+      <GearIcon size={18} />
     </button>
   )
 }

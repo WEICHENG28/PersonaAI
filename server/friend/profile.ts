@@ -18,6 +18,7 @@ import {
   type ProfileExtract,
 } from '../prompts/03_profile'
 import type { ShareableProfile, AgentProfile } from '../../shared/types'
+import { shareableToSimplified } from '../lib/zh'
 
 export class ProfileError extends Error {
   constructor(message = '档案更新失败，稍后再试') {
@@ -164,12 +165,13 @@ export async function updateShareable(
   input: z.infer<typeof shareableUpdateSchema>,
 ): Promise<ShareableView> {
   const db = getServiceClient()
-  const next: ShareableProfile = {
+  // 統一轉簡體：種子用戶興趣都是簡體，繁體「攝影」和「摄影」比對不到
+  const next: ShareableProfile = shareableToSimplified({
     intro: input.intro,
     interests: input.interests,
     chat_style: input.chat_style,
     looking_for: input.looking_for,
-  }
+  })
 
   const { error } = await db.from('user_profiles').upsert({
     user_id: userId,

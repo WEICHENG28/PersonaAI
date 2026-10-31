@@ -298,6 +298,13 @@ describe('endConversation', () => {
     expect(speakers(h)).toEqual([AN])
   })
 
+  it('C8 言行異常提醒選結束：照樣結束，但不寫結束日誌（日誌寫給 side_a，被標記的人可能就是他）', async () => {
+    const h = harness({ conv: row({ side_a_controller: 'human', side_b_controller: 'human' }) })
+    await h.api.endConversation('conv-1', 'anomaly', { closerUserId: ZHE })
+    expect(h.rows.get('conv-1')?.status).toBe('ended')
+    expect(h.logs).toEqual([])
+  })
+
   it('雙方都是本人：不送收尾，直接結束', async () => {
     const h = harness({ conv: row({ side_a_controller: 'human', side_b_controller: 'human' }) })
     await h.api.endConversation('conv-1', 'done')

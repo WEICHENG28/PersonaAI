@@ -9,18 +9,21 @@ import { useDemoStore } from '@store/useDemoStore'
 import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
+import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
 import {
   triggerNextMeet,
   isHttpMode,
   callFriendIntro,
   callFriendChat,
   getFriendMessages,
+  fetchSettings,
   type FriendMessage,
 } from '@lib/api/friend'
 
 /** 画面 2-4：AI 朋友聊天 + 记忆侧栏 + 任务确认 + 回报
- *  http 模式：消息来自 GET /api/friend/messages；发送走 POST /api/friend/chat。
- *  mock 模式：demo store 驱动（不打 API）。
+ *  http 模式：消息来自 GET /api/friend/messages；发送走 POST /api/friend/chat；
+ *  task_intent 时显示 B 的 <TaskConfirmCard>（真任务，确认后导向 /tasks/<id>）。
+ *  mock 模式：demo store 驱动（不打 API，TaskConfirmModal demo 流程）。
  */
 export function FriendPage() {
   const s = useDemoStore()
@@ -34,6 +37,9 @@ export function FriendPage() {
   const [httpMessages, setHttpMessages] = useState<FriendMessage[]>([])
   const [httpTyping, setHttpTyping] = useState(false)
   const [httpError, setHttpError] = useState<string | null>(null)
+  // http 模式：后端建的待确认任务 ID（显示 B 的 TaskConfirmCard）；工作日志面板开关用后端 dev_mode
+  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
+  const [httpDevMode, setHttpDevMode] = useState(false)
 
   // 消息数量用于自动滚动（mock 或 http 模式均适用）
   const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
@@ -52,6 +58,11 @@ export function FriendPage() {
       } catch (e) {
         console.error('[FriendPage] loadMessages', e)
       }
+      try {
+        // 工作日志面板的开关用后端设定（demo store 的 devMode 在 http 模式不代表后端）
+        const settings = await fetchSettings()
+        setHttpDevMode(settings?.dev_mode ?? false)
+      } catch { /* 面板默认不显示 */ }
     }
     void init()
   }, [])
@@ -87,9 +98,9 @@ export function FriendPage() {
       // 拉最新消息（包含 AI 回复）
       const msgs = await getFriendMessages()
       setHttpMessages(msgs)
-      // task_intent：弹出任务确认
+      // task_intent：后端已建真任务（pending_confirm），显示 B 的确认卡
       if (result.taskId) {
-        setTaskDraftOpen(true)
+        setPendingTaskId(result.taskId)
       }
     } catch (e: unknown) {
       setHttpError(e instanceof Error ? e.message : '阿澈刚刚恍神了，再说一次？')
@@ -314,26 +325,47 @@ export function FriendPage() {
         <TaskReport />
       </Modal>
 
-      {/* Agent 工作日志（dev_mode） */}
-      {s.settings.devMode && <AgentLogPanel logs={s.taskLogs} />}
+      {/* Agent 工作日志（http 用后端 dev_mode；mock 用 demo store 的 devMode） */}
+      {(isHttpMode ? httpDevMode : s.settings.devMode) && <AgentLogPanel logs={s.taskLogs} />}
 
-      {/* 任务确认卡 Modal */}
-      <TaskConfirmModal
-        open={taskDraftOpen}
-        text={taskText}
-        onText={setTaskText}
-        onCancel={() => setTaskDraftOpen(false)}
-        onConfirm={() => {
-          s.createTask({
-            goal: '运动伙伴',
-            condition: '喜欢登山',
-            count: 3,
-            doneWhen: '找到 2 位双向合适就停',
-          })
-          setTaskDraftOpen(false)
-          s.startProxy()
-        }}
-      />
+      {/* http 模式：B 的真任务确认卡（确认后导向 /tasks/<id>） */}
+      {isHttpMode && pendingTaskId && (
+        <Modal
+          open
+          onClose={() => setPendingTaskId(null)}
+          title={t('friend.taskCard')}
+          sub="Agent 理解的任务如下，确认后开始执行"
+        >
+          <TaskConfirmCard
+            taskId={pendingTaskId}
+            onStarted={(task) => {
+              setPendingTaskId(null)
+              navigate(`/tasks/${task.id}`)
+            }}
+            onCancelled={() => setPendingTaskId(null)}
+          />
+        </Modal>
+      )}
+
+      {/* mock 模式：demo 任务确认卡 */}
+      {!isHttpMode && (
+        <TaskConfirmModal
+          open={taskDraftOpen}
+          text={taskText}
+          onText={setTaskText}
+          onCancel={() => setTaskDraftOpen(false)}
+          onConfirm={() => {
+            s.createTask({
+              goal: '运动伙伴',
+              condition: '喜欢登山',
+              count: 3,
+              doneWhen: '找到 2 位双向合适就停',
+            })
+            setTaskDraftOpen(false)
+            s.startProxy()
+          }}
+        />
+      )}
     </div>
   )
 }

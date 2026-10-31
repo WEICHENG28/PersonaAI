@@ -1,12 +1,13 @@
 // C7 通知铃铛（docs/07C C7）：放在 A 的顶栏 NavBar 右端，由 A 挂上。拥有者：C。
 // 订阅自己的 notifications，依类型显示：match → 结果页；request_human → 现在聊／稍后聊／拒绝；
-// anomaly → 文字（动作是 C8）；friend_report → /friend。mock 模式不显示（demo 通知仍由 AppShell 的吐司显示）。
+// anomaly（C8）→ 对方的具体行为＋继续聊／结束对话／检举；friend_report → /friend。mock 模式不显示（demo 通知仍由 AppShell 的吐司显示）。
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router'
 import { Button, Chip } from '@components/ui/Button'
-import { isLiveChat, type HumanResponse, type NotificationView } from '@lib/api/twin'
+import { isLiveChat, type AnomalyChoice, type HumanResponse, type NotificationView } from '@lib/api/twin'
 import {
+  isPendingAnomaly,
   isPendingRequest,
   notificationLink,
   notificationTitle,
@@ -16,6 +17,7 @@ import {
   unreadCount,
 } from './notificationView'
 import { useNotifications, type NotificationsState } from './useNotifications'
+import { BellIcon } from '@components/ui/Icons'
 import './notificationBell.css'
 
 export function NotificationBell() {
@@ -61,8 +63,9 @@ function LiveNotificationBell() {
         aria-haspopup="dialog"
         aria-expanded={open}
         title={NOTIFY_TEXT.bell}
+        aria-label={NOTIFY_TEXT.bell}
       >
-        <span className="knob__meta">{NOTIFY_TEXT.bell}</span>
+        <BellIcon size={18} />
         {unread > 0 && <span className="notif-count">{unread}</span>}
       </button>
       {open && <NotificationPanel state={state} anchorRef={buttonRef} panelRef={panelRef} onClose={() => setOpen(false)} />}
@@ -164,15 +167,7 @@ function NotificationItem({ n, state, onClose }: NotificationItemProps) {
       {busy && <p className="notif-bell__note" role="status">{pending === 'now' ? NOTIFY_TEXT.takingOver : NOTIFY_TEXT.responding}</p>}
       {error && <p className="notif-bell__note" role="alert">{error}</p>}
 
-      {n.type === 'anomaly' && (
-        <div className="notif-item__actions">
-          {NOTIFY_TEXT.anomalyActions.map((a) => (
-            <Button key={a} small variant="secondary" disabled title={NOTIFY_TEXT.comingSoon}>
-              {a}
-            </Button>
-          ))}
-        </div>
-      )}
+      {n.type === 'anomaly' && <AnomalyDetail n={n} state={state} busy={busy} />}
       {link && (
         <div className="notif-item__actions">
           <Button small variant="secondary" onClick={open}>
@@ -181,6 +176,42 @@ function NotificationItem({ n, state, onClose }: NotificationItemProps) {
         </div>
       )}
     </li>
+  )
+}
+
+interface AnomalyDetailProps {
+  n: NotificationView
+  state: NotificationsState
+  busy: boolean
+}
+
+/** C8：对方的具体行为（只有你看得到）＋继续聊／结束对话／检举；选过就显示选了什么。 */
+function AnomalyDetail({ n, state, busy }: AnomalyDetailProps) {
+  return (
+    <>
+      {n.evidence.length > 0 && (
+        <div className="notif-item__evidence">
+          <span className="notif-bell__note">{NOTIFY_TEXT.anomalyEvidence}</span>
+          <ul>
+            {n.evidence.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="notif-bell__note">{NOTIFY_TEXT.anomalyNote}</p>
+      {isPendingAnomaly(n) ? (
+        <div className="notif-item__actions">
+          {(['continue', 'end', 'report'] as const satisfies readonly AnomalyChoice[]).map((c) => (
+            <Button key={c} small variant={c === 'end' ? 'danger' : 'secondary'} disabled={busy} onClick={() => void state.choose(n, c)}>
+              {NOTIFY_TEXT.choose[c]}
+            </Button>
+          ))}
+        </div>
+      ) : (
+        n.choice && !busy && <p className="notif-bell__note">{NOTIFY_TEXT.chosen[n.choice]}</p>
+      )}
+    </>
   )
 }
 
