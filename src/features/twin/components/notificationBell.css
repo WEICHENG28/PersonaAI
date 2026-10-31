@@ -1,0 +1,79 @@
+/* C7 通知铃铛：顶栏 knob ＋往下展开的纸卡。只用 tokens.css 的 token 和既有类（.knob／.card／.btn／.chip）。拥有者：C。 */
+/* 顶栏在手机上很挤，铃铛文字不要折行 */
+.notif-bell .knob { white-space: nowrap; }
+
+/* 面板用 portal 挂在 body（顶栏的 clip-path 会裁掉里面的东西），top／right／width 由 JS 依铃铛位置算 */
+.notif-bell__panel {
+  position: fixed;
+  z-index: 400;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-md);
+  animation: toast-in var(--dur-long) var(--ease-spring);
+}
+
+.notif-bell__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  font-size: var(--text-title);
+}
+
+.notif-bell__list {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notif-bell__note {
+  font-size: var(--text-xs);
+  color: var(--color-ink-2);
+  line-height: 1.4;
+}
+
+.notif-item {
+  display: grid;
+  gap: var(--space-xs);
+  justify-items: start;
+  padding: var(--space-md);
+  border-radius: var(--radius-stock);
+  background: var(--fibre), var(--color-paper-2);
+}
+
+.notif-item.is-read {
+  background: var(--fibre), var(--color-card);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 8%, transparent);
+}
+
+.notif-item__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.notif-item__title {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  min-width: 0;
+}
+
+.notif-item__time {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.notif-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-bell__panel { animation: none; }
+}

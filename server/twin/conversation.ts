@@ -26,6 +26,11 @@ const END_REASON_TEXT: Record<EndReason, string> = {
 
 export type EndReason = 'unsuitable' | 'done' | 'declined'
 
+export interface EndOptions {
+  /** 指定由誰的分身收尾（例如 C7 拒絕時由拒絕的人）；不是分身時照輪到的順序。 */
+  closerUserId?: string
+}
+
 export interface ConversationRow extends TwinConversation {
   round_count: number
   ended_at?: string | null
@@ -70,7 +75,7 @@ export interface ConversationApi {
   startConversation(input: StartConversationInput): Promise<{ conversationId: string }>
   runTwinRounds(conversationId: string, rounds: number): Promise<{ roundCount: number; ended: boolean }>
   getTranscript(conversationId: string): Promise<ChatMessage[]>
-  endConversation(conversationId: string, reason: EndReason): Promise<void>
+  endConversation(conversationId: string, reason: EndReason, options?: EndOptions): Promise<void>
   markWaitingHuman(conversationId: string): Promise<void>
 }
 
@@ -190,8 +195,9 @@ async function getTranscript(deps: ConversationDeps, conversationId: string): Pr
 }
 
 /** 輪到的分身送一則收尾；失敗只寫日誌，不擋結束。 */
-async function sendClosing(deps: ConversationDeps, conv: ConversationRow): Promise<void> {
-  const [closer] = twinSpeakersInOrder(conv, await deps.store.getLastSenderId(conv.id))
+async function sendClosing(deps: ConversationDeps, conv: ConversationRow, preferred?: string): Promise<void> {
+  const speakers = twinSpeakersInOrder(conv, await deps.store.getLastSenderId(conv.id))
+  const closer = preferred && speakers.includes(preferred) ? preferred : speakers[0]
   if (!closer) return
   try {
     await deps.twinReply(conv.id, closer, { extraInstruction: CLOSING_INSTRUCTION })
@@ -200,10 +206,15 @@ async function sendClosing(deps: ConversationDeps, conv: ConversationRow): Promi
   }
 }
 
-async function endConversation(deps: ConversationDeps, conversationId: string, reason: EndReason): Promise<void> {
+async function endConversation(
+  deps: ConversationDeps,
+  conversationId: string,
+  reason: EndReason,
+  options: EndOptions = {},
+): Promise<void> {
   const conv = await requireConversation(deps, conversationId)
   if (conv.status === 'ended') return
-  await sendClosing(deps, conv)
+  await sendClosing(deps, conv, options.closerUserId)
   await deps.store.updateConversation(conversationId, { status: 'ended', ended_at: deps.now().toISOString() })
   await deps.writeLog({ ...baseLog(conv), action: '结束代聊', reason: END_REASON_TEXT[reason] })
 }
@@ -221,7 +232,7 @@ export function createConversationApi(deps: ConversationDeps): ConversationApi {
     startConversation: (input) => startConversation(deps, input),
     runTwinRounds: (id, rounds) => runTwinRounds(deps, id, rounds),
     getTranscript: (id) => getTranscript(deps, id),
-    endConversation: (id, reason) => endConversation(deps, id, reason),
+    endConversation: (id, reason, options) => endConversation(deps, id, reason, options),
     markWaitingHuman: (id) => markWaitingHuman(deps, id),
   }
 }

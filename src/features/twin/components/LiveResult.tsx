@@ -8,6 +8,7 @@ import { Card, CardHead } from '@components/ui/Card'
 import { t } from '@i18n/t'
 import type { FitPointView, OutlineView, ResultMessage, ResultView } from '@lib/api/twin'
 import { speakerOf, statusChip } from './chatRoomView'
+import { HANDOFF_TEXT, takeoverBlockOf, type HandoffRouteState } from './handoffView'
 import { groupByRound, RESULT_TEXT, verdictLine } from './resultView'
 import { useResult, type ResultState } from './useResult'
 
@@ -57,7 +58,10 @@ function ResultBody({ view, state, onSkip }: ResultBodyProps) {
   const [showFull, setShowFull] = useState(false)
   // seq 让同一轮再点一次也会重新捲动
   const [jump, setJump] = useState<{ round: number; seq: number } | null>(null)
+  const navigate = useNavigate()
   const chip = statusChip(view.status)
+  const chatPath = `/chat/${encodeURIComponent(view.conversationId)}`
+  const busy = state.continuing || state.takingOver
 
   const jumpTo = (round: number) => {
     setShowFull(true)
@@ -65,6 +69,11 @@ function ResultBody({ view, state, onSkip }: ResultBodyProps) {
   }
   const continueChat = async () => {
     if (await state.continueChat()) setShowFull(true)
+  }
+  // C6：接手成功后到聊天室，先显示接手卡片
+  const takeOverChat = async () => {
+    const handoff = await state.takeOver()
+    if (handoff) navigate(chatPath, { state: { handoff } satisfies HandoffRouteState })
   }
 
   return (
@@ -102,13 +111,17 @@ function ResultBody({ view, state, onSkip }: ResultBodyProps) {
         <Card>
           <CardHead title={t('result.nextTitle')} />
           <div className="next-actions">
-            <Button disabled title={RESULT_TEXT.comingSoon}>
-              {t('result.takeOver')} · {RESULT_TEXT.comingSoon}
-            </Button>
+            <TakeOverButton
+              view={view}
+              takingOver={state.takingOver}
+              disabled={busy}
+              onTakeOver={() => void takeOverChat()}
+              onGoChat={() => navigate(chatPath)}
+            />
             <Button
               variant="secondary"
               onClick={() => void continueChat()}
-              disabled={view.continueBlock !== null || state.continuing}
+              disabled={view.continueBlock !== null || busy}
               title={view.continueBlock ?? undefined}
             >
               {t('result.continueTwin')}
@@ -125,6 +138,25 @@ function ResultBody({ view, state, onSkip }: ResultBodyProps) {
         </Card>
       </div>
     </div>
+  )
+}
+
+interface TakeOverButtonProps {
+  view: ResultView
+  takingOver: boolean
+  disabled: boolean
+  onTakeOver(): void
+  onGoChat(): void
+}
+
+/** 「本人接手」（C6）；已经本人接手就改成「回到聊天室」，对话结束则停用。 */
+function TakeOverButton({ view, takingOver, disabled, onTakeOver, onGoChat }: TakeOverButtonProps) {
+  const block = takeoverBlockOf(view)
+  if (view.status !== 'ended' && view.me.controller === 'human') return <Button onClick={onGoChat}>{HANDOFF_TEXT.goChat}</Button>
+  return (
+    <Button onClick={onTakeOver} disabled={block !== null || disabled} title={block ?? undefined}>
+      {takingOver ? HANDOFF_TEXT.taking : t('result.takeOver')}
+    </Button>
   )
 }
 

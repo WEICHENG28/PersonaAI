@@ -1,16 +1,20 @@
-// C4 聊天室资料：第一次读取、Realtime 新消息、定时更新目前判定、本人发言。拥有者：C。
+// C4 聊天室资料：第一次读取、Realtime 新消息、定时更新目前判定、本人发言；C6 本人接手。拥有者：C。
 import { useCallback, useEffect, useState } from 'react'
 import {
   getChatRoom,
   getChatStatus,
+  requestHuman,
   sendChatMessage,
   subscribeChatMessages,
+  takeOver,
   TwinApiError,
   type ChatMessageView,
   type ChatRoomView,
   type ChatStatusView,
+  type TakeoverView,
 } from '@lib/api/twin'
 import { CHAT_TEXT, expectsTwinReply, mergeMessages, withStatus } from './chatRoomView'
+import { HANDOFF_TEXT } from './handoffView'
 
 /** 多久更新一次目前判定与「谁在聊」（match_scores、conversations 没有 Realtime）。 */
 const STATUS_POLL_MS = 5000
@@ -25,6 +29,15 @@ export interface ChatRoomState {
   sending: boolean
   twinTyping: boolean
   send(text: string): Promise<boolean>
+  /** 正在接手（产生接手卡片中）。 */
+  takingOver: boolean
+  /** 本人接手；成功回接手卡片，失败回 null（错误放在 notice）。 */
+  takeOver(): Promise<TakeoverView | null>
+  /** C7 正在请求对方本人。 */
+  requestingHuman: boolean
+  /** C7 这次打开聊天室后已经请求过。 */
+  humanRequested: boolean
+  requestHuman(): Promise<void>
 }
 
 function messageOf(err: unknown): string {
@@ -39,6 +52,9 @@ export function useChatRoom(conversationId: string): ChatRoomState {
   const [sending, setSending] = useState(false)
   const [twinTyping, setTwinTyping] = useState(false)
   const [realtimeDown, setRealtimeDown] = useState(false)
+  const [takingOver, setTakingOver] = useState(false)
+  const [requestingHuman, setRequestingHuman] = useState(false)
+  const [humanRequested, setHumanRequested] = useState(false)
 
   const addMessages = useCallback((incoming: readonly ChatMessageView[]) => {
     setRoom((prev) => (prev ? { ...prev, messages: mergeMessages(prev.messages, incoming) } : prev))
@@ -116,5 +132,50 @@ export function useChatRoom(conversationId: string): ChatRoomState {
     [live, conversationId, addMessages, reload],
   )
 
-  return { room: live, verdict: status?.verdict ?? null, loadError, notice, sending, twinTyping, send }
+  const takeOverNow = useCallback(async (): Promise<TakeoverView | null> => {
+    setTakingOver(true)
+    setNotice(HANDOFF_TEXT.taking)
+    try {
+      const view = await takeOver(conversationId)
+      setNotice(null)
+      // 「谁在聊」要马上变成本人，输入框才会打开
+      await Promise.all([reload(), refreshStatus()])
+      return view
+    } catch (err) {
+      setNotice(messageOf(err))
+      await refreshStatus()
+      return null
+    } finally {
+      setTakingOver(false)
+    }
+  }, [conversationId, reload, refreshStatus])
+
+  const requestHumanNow = useCallback(async () => {
+    setRequestingHuman(true)
+    setNotice(null)
+    try {
+      await requestHuman(conversationId)
+      setHumanRequested(true)
+      setNotice(CHAT_TEXT.humanRequestedNotice)
+    } catch (err) {
+      setNotice(messageOf(err))
+    } finally {
+      setRequestingHuman(false)
+    }
+  }, [conversationId])
+
+  return {
+    room: live,
+    verdict: status?.verdict ?? null,
+    loadError,
+    notice,
+    sending,
+    twinTyping,
+    send,
+    takingOver,
+    takeOver: takeOverNow,
+    requestingHuman,
+    humanRequested,
+    requestHuman: requestHumanNow,
+  }
 }

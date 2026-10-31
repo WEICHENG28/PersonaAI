@@ -286,6 +286,18 @@ describe('endConversation', () => {
     expect(speakers(h)).toEqual([AN])
   })
 
+  it('指定 closerUserId（C7 拒絕的人）：雙方都是分身時由他收尾，不照輪到的順序', async () => {
+    const h = harness({ conv: row(), messages: lastFrom(AN) })
+    await h.api.endConversation('conv-1', 'declined', { closerUserId: AN })
+    expect(speakers(h)).toEqual([AN])
+  })
+
+  it('指定的 closerUserId 不是分身：照輪到的順序', async () => {
+    const h = harness({ conv: row({ side_b_controller: 'human' }), messages: lastFrom(AN) })
+    await h.api.endConversation('conv-1', 'declined', { closerUserId: ZHE })
+    expect(speakers(h)).toEqual([AN])
+  })
+
   it('雙方都是本人：不送收尾，直接結束', async () => {
     const h = harness({ conv: row({ side_a_controller: 'human', side_b_controller: 'human' }) })
     await h.api.endConversation('conv-1', 'done')

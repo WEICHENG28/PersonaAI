@@ -400,6 +400,68 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-31｜C7 請求真人＋通知元件｜Jerry（AI 協助）｜PR #82｜Closes #27
+- **做了什麼**：
+  - 後端（`server/twin/requestHuman.ts`、`notifications.ts`、`notificationStore.ts`，路由在 `server/routes/twin.ts`）：
+    - `POST /api/conversations/:id/request-human`：確認是對話一方、對方是分身、對話沒結束、對方還沒有一則未回應的請求 → 新增通知給對方（type `request_human`，payload `{ conversationId, fromName }`）→ 寫日誌。對方是種子用戶（`users.is_seed`）時 3 秒後自動用 `CONFIG.SEED_AUTO_RESPONSE`（`later`）回應。
+    - `POST /api/notifications/:id/respond`，`{ response: 'now' | 'later' | 'decline' }`：now → 呼叫 C6 的接手（回傳接手卡片）；later → 自己的分身送出固定的「本人晚点会上线，我们可以先继续聊。」（AI 訊息），對話照常；decline → `endConversation(id, 'declined', { closerUserId: 拒絕的人 })`（拒絕的人的分身收尾、對話結束）。每個回應都寫日誌。
+    - `GET /api/notifications`：自己最近 20 則，每種只回鈴鐺要的欄位（名字、對話 id、雙向合適、回應）；friend_report 的報告內容不回。`POST /api/notifications/:id/read`：只有 match 能從這裡設已讀。
+    - 錯誤：沒登入 401（一律先檢查登入，再看內容）、id 不是 uuid 404、不是成員 403、別人的通知 404、不是請求真人的通知 400、已回應／重複請求／對話已結束／對方本人已在聊 409、回應的動作失敗 503。
+  - 前端：聊天室「请求真人」可以按（對方是分身、對話沒結束時），按了變「已通知对方本人」並提示等對方回應。新元件 `src/features/twin/components/NotificationBell.tsx`（＋`useNotifications.ts`、`notificationView.ts`、`notificationBell.css`）：顶栏 knob＋未讀數，點開是通知面板；match →「查看结果」到結果頁並設已讀；request_human → 现在聊／稍后聊／拒绝（现在聊會到聊天室先顯示接手卡片）；anomaly → 文字，動作先停用（C8）；friend_report →「去看看」到 `/friend`。mock 模式不顯示。
+- **為什麼這樣做**：
+  - **鈴鐺還沒放進顶栏**：NavBar 是 A 的檔案，照 `.local/c-prep` 的計畫，C7 合併後請 A 加一行 `<NotificationBell />`。
+  - **面板用 portal 掛到 body**：顶栏有撕紙下緣的 `clip-path`，放在顶栏裡的下拉面板會整個被裁掉（第一版 DOM 檢查都過，截圖才發現看不到）。改成 `createPortal`＋`position: fixed`，位置依鈴鐺算（`panelPlacement`），手機不超出畫面。
+  - **friend_report 點了不設已讀**：A 的「下次見面」是讀「未讀的 friend_report」來回報，鈴鐺設已讀的話阿澈就不會說了。request_human 回應時設已讀，所以只有 match 能從 `/read` 設已讀。
+  - **先記下回應再動作**（條件更新：`response is null` 才寫）：連按兩次、兩個分頁同時按時只有一次會接手或收尾。對話已結束時只設已讀、回 409，鈴鐺上不會一直掛著。**動作失敗**（接手、送出稍後聊、收尾）時把 `response`／`read_at` 改回 null 再回錯誤（503「刚才没处理成功，请再选一次」，或原本給用戶看的錯誤），用戶可以重按（檢查後修正）。
+  - **稍後聊用固定的一句話，不讓模型說**（檢查後修正）：第一版用 Prompt 5 的 extra_instruction 要分身轉告，實測說成「我晚点会上线」「他晚点会上线」，對方分不清是誰要上線。改成直接以分身身分送出 07C 的原句，之後的輕聊照常由分身回覆。
+  - **拒絕由拒絕的人的分身收尾**（檢查後修正）：C3 的 `endConversation` 原本照「輪到誰」選收尾的分身，雙方都是分身時可能變成請求的那一方在道別。內部 API 加了可選的 `closerUserId`（只在那一方是分身時採用）；`server/contracts/twin.ts` 的簽名沒變。
+  - **我方已經本人在聊時只記下回應**：例如先按了「我来聊」再回應，不再接手、不讓分身說「晚點上線」、不結束對話。
+  - **請求真人不限定我方是本人**：照 07C C4 的「對方是 twin 時」顯示按鈕；B 的「直接請求真人」本來就是本人。
+  - 通知列表的 Realtime 只當「該重讀了」的訊號，內容一律從 `/api/notifications` 讀（payload 由不同線寫，後端統一整理）；打開面板時也重讀一次，Realtime 漏掉事件也不會一直是舊的；斷線時每 15 秒輪詢。
+- **改了哪些檔案**：`server/twin/{requestHuman,notifications,notificationStore}.ts`（新）、`server/twin/conversation.ts`（`endConversation` 可指定收尾者）、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/components/{NotificationBell.tsx,useNotifications.ts,notificationView.ts,notificationBell.css}`（新）、`src/features/twin/components/{LiveChatRoom.tsx,useChatRoom.ts,chatRoomView.ts}`、`tests/twin/{request-human,notifications,notification-view}.test.ts`（新）、`tests/twin/{chat-room-routes,chat-room-view,conversation}.test.ts`。沒有動共用檔。
+- **驗證**：vitest 492 項、`tsc -b`、`npm run build` 通過；和最新 main 試合併（暫時的 worktree）後也全過（修正前 498 項）。
+  - **真資料端到端**（Jerry 同意寫入，另一個 Claude Code 對話執行，`.local/c7-real-e2e.ts`、`c7-real-e2e-2.ts`）：兩個獨立瀏覽器匿名登入 c-test1（`68ebcf2d-…`）、c-test2（`4bb978ce-…`）。種子用戶小安自動回「稍後聊」、兩個真人帳號的現在聊／稍後聊／拒絕、第 4 步 match 與 friend_report 都通過；鈴鐺不用重新整理就跳出通知（Realtime）。種子用戶在畫面上約 8～9 秒才看到回覆：3 秒的計時加上當時分身用 LLM 產生那句話的時間（修正後改成固定的一句話，不再經過 LLM）。
+  - 實測發現的問題都已修：稍後聊的說法（見上）；回應處理中，鈴鐺因 Realtime 重讀，提早顯示「已拒绝，对话已结束」（改成處理中只顯示「处理中…」）。
+  - 瀏覽器（headless Chrome＋CDP，`.local/c7-cdp.ts`，`/api` 在瀏覽器裡攔截回假資料，不登入、不碰資料庫；NavBar 暫時掛上鈴鐺，測完還原）30 項通過：請求真人只打一次、按鈕變已通知；鈴鐺 6 則未讀；面板真的看得到（`elementFromPoint`）、點裡面不關、點外面和 Esc 會關；五種文字、「双向合适」、沒有 emoji；稍後聊／拒絕後顯示結果、未讀數減少；match 設已讀並到結果頁；friend_report 到 `/friend` 不設已讀；現在聊顯示整理中 → 到聊天室先看接手卡片 → 可以打字；已經在同一個聊天室時也會跳出卡片；375px 面板在畫面內。
+  - 真後端只打了不寫入的請求：新路由沒登入 401、token 錯 401、回應內容不對 400。
+- **踩到的坑／注意事項**：
+  - 顶栏的 `clip-path` 會裁掉所有放在裡面的東西（下拉、提示框），要用 portal。
+  - B 的「直接請求真人」（`server/social/history.ts`）自己寫通知、沒有種子用戶自動回應；要的話之後把 `requestHuman` 包成 contract（改簽名要三人同意）。
+  - 分支疊在 C6（PR #80）上，PR 目標先設 `c/C6-takeover`；C6 合併後改成 main。
+- **還沒做完／待辦**：
+  - 實測留下的資料：c-test1、c-test2 兩個用戶，對話 `0d4f8fef-…`（c-test1×小安）、`eb40fbb2-…`、`b4fc11b8-…`、`50740b5d-…`、`54b148c1-…`（c-test1×c-test2），notifications 7 筆，handoffs 1 筆，日誌數筆。
+  - 修正後「稍後聊固定句子」「動作失敗改回未回應」「拒絕由回應者收尾」還沒用真資料重跑（單元測試已涵蓋）。
+  - 請 A 把 `<NotificationBell />` 放進 NavBar 右端（手機顶栏已經很擠，A 決定位置）。
+  - anomaly 的「继续聊／结束对话／检举」在 C8 接上；畫面文字之後和 C4～C6 的一起搬到 `messages/strings.json`。
+
+### 2026-10-31｜C6 本人接手＋接手卡片｜Jerry（AI 協助）｜PR #80｜Closes #26
+- **做了什麼**：
+  - 後端（`server/twin/handoff.ts`、`handoffStore.ts`，Prompt 7 在 `server/prompts/07_handoff.ts`，路由在 `server/routes/twin.ts`）：`POST /api/conversations/:id/takeover`：確認是對話一方、我方還是分身、對話沒結束 → Prompt 7（`fast`，temperature 0.3）產生接手摘要 → 我方 controller 改 human、狀態改 active → 寫入 `handoffs` → 寫日誌「本人接手，分身停止代聊」→ 回傳 `{ verdict, summary, summaryFailed }`。
+  - 錯誤：不是成員 403、id 不是 uuid 404、沒登入 401；已接手／已結束／同一人同時接手兩次 409。
+  - 前端：`src/lib/api/twin.ts` 加 `takeOver`；新元件 `src/features/twin/components/HandoffCard.tsx`（版面照 A 的畫面 8 `HandoffPage`：目前判定與走勢、前面重點、對方在意的事與亮點、還沒聊完的話題、分身已替你說過的話、建議接話、「开始由本人聊」）、`handoffView.ts`（文字與純函式）。
+  - 聊天室「我来聊」可以按：接手中顯示「正在整理接手卡片…」，成功後整頁換成接手卡片，按「开始由本人聊」回到聊天室、輸入框打開、「我来聊」消失。
+  - 結果頁「本人接手」可以按：成功後到聊天室並先顯示接手卡片（卡片放在路由 state，關閉時清掉，重新整理不會再跳出）；已經本人接手時按鈕改成「回到聊天室」。
+- **為什麼這樣做**：
+  - **一次 POST 就接手，沒有「先看卡片再決定」**：07C 規定卡片在 takeover 時產生並寫入 `handoffs`，而且接手後不能交回，所以 A 的 demo 頁上的「先不接手」不放。卡片不另外開路由（不用改共用的 `src/routes.tsx`）。
+  - 隱私：Prompt 7 只放對話紀錄和**我方視角**的判定文字（例「合适，走势上升」），不讀對方的 `match_scores`，也不放任何數字；卡片畫面也沒有數字。
+  - 「分身已經替你說過」Prompt 特別寫「只寫你的分身在紀錄裡真的說過的內容，不要編」（C1 待辦：接手後不要和分身的說法矛盾）。對話紀錄放在 user 訊息的 `<transcript>` 標籤，標明只是資料。
+  - LLM 的輸出太長、太多點就截斷（每項 3 點、每點 25 字），不要讓 schema 判失敗。**Prompt 7 失敗時照常接手**，卡片空白並提示「接手卡片暂时没整理出来」，錯誤寫在日誌 detail：用戶要的是自己聊，不該因為摘要失敗就接不了手。
+  - **先改成本人、再讀訊息產生摘要**（檢查後修正，原本是先摘要）：Prompt 7 要跑約 5 秒，對話是 active 時分身這段時間還會說話，先摘要會讓「分身已經替你說過」漏掉這幾則、「最後一則是誰說的」判斷錯。改成本人用條件更新（這一方還是 twin、對話沒結束），兩個請求同時接手時只有一個成功，另一個回 409，也不會呼叫 LLM。改成本人後讀訊息、Prompt 7、`handoffs` 寫入任一個失敗都只寫日誌、仍回傳卡片（已經接手了，不能回滾）。
+  - 接手後對話改回 active：C4 的本人發言只在 active 時讓對方分身回覆；B 的 runner 看到任一方是本人就放手，C5 的「讓分身繼續聊」也會擋。
+- **改了哪些檔案**：`server/prompts/07_handoff.ts`（新）、`server/twin/handoff.ts`（新）、`server/twin/handoffStore.ts`（新）、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/components/{HandoffCard.tsx,handoffView.ts}`（新）、`src/features/twin/components/{LiveChatRoom.tsx,useChatRoom.ts,LiveResult.tsx,useResult.ts,resultView.ts}`、`tests/twin/{handoff,handoff-view}.test.ts`（新）、`tests/twin/chat-room-routes.test.ts`。沒有動共用檔。
+- **驗證**：vitest 全部 437 項通過、`tsc -b`、`npm run build` 通過；和最新 main 試合併（暫時的 worktree）後 446 項也全過。
+  - 瀏覽器（本機 Chrome headless＋CDP，`.local/c6-cdp.ts`，`/api` 在瀏覽器裡攔截回假資料，不登入、不碰資料庫）21 項通過：接手前輸入框停用；按「我来聊」顯示整理中並停用；卡片六區內容都在、沒有任何數字、沒有「先不接手」或「交回」；只打一次 `/takeover`；開始聊後輸入框能打字、「我来聊」消失、頂部顯示「你本人」；送出訊息後對方分身的回覆出現；結果頁接手 → 到聊天室先看卡片；關閉卡片後路由 state 清掉；已接手後結果頁變「回到聊天室」；375px 沒有橫向溢出。
+  - **真資料端到端**（Jerry 同意寫入，`.local/c6-e2e.ts`）：匿名登入新的 c-test1（`da8dd23b-…`），和小安開對話 `dbeff68d-…` 跑 4 輪，用 c-test1 的 JWT 打 API，12 項通過：接手前 `/status` 我方是分身；`/takeover` 200（5.5 秒），摘要有產生，回應沒有分數、理由或數字；`conversations` 我方 human、小安 twin、active；`handoffs` 多一筆；日誌有「本人接手，分身停止代聊」；再接手、讓分身繼續聊都 409；送出「嗨，我本人来了」後小安的分身回覆；等 15 秒我方分身沒有再發言。卡片的「分身已經替你說過」3 點都真的說過。
+  - **瀏覽器＋真後端**（`.local/c6-browser-e2e.ts`，不攔截 `/api`）：headless Chrome 從登入頁真的匿名登入 c-test1（`25618edb-…`），和小安開對話 `de027a06-…` 跑 4 輪，14 項通過：聊天室載入真的訊息、每則都有 AI 標示、接手前輸入框停用；按「我来聊」出現真的接手卡片（沒有數字、沒有交回按鈕、摘要有內容，和 `handoffs` 存的是同一份）；開始聊後頂部「你本人」、「我来聊」消失；送出「嗨，我本人来了」後小安的分身在畫面上回覆；15 秒內我方分身沒有再發言；`conversations` 我方 human；結果頁變成「回到聊天室」。卡片的「分身已經替你說過」3 點都對得上，建議接話沒有回答分身最後問小安的問題。
+- **踩到的坑／注意事項**：
+  - `useEffect(() => window.scrollTo(...), [])` 會讓整頁當掉：新版 Chrome 的 `scrollTo` 回傳 Promise，React 把它當 cleanup 呼叫，錯誤「destroy is not a function」。effect 要用大括號寫。
+  - 這個分支疊在 C5（PR #76）上面，PR 的目標先設成 `c/C5-result-page`；C5 合併後要把 PR 目標改成 main（刪掉 C5 分支時 GitHub 會自動改）。
+  - **Prompt 7 第一版的建議接話會回答分身自己剛問的問題**：最後一則是我方分身問小安「用相机还是手机？」，建議接話卻寫「我一般用相机」；也會替本人編新喜好（和分身說過的矛盾），還沒聊完的話題會自己加「下次一起去拍照」。光在規則裡寫「看清楚最後一則是誰說的」模型不太遵守；改成程式算出最後一則是誰說的（`lastSpeakerNote`），最後是我方時把那句原文放進 user 訊息並直接說「不要回答这一则里问对方的问题」，加上「不要替用户说纪录里没有的新喜好」「open_topics 每一项都要能在纪录里找到」後，同一段對話跑 8 次（最後是我方／最後是小安各 4 次）都沒再出現（`.local/try-handoff.ts`，只讀）。
+  - 「讓分身繼續聊」跑到一半時本人接手：`runTwinRounds` 下一輪會跳過我方，對方分身會自己再說幾則才停（最多到這次的 `ROUNDS_PER_STEP` 輪）。很少發生，先不處理。
+- **還沒做完／待辦**：
+  - 實測留下的資料：c-test1 兩個（`da8dd23b-…`、`25618edb-…`）、對話 `dbeff68d-…`、`de027a06-…`（各 11 則訊息）、`handoffs` 2 筆、日誌數筆。
+  - 畫面文字先放在 `handoffView.ts` 的 `HANDOFF_TEXT`，之後和 C4、C5 的一起搬到 `messages/strings.json`（A 的檔案）。
+
 ### 2026-10-31｜C5 代聊結果頁｜Jerry（AI 協助）｜PR #76｜Closes #25
 - **做了什麼**：
   - 後端（`server/twin/result.ts`、`resultStore.ts`，路由在 `server/routes/twin.ts`）：

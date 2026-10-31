@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CHAT_TEXT,
+  canRequestHuman,
   canType,
   expectsTwinReply,
   mergeMessages,
@@ -96,5 +97,14 @@ describe('顯示文字', () => {
     for (const value of ['suitable', 'uncertain', 'unsuitable'] as const) {
       expect(verdictText({ value, trend: 'flat' })).not.toMatch(/\d/)
     }
+  })
+})
+
+describe('canRequestHuman（C7）', () => {
+  it('對方是分身、對話沒結束才能請求真人', () => {
+    expect(canRequestHuman(room({ other: { userId: AN, name: '小安', controller: 'twin' } }))).toBe(true)
+    expect(canRequestHuman(room({ status: 'waiting_human', other: { userId: AN, name: '小安', controller: 'twin' } }))).toBe(true)
+    expect(canRequestHuman(room({ other: { userId: AN, name: '小安', controller: 'human' } }))).toBe(false)
+    expect(canRequestHuman(room({ status: 'ended', other: { userId: AN, name: '小安', controller: 'twin' } }))).toBe(false)
   })
 })
