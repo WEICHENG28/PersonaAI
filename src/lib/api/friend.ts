@@ -143,10 +143,10 @@ export async function callFriendIntro(): Promise<void> {
 }
 
 /** POST /api/friend/chat：发送消息，返回 AI 回复。 */
-export async function callFriendChat(text: string): Promise<FriendChatResult> {
+export async function callFriendChat(text: string, mode?: 'nudge'): Promise<FriendChatResult> {
   return apiCall<FriendChatResult>('/api/friend/chat', {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(mode ? { text, mode } : { text }),
   })
 }
 
@@ -229,6 +229,11 @@ export interface MemoryRow {
   confidence: number
   created_at: string
   deleted_at: string | null
+}
+
+/** GET /api/memory：读取用户「它记得的事」列表（http 模式用）。 */
+export async function listMemories(): Promise<MemoryRow[]> {
+  return apiCall<MemoryRow[]>('/api/memory')
 }
 
 /** PATCH /api/memory/:id：编辑记忆内容（source→user_edited, confidence=1）。 */

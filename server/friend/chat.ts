@@ -36,6 +36,7 @@ export class FriendChatError extends Error {
 }
 
 export const chatBodySchema = z.object({ text: z.string().trim().min(1).max(1000) })
+export const nudgeBodySchema = z.object({ text: z.string().trim().max(1000).optional() })
 
 /** 確保 users/ai_friends 有行（冪等；A0b 的 profile/init 只建 users）。 */
 export async function ensureFriendRow(userId: string): Promise<FriendRow> {
@@ -97,17 +98,25 @@ export async function friendIntro(userId: string): Promise<void> {
   })
 }
 
-/** 主流程：POST /api/friend/chat。回傳給前端的訊息（含 task_card）。 */
-export async function friendChat(userId: string, text: string) {
+/** 主流程：POST /api/friend/chat。回傳給前端的訊息（含 task_card）。
+ *  mode='nudge'：用户沉默后阿澈主动接话，不保存用户消息，text 可为空。
+ */
+export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   const db = getServiceClient()
-  const body = chatBodySchema.parse({ text })
+  const isNudge = mode === 'nudge'
+  // nudge 模式允许 text 为空；普通模式校验 1-1000 字
+  const body = isNudge
+    ? { text: text || '（阿澈主动接话）' }
+    : chatBodySchema.parse({ text })
   const friend = await ensureFriendRow(userId)
 
-  // 1. 存用户讯息
-  const { error: uErr } = await db
-    .from('friend_messages')
-    .insert({ user_id: userId, role: 'user', kind: 'chat', content: body.text, meta: {} })
-  if (uErr) throw new FriendChatError(`保存讯息失败：${uErr.message}`)
+  // 1. 存用户讯息（nudge 模式不保存用户消息，阿澈主动开口）
+  if (!isNudge) {
+    const { error: uErr } = await db
+      .from('friend_messages')
+      .insert({ user_id: userId, role: 'user', kind: 'chat', content: body.text, meta: {} })
+    if (uErr) throw new FriendChatError(`保存讯息失败：${uErr.message}`)
+  }
 
   // 2. 组上下文
   const lifeState = friend.life_state ?? getLifeUpdate(friend.story_stage)
@@ -132,10 +141,14 @@ export async function friendChat(userId: string, text: string) {
     memories: memoriesText,
     crisisResource: CONFIG.CRISIS_RESOURCE,
   })
+  // nudge 模式：告诉 LLM 这是主动接话，不是用户发来的消息
+  const userContent = isNudge
+    ? `[mode: nudge] 用户停止回复了一段时间，现在请阿澈主动接话，分享一件和最近话题相关的事或问一个轻松的问题。上下文：\n${recentText || '（还没有聊天记录）'}`
+    : recentText || body.text
   const reply = await llmJson({
     role: 'chat',
     system,
-    messages: [{ role: 'user', content: recentText || body.text }],
+    messages: [{ role: 'user', content: userContent }],
     temperature: 0.8,
     schema: friendReplySchema,
   })

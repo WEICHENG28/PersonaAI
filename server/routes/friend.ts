@@ -70,7 +70,10 @@ friendRoutes.post('/friend/chat', async (c) => {
   }
 
   try {
-    const result = await friendChat(userId, await c.req.json().then((b) => b?.text ?? '').catch(() => ''))
+    const body = await c.req.json().catch(() => ({}))
+    const text: string = body?.text ?? ''
+    const mode: string | undefined = body?.mode
+    const result = await friendChat(userId, text, mode === 'nudge' ? 'nudge' : undefined)
     return c.json({ ok: true, data: result })
   } catch (err) {
     if (err instanceof FriendChatError) {

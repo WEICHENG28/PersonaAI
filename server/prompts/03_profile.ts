@@ -12,6 +12,12 @@ export const PROFILE_PROMPT_SYSTEM = `你在后台分析用户和 AI 朋友的�
 - evidence 与 style 用抽象描述，不可引用用户原句。
 - 资讯不足的栏位维持上一版的值；没有上一版就给 score 50、confidence 0.1。
 
+【重要：喜欢 vs 不喜欢的区分】
+- interests 只放用户明确表示喜欢、或在不同时候多次正面提到的事物。
+- 用户说「不喜欢」「讨厌」「不感兴趣」的，绝对不能放进 interests。
+  例：用户说「我不喜欢看展」→ 看展不进 interests；「我喜欢打游戏」→ 打游戏进 interests。
+- 将用户明确表示不喜欢、想避开的事物，放入 agent_profile.avoidance 清单（给社交 Agent 选人参考），不放入 shareable_profile。
+
 输入：
 - 用户说过的话：{{user_lines}}
 - 上一版资料：{{previous}}
@@ -25,6 +31,7 @@ export const PROFILE_PROMPT_SYSTEM = `你在后台分析用户和 AI 朋友的�
       "C": {…}, "E": {…}, "A": {…}, "N": {…}
     },
     "values": ["…"],
+    "avoidance": ["用户不喜欢或想避开的话题/事物，例如昆虫、看展"],
     "style": {"sentence_length": "short|medium|long", "tone": "…", "emoji_level": 0-3, "formality": "casual|neutral|formal"}
   }
 }`
@@ -58,6 +65,7 @@ export const profileExtractSchema = z.object({
       N: traitScoreSchema,
     }),
     values: z.array(z.string()).default([]),
+    avoidance: z.array(z.string()).default([]),
     style: styleSchema,
   }),
 })

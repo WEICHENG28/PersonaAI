@@ -64,7 +64,7 @@ export function LandingPage() {
         </p>
         <div className="landing-roles__grid">
           <article className="role-card">
-            <RiveAvatar name="robot" size={96} />
+            <RiveAvatar name="chromabot" size={96} />
             <h3>AI 朋友</h3>
             <p>有稳定性格和虚构生活。陪你聊、记得你说过的事，慢慢认识你。</p>
             <ul className="role-card__list">
