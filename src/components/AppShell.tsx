@@ -3,8 +3,8 @@ import { useLocation } from 'react-router'
 import { NavBar } from '@components/ui/NavBar'
 import { useDemoStore } from '@store/useDemoStore'
 
-/** 内容不足一屏就垂直置中的短页（登录） */
-const CENTER_PAGES = ['/']
+/** 内容不足一屏就垂直置中的短页（登录页 /login） */
+const CENTER_PAGES = ['/login']
 
 /**
  * 应用外壳：所有页面共用同一顶栏（含落地页、登录页）。

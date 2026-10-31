@@ -28,7 +28,7 @@ export function LandingPage() {
             聊天认识你的 AI 朋友，加上一组替你跑完「找人、代聊、判定」的社交 Agent。你只在最后接手聊得来的人。
           </p>
           <div className="landing-actions">
-            <Button onClick={() => navigate(user ? '/friend' : '/')}>
+            <Button onClick={() => navigate(user ? '/friend' : '/login')}>
               开始使用
             </Button>
           </div>
@@ -191,7 +191,7 @@ export function LandingPage() {
       <section className="landing-cta">
         <h2>认识你的 AI 朋友</h2>
         <p className="landing-sec__sub">第一句问候开始，剩下的它自己会安排。</p>
-        <Button onClick={() => navigate(user ? '/friend' : '/')}>
+        <Button onClick={() => navigate(user ? '/friend' : '/login')}>
           {user ? '回到阿澈身边' : '现在开始'}
         </Button>
         <p className="landing-note">注册即代表同意 AI 会在画面上清楚标示，对话为虚构角色设定。</p>
