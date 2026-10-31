@@ -107,10 +107,71 @@
 .field em { font-style: normal; font-weight: 500; color: var(--color-muted); font-size: var(--text-xs); }
 .field textarea.input { padding: var(--space-sm) var(--space-md); min-height: 64px; resize: vertical; }
 
-/* ── 朋友页布局：桌机双栏、手机单栏 ── */
-.friend-layout { display: grid; gap: var(--space-md); }
+/* ── 朋友页布局：桌机 左（avatar）右（聊天）分栏，手机只显示聊天 ── */
+.friend-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100svh - var(--bar-h));
+  padding: 0;
+  overflow: hidden;
+}
+.friend-avatar-col {
+  display: none; /* 手机隐藏 */
+}
+.friend-chat-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.friend-chat-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  min-height: 36px;
+  flex-shrink: 0;
+}
+.friend-chat-head:empty { display: none; }
+.typing-label { font-size: var(--text-xs); color: var(--color-muted); }
+
+/* 聊天气泡区：可滚动 */
+.friend-chat-col .chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* 输入栏：有 card 底纹，贴在底部 */
+.friend-input-bar {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  flex-shrink: 0;
+  border-radius: 0;
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+.friend-input-bar .input { flex: 1; min-width: 0; }
+
 @media (min-width: 64rem) {
-  .friend-layout { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start; }
+  .friend-page {
+    flex-direction: row;
+    padding: 0;
+  }
+  .friend-avatar-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--fibre), var(--color-paper-2);
+    border-right: var(--rule-hair) solid var(--color-rule);
+  }
+  .friend-avatar-rive { display: block; }
 }
 
 /* Profile 页桌机双栏：档案+风格（左）／记忆（右） */
@@ -425,3 +486,194 @@
 .log__head time { margin-left: auto; font-size: 10px; color: var(--color-muted); font-family: var(--font-outlier); }
 .log__text { font-size: var(--text-sm); }
 .log__reason { font-size: var(--text-xs); color: var(--color-muted); }
+
+/* ── 大厅 AI 浮动按钮 ── */
+.lobby-ai-fab {
+  position: fixed;
+  bottom: calc(var(--bar-h) + var(--space-md));
+  right: var(--space-md);
+  z-index: 120;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: var(--color-card);
+  box-shadow: 0 4px 16px color-mix(in oklab, var(--color-ink) 18%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow var(--dur-fast) var(--ease-snap), transform var(--dur-fast) var(--ease-snap);
+}
+.lobby-ai-fab:hover { box-shadow: 0 6px 24px color-mix(in oklab, var(--color-ink) 24%, transparent); transform: translateY(-2px); }
+.lobby-ai-fab.is-open { background: var(--color-pear); }
+
+/* 弹窗 */
+.lobby-ai-popup {
+  position: fixed;
+  bottom: calc(var(--bar-h) + 80px);
+  right: var(--space-md);
+  z-index: 119;
+  width: min(360px, calc(100vw - var(--space-lg) * 2));
+  max-height: 480px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-card);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 32px color-mix(in oklab, var(--color-ink) 18%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 10%, transparent);
+  overflow: hidden;
+  animation: popup-in 0.18s var(--ease-snap);
+}
+@keyframes popup-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.lobby-ai-popup__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+.lobby-ai-popup__close {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--color-muted);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-stock);
+}
+.lobby-ai-popup__close:hover { background: var(--color-rule); color: var(--color-ink); }
+.lobby-ai-popup__presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) var(--space-md);
+  flex-shrink: 0;
+}
+.lobby-ai-preset {
+  border: 0;
+  background: var(--fibre), var(--color-paper-2);
+  border-radius: var(--radius-stock);
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  color: var(--color-ink);
+  transition: background var(--dur-fast);
+}
+.lobby-ai-preset:hover { background: var(--color-pear); }
+.lobby-ai-popup__chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.lobby-ai-bubble {
+  max-width: 85%;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-stock);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.lobby-ai-bubble--user {
+  align-self: flex-end;
+  background: var(--color-pear);
+}
+.lobby-ai-bubble--assistant {
+  align-self: flex-start;
+  background: var(--fibre), var(--color-paper-2);
+}
+.lobby-ai-bubble--thinking {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: var(--space-sm);
+}
+.lobby-ai-popup__input {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-top: var(--rule-hair) solid var(--color-rule);
+  flex-shrink: 0;
+}
+.lobby-ai-popup__input .input { flex: 1; min-width: 0; }
+
+/* ── 三点脉冲（thinking 用） ── */
+.dot-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-muted);
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+.dot-pulse:nth-child(2) { animation-delay: 0.2s; }
+.dot-pulse:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1.1); }
+}
+
+/* ── 顶部 Toast 通知（loading / thinking 指示） ── */
+.app-toast {
+  position: fixed;
+  top: calc(var(--bar-h) + var(--space-sm));
+  left: 50%;
+  translate: -50% 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) var(--space-md);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  box-shadow: 0 4px 16px color-mix(in oklab, var(--color-ink) 24%, transparent);
+  pointer-events: none;
+  animation: toast-in 0.2s var(--ease-snap);
+}
+@keyframes toast-in {
+  from { opacity: 0; translate: -50% -8px; }
+  to   { opacity: 1; translate: -50% 0; }
+}
+/* loading 用旋转圆圈 */
+.app-toast--loading .toast-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in oklab, var(--color-paper) 40%, transparent);
+  border-top-color: var(--color-paper);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+/* thinking 用三点 */
+.app-toast--thinking .toast-dots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.app-toast--thinking .toast-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-paper);
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+.app-toast--thinking .toast-dot:nth-child(2) { animation-delay: 0.2s; }
+.app-toast--thinking .toast-dot:nth-child(3) { animation-delay: 0.4s; }

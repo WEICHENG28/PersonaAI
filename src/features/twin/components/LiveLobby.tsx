@@ -6,7 +6,7 @@ import { Button } from '@components/ui/Button'
 import { Card } from '@components/ui/Card'
 import { t } from '@i18n/t'
 import type { LobbyPurpose } from '@lib/api/twin'
-import { LobbyAssistant } from './LobbyAssistant'
+import { LobbyAIFloating } from './LobbyAIFloating'
 import { LobbyCard } from './LobbyCard'
 import { LOBBY_QUERY_MAX, LOBBY_TEXT, PURPOSE_OPTIONS } from './lobbyView'
 import { useLobbyCards, useStartChat, type LobbyAction, type LobbyCardsState, type StartChatState } from './useLobby'
@@ -32,13 +32,6 @@ export function LiveLobby() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{t('lobby.title')}</h1>
-        <p>{t('lobby.subtitle')}</p>
-      </div>
-
-      <LobbyAssistant chat={chat} onStart={start} />
-
       <h2 className="section-title">{t('lobby.candidatesTitle')}</h2>
       <Card className="stack">
         <div className="chips" role="group" aria-label={LOBBY_TEXT.filterLabel}>
@@ -71,7 +64,7 @@ export function LiveLobby() {
         </div>
       </Card>
       <LobbyCards lobby={lobby} chat={chat} onStart={start} />
-      <p className="mbti-note">{t('lobby.mbtiNote')}</p>
+      <LobbyAIFloating />
     </div>
   )
 }

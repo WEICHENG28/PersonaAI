@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
-import { Card, CardHead } from '@components/ui/Card'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { Modal } from '@components/ui/Modal'
 import { useDemoStore } from '@store/useDemoStore'
@@ -11,17 +10,13 @@ import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
 import {
-  triggerNextMeet,
   isHttpMode,
   callFriendIntro,
   callFriendChat,
   getFriendMessages,
-  listMemories,
   fetchSettings,
   type FriendMessage,
-  type MemoryRow,
 } from '@lib/api/friend'
-import { listTasks, type TaskView } from '@lib/api/social'
 
 /** 画面 2-4：AI 朋友聊天 + 记忆侧栏 + 任务确认 + 回报
  *  http 模式：消息来自 GET /api/friend/messages；发送走 POST /api/friend/chat；
@@ -32,9 +27,6 @@ export function FriendPage() {
   const s = useDemoStore()
   const navigate = useNavigate()
   const [draft, setDraft] = useState('')
-  const [taskDraftOpen, setTaskDraftOpen] = useState(false)
-  const [taskText, setTaskText] = useState('帮我找 3 个喜欢登山的人聊聊')
-  const [nextMeetLoading, setNextMeetLoading] = useState(false)
 
   // http 模式专用状态
   const [httpMessages, setHttpMessages] = useState<FriendMessage[]>([])
@@ -43,12 +35,8 @@ export function FriendPage() {
   // http 模式：后端建的待确认任务 ID（显示 B 的 TaskConfirmCard）；工作日志面板开关用后端 dev_mode
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
   const [httpDevMode, setHttpDevMode] = useState(false)
-  // http 模式：当前/最近一个任务（侧栏显示进度）
-  const [httpTask, setHttpTask] = useState<TaskView | null>(null)
   // nudge：最后一则消息是 AI 消息 + 用户 40s 没回复时，主动接话一次
   const [nudgeSentAfter, setNudgeSentAfter] = useState<string | null>(null) // 上次 nudge 触发时的最后 AI 消息 id
-  // http 模式：从 API 拉的记忆列表
-  const [httpMemories, setHttpMemories] = useState<MemoryRow[]>([])
 
   // 消息数量用于自动滚动（mock 或 http 模式均适用）
   const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
@@ -71,17 +59,6 @@ export function FriendPage() {
         const settings = await fetchSettings()
         setHttpDevMode(settings?.dev_mode ?? false)
       } catch { /* 面板默认不显示 */ }
-      // 加载最近任务（显示在侧栏）
-      try {
-        const tasks = await listTasks()
-        const active = tasks.find((t) => t.status !== 'cancelled' && t.status !== 'done') ?? tasks[0] ?? null
-        setHttpTask(active)
-      } catch { /* 任务加载失败忽略 */ }
-      // 加载记忆（「它记得的事」侧栏）
-      try {
-        const mems = await listMemories()
-        setHttpMemories(mems)
-      } catch { /* 记忆加载失败忽略 */ }
     }
     void init()
   }, [])
@@ -121,10 +98,7 @@ export function FriendPage() {
       if (result.taskId) {
         setPendingTaskId(result.taskId)
         // 更新侧栏任务列表
-        try { const tasks = await listTasks(); setHttpTask(tasks[0] ?? null) } catch { /* ignore */ }
       }
-      // 更新记忆侧栏（背景任务可能已写入）
-      try { const mems = await listMemories(); setHttpMemories(mems) } catch { /* ignore */ }
     } catch (e: unknown) {
       setHttpError(e instanceof Error ? e.message : '阿澈刚刚恍神了，再说一次？')
       // 移除乐观消息
@@ -134,10 +108,6 @@ export function FriendPage() {
     }
   }, [draft, s])
 
-  // http 模式：用真实消息数；mock 模式：demo store
-  const httpUserReplyCount = httpMessages.filter((m) => m.role === 'user').length
-  const canAssignTask = isHttpMode ? httpUserReplyCount >= 5 : s.userReplyCount >= 5
-  const replyCountLeft = isHttpMode ? Math.max(0, 5 - httpUserReplyCount) : Math.max(0, 5 - s.userReplyCount)
 
   // Nudge：http 模式下，最后一则是 AI 消息 + 用户沉默 40s → 阿澈主动接话（每次沉默最多一次）
   useEffect(() => {
@@ -166,239 +136,71 @@ export function FriendPage() {
     navigate('/chat/lin/result')
   }
 
-  const handleNextMeet = async () => {
-    setNextMeetLoading(true)
-    try {
-      if (isHttpMode) {
-        await triggerNextMeet()
-        // HTTP 模式：後端已寫入 DB，前端可以透過 Realtime 或重新 fetch 拿到新訊息
-        // 暫時用 alert 提示（A5 完整實現需要前端訂閱 Realtime 或輪詢）
-        alert('模擬下次見面成功！新訊息已送達（重新整理頁面查看）')
-      } else {
-        // Mock 模式：用 demo store
-        s.nextMeet()
-      }
-    } catch (err) {
-      console.error('[nextMeet] 失敗', err)
-      alert(err instanceof Error ? err.message : '模擬下次見面失敗，請再試一次')
-    } finally {
-      setNextMeetLoading(false)
-    }
-  }
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <h1>{t('friend.title')}</h1>
-      </div>
+    <div className="page friend-page">
+      {/* 桌机左栏：chromabot 大头像（手机隐藏） */}
+      <aside className="friend-avatar-col" aria-hidden>
+        <RiveAvatar name="chromabot" size={260} className="friend-avatar-rive" />
+      </aside>
 
-      <div className="friend-layout">
-        {/* 聊天主栏 */}
-        <Card className="friend-chat">
-          <div className="friend-chat__head">
-            <RiveAvatar name="chromabot" size={44} />
-            <div>
-              <strong>{t('friend.title')}</strong>
-              {(isHttpMode ? httpTyping : s.friendTyping) && (
-                <span>{t('friend.typing')}</span>
-              )}
-            </div>
-            {s.reportReady && <Chip tone="pear">{t('friend.hasNews')}</Chip>}
-          </div>
-
-          <div className="chat" ref={chatRef}>
-            {isHttpMode ? (
-              <>
-                {httpMessages.length === 0 && !httpTyping && (
-                  <p className="empty">{t('friend.empty')}</p>
-                )}
-                {httpMessages.map((m) => (
-                  <ChatBubble key={m.id} speaker={m.role === 'user' ? 'human' : 'friend'}>
-                    {m.content}
-                  </ChatBubble>
-                ))}
-                {httpTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
-                {httpError && (
-                  <p style={{ color: 'var(--c-err)', fontSize: '0.85em', padding: '0.5rem 0' }}>
-                    {httpError}
-                  </p>
-                )}
-              </>
-            ) : (
-              <>
-                {s.friendMessages.length === 0 && <p className="empty">{t('friend.empty')}</p>}
-                {s.friendMessages.map((m) => (
-                  <ChatBubble key={m.id} speaker={m.speaker}>
-                    {m.text}
-                  </ChatBubble>
-                ))}
-                {s.friendTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
-              </>
-            )}
-          </div>
-
-          <div className="chat-input">
-            <input
-              className="input"
-              placeholder={t('friend.inputPlaceholder')}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void send()}
-              disabled={isHttpMode ? httpTyping : s.friendTyping}
-            />
-            <Button
-              small
-              onClick={() => void send()}
-              disabled={!draft.trim() || (isHttpMode ? httpTyping : s.friendTyping)}
-            >
-              {t('friend.send')}
-            </Button>
-          </div>
-        </Card>
-
-        {/* 侧栏：它记得的事 + 任务入口 */}
-        <div className="friend-side stack">
-          <Card>
-            <CardHead title={t('friend.memoriesTitle')} sub={t('friend.memoriesHint')} />
-            {isHttpMode ? (
-              httpMemories.length === 0 ? (
-                <p className="empty">{t('profile.memoriesEmpty')}</p>
-              ) : (
-                <ul className="mem-list">
-                  {httpMemories.filter((m) => !m.deleted_at).map((m) => (
-                    <li key={m.id} className="mem">
-                      <p>{m.content}</p>
-                      <footer>
-                        <Chip tone="well">{m.source}</Chip>
-                        <Chip tone={m.confidence >= 0.7 ? 'mint' : 'paper'}>
-                          {t('profile.confidence')}：{m.confidence >= 0.7 ? t('profile.confHigh') : m.confidence >= 0.4 ? t('profile.confMid') : t('profile.confLow')}
-                        </Chip>
-                      </footer>
-                    </li>
-                  ))}
-                </ul>
-              )
-            ) : s.memories.length === 0 ? (
-              <p className="empty">{t('profile.memoriesEmpty')}</p>
-            ) : (
-              <ul className="mem-list">
-                {s.memories.map((m) => (
-                  <li key={m.id} className="mem">
-                    <p>{m.content}</p>
-                    <footer>
-                      <Chip tone="well">{m.source}</Chip>
-                      <Chip tone={m.confidence === 'high' ? 'mint' : 'paper'}>
-                        {t('profile.confidence')}：
-                        {m.confidence === 'high'
-                          ? t('profile.confHigh')
-                          : m.confidence === 'mid'
-                            ? t('profile.confMid')
-                            : t('profile.confLow')}
-                      </Chip>
-                      <button className="mem-del" onClick={() => s.deleteMemory(m.id)}>
-                        {t('profile.deleteMemory')}
-                      </button>
-                    </footer>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          {/* 任务区 */}
-          <Card>
-            <CardHead
-              title={
-                s.task
-                  ? `${t('friend.taskCard')} · ${s.task.status === 'running'
-                    ? t('task.statusRunning')
-                    : s.task.status === 'done'
-                      ? t('task.statusDone')
-                      : t('task.statusPaused')
-                  }`
-                  : t('friend.taskCard')
-              }
-            />
-            {isHttpMode ? (
-              // ── http 模式：真实任务 ──
-              httpTask ? (
-                <div className="task-mini">
-                  <p>{httpTask.restatement ?? httpTask.raw_instruction ?? '—'}</p>
-                  <p className="hint-inline" style={{ fontSize: '0.82em' }}>
-                    状态：{
-                      httpTask.status === 'running' ? '执行中'
-                      : httpTask.status === 'done' ? '已完成'
-                      : httpTask.status === 'paused' ? '已暂停'
-                      : httpTask.status === 'cancelled' ? '已取消'
-                      : httpTask.status === 'failed' ? '失败'
-                      : '待确认'
-                    }
-                  </p>
-                  <Button small variant="secondary" block onClick={() => navigate(`/tasks/${httpTask.id}`)}>
-                    看进度
-                  </Button>
-                </div>
-              ) : canAssignTask ? (
-                <p className="empty" style={{ fontSize: '0.88em' }}>
-                  跟阿澈说：「帮我找 2 个喜欢登山的人聊聊」
-                </p>
-              ) : (
-                <p className="empty">
-                  跟阿澈多聊几句（还差 {replyCountLeft} 则），就能交办任务。
-                </p>
-              )
-            ) : (
-              // ── mock 模式 ──
-              s.task ? (
-                <div className="task-mini">
-                  <p>
-                    {t('task.goal')}：{s.task.goal} · {t('task.condition')}：{s.task.condition} ·{' '}
-                    {t('task.count')}：{s.task.count} {t('report.statUnit')}
-                  </p>
-                  <p className="task-mini__done">
-                    {t('task.doneWhen')}：{s.task.doneWhen}
-                  </p>
-                  <div
-                    className="grow"
-                    style={{ ['--g' as string]: String(s.task.progress / s.task.count) }}
-                  />
-                  <p className="task-mini__progress">
-                    {t('task.progress')}：
-                    {t('task.progressOf', { done: s.task.progress, total: s.task.count })}
-                  </p>
-                  {s.proxyMessages.length === 0 && (
-                    <Button small variant="secondary" block onClick={s.startProxy}>
-                      开始执行（demo 加速）
-                    </Button>
-                  )}
-                  {s.proxyDone && (
-                    <Button small block onClick={() => navigate('/chat/lin/result')}>
-                      {t('proxyChat.resultLink')}
-                    </Button>
-                  )}
-                </div>
-              ) : canAssignTask ? (
-                <div className="task-entry">
-                  <p>试试跟阿澈说：「{taskText}」</p>
-                  <Button small variant="secondary" block onClick={() => setTaskDraftOpen(true)}>
-                    生成{t('friend.taskCard')}
-                  </Button>
-                </div>
-              ) : (
-                <p className="empty">
-                  跟阿澈多聊几句（还差 {replyCountLeft} 则），就能交办任务。
-                </p>
-              )
-            )}
-          </Card>
-
-          {/* 模拟下次见面（仅 mock 模式 demo） */}
-          {!isHttpMode && canAssignTask && !s.reportReady && !s.task && (
-            <Button small variant="secondary" block onClick={handleNextMeet} disabled={nextMeetLoading}>
-              {nextMeetLoading ? '处理中…' : t('friend.nextMeet')}
-              <em className="hint-inline">{t('friend.nextMeetHint')}</em>
-            </Button>
+      {/* 聊天栏（无容器，直接融入页面；输入框固定底部） */}
+      <div className="friend-chat-col">
+        <div className="friend-chat-head">
+          {(isHttpMode ? httpTyping : s.friendTyping) && (
+            <span className="typing-label">{t('friend.typing')}</span>
           )}
+          {s.reportReady && <Chip tone="pear">{t('friend.hasNews')}</Chip>}
+        </div>
+
+        <div className="chat" ref={chatRef}>
+          {isHttpMode ? (
+            <>
+              {httpMessages.length === 0 && !httpTyping && (
+                <p className="empty">{t('friend.empty')}</p>
+              )}
+              {httpMessages.map((m) => (
+                <ChatBubble key={m.id} speaker={m.role === 'user' ? 'human' : 'friend'}>
+                  {m.content}
+                </ChatBubble>
+              ))}
+              {httpTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
+              {httpError && (
+                <p style={{ color: 'var(--c-err)', fontSize: '0.85em', padding: '0.5rem 0' }}>
+                  {httpError}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              {s.friendMessages.length === 0 && <p className="empty">{t('friend.empty')}</p>}
+              {s.friendMessages.map((m) => (
+                <ChatBubble key={m.id} speaker={m.speaker}>
+                  {m.text}
+                </ChatBubble>
+              ))}
+              {s.friendTyping && <div className="typing-dot" aria-label={t('friend.typing')} />}
+            </>
+          )}
+        </div>
+
+        {/* 输入区：有圆角 card 包裹，固定在聊天列底部 */}
+        <div className="friend-input-bar card">
+          <input
+            className="input"
+            placeholder={t('friend.inputPlaceholder')}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void send()}
+            disabled={isHttpMode ? httpTyping : s.friendTyping}
+          />
+          <Button
+            small
+            onClick={() => void send()}
+            disabled={!draft.trim() || (isHttpMode ? httpTyping : s.friendTyping)}
+          >
+            {t('friend.send')}
+          </Button>
         </div>
       </div>
 
@@ -442,26 +244,6 @@ export function FriendPage() {
           />
         </Modal>
       )}
-
-      {/* mock 模式：demo 任务确认卡 */}
-      {!isHttpMode && (
-        <TaskConfirmModal
-          open={taskDraftOpen}
-          text={taskText}
-          onText={setTaskText}
-          onCancel={() => setTaskDraftOpen(false)}
-          onConfirm={() => {
-            s.createTask({
-              goal: '运动伙伴',
-              condition: '喜欢登山',
-              count: 3,
-              doneWhen: '找到 2 位双向合适就停',
-            })
-            setTaskDraftOpen(false)
-            s.startProxy()
-          }}
-        />
-      )}
     </div>
   )
 }
@@ -492,61 +274,5 @@ function TaskReport() {
         <em>{t('report.calcNoteAdjust')}</em>
       </p>
     </div>
-  )
-}
-
-function TaskConfirmModal({
-  open,
-  text,
-  onText,
-  onCancel,
-  onConfirm,
-}: {
-  open: boolean
-  text: string
-  onText: (v: string) => void
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  return (
-    <Modal
-      open={open}
-      onClose={onCancel}
-      title={t('task.title')}
-      sub={t('task.subtitle')}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onCancel}>
-            {t('task.cancel')}
-          </Button>
-          <Button onClick={onConfirm}>{t('task.confirm')}</Button>
-        </>
-      }
-    >
-      <div className="task-form">
-        <label className="field">
-          <span>一句话交办</span>
-          <input className="input" value={text} onChange={(e) => onText(e.target.value)} />
-        </label>
-        <dl className="task-grid">
-          <div>
-            <dt>{t('task.goal')}</dt>
-            <dd>运动伙伴</dd>
-          </div>
-          <div>
-            <dt>{t('task.condition')}</dt>
-            <dd>喜欢登山</dd>
-          </div>
-          <div>
-            <dt>{t('task.count')}</dt>
-            <dd>3 人</dd>
-          </div>
-          <div>
-            <dt>{t('task.doneWhen')}</dt>
-            <dd>找到 2 位双向合适就停</dd>
-          </div>
-        </dl>
-      </div>
-    </Modal>
   )
 }

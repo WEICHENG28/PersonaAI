@@ -34,10 +34,6 @@ export function TaskPage() {
   const { id } = useParams()
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{id ? '任务进度' : '我的任务'}</h1>
-        <p>社交 Agent 替你找人的每一个任务，进度都在这里</p>
-      </div>
       {!historyFromApi ? (
         <p className="empty">Demo 模式没有真实任务，请到 AI 朋友页看示范的任务卡。</p>
       ) : id ? (

@@ -17,10 +17,6 @@ export function HistoryPage() {
   if (historyFromApi) {
     return (
       <div className="page">
-        <div className="page-head">
-          <h1>{t('history.title')}</h1>
-          <p>{t('history.subtitle')}</p>
-        </div>
         <HistoryList />
       </div>
     )
@@ -31,10 +27,6 @@ export function HistoryPage() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{t('history.title')}</h1>
-        <p>{t('history.subtitle')}</p>
-      </div>
 
       {!hasRun ? (
         <p className="empty">{t('history.empty')}</p>
