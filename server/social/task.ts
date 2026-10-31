@@ -4,6 +4,7 @@ import { llmJson } from '../lib/llm/index.js'
 import { writeLog } from '../lib/log.js'
 import { TASK_PROMPT_SYSTEM, parsedTaskSchema, taskPromptUser, type RawParsedTask } from '../prompts/14_task.js'
 import { getTaskStore } from './taskStore.js'
+import { notReadyMessage } from './readiness.js'
 
 const MAX_COUNT = 10
 const DEFAULT_COUNT = 3
@@ -84,10 +85,8 @@ export async function createTaskFromText(userId: string, text: string): Promise<
  * 和確認任務一樣，要先確認對外檔案、開啟社交 Agent。
  */
 export async function createSingleTargetTask(userId: string, targetUserId: string, targetName = '对方'): Promise<AgentTask> {
-  const ready = await getTaskStore().readiness(userId)
-  if (!ready.socialAgentEnabled || !ready.shareableConfirmed) {
-    throw new TaskError('先到「我的档案」确认对外档案，并在设置开启社交 Agent', 403)
-  }
+  const notReady = notReadyMessage(await getTaskStore().readiness(userId), '，分身才能替你去聊')
+  if (notReady) throw new TaskError(notReady, 403)
   const restatement = `让分身和${targetName}聊一聊`
   const task = await getTaskStore().insert({
     user_id: userId,
@@ -164,10 +163,8 @@ export async function changeTaskStatus(userId: string, taskId: string, action: T
   if (!rule.from.includes(task.status)) throw new TaskError(`这个任务目前不能${rule.verb}`)
 
   if (rule.to === 'running') {
-    const ready = await getTaskStore().readiness(userId)
-    if (!ready.socialAgentEnabled || !ready.shareableConfirmed) {
-      throw new TaskError('先到「我的档案」确认对外档案，并在设置开启社交 Agent', 403)
-    }
+    const notReady = notReadyMessage(await getTaskStore().readiness(userId))
+    if (notReady) throw new TaskError(notReady, 403)
   }
 
   const updated = await getTaskStore().setStatus(taskId, rule.to)

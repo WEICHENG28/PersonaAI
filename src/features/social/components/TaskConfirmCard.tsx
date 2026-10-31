@@ -40,7 +40,10 @@ export function TaskConfirmCard({
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
   // 後端回「先到我的档案确认…并在设置开启社交 Agent」時，直接給兩個入口，不讓用戶卡住
-  const needsSetup = Boolean(error && error.includes('我的档案'))
+  // 只給缺的那一步的按鈕（後端訊息只會提到缺的步驟）
+  const needsProfile = Boolean(error && error.includes('我的档案'))
+  const needsAgent = Boolean(error && error.includes('社交 Agent'))
+  const needsSetup = needsProfile || needsAgent
 
   useEffect(() => {
     let alive = true
@@ -166,13 +169,17 @@ export function TaskConfirmCard({
       )}
       {needsSetup && (
         <div>
-          <Button small variant="secondary" onClick={() => navigate('/profile')}>
-            去确认对外档案
-          </Button>
-          <Button small variant="secondary" onClick={() => navigate('/settings')}>
-            去设置开启社交 Agent
-          </Button>
-          <p>两步都完成后，到「我的任务」打开这个任务按确认就会开始，任务会保留。</p>
+          {needsProfile && (
+            <Button small variant="secondary" onClick={() => navigate('/profile')}>
+              去确认对外档案
+            </Button>
+          )}
+          {needsAgent && (
+            <Button small variant="secondary" onClick={() => navigate('/settings')}>
+              去设置开启社交 Agent
+            </Button>
+          )}
+          <p>完成后，到「我的任务」打开这个任务按确认就会开始，任务会保留。</p>
         </div>
       )}
       {pending ? (
