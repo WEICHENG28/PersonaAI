@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { Button } from '@components/ui/Button'
 import { t } from '@i18n/t'
 import { ApiError, PURPOSE_LABEL, describeDone, getTask, updateTask, type TaskView } from '@lib/api/social'
@@ -19,6 +20,9 @@ export function TaskConfirmCard({
   const [task, setTask] = useState<TaskView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const navigate = useNavigate()
+  // 後端回「先到我的档案确认…并在设置开启社交 Agent」時，直接給兩個入口，不讓用戶卡住
+  const needsSetup = Boolean(error && error.includes('我的档案'))
 
   useEffect(() => {
     let alive = true
@@ -76,6 +80,17 @@ export function TaskConfirmCard({
         <p className="chip chip--coral" role="alert">
           {error}
         </p>
+      )}
+      {needsSetup && (
+        <div>
+          <Button small variant="secondary" onClick={() => navigate('/profile')}>
+            去确认对外档案
+          </Button>
+          <Button small variant="secondary" onClick={() => navigate('/settings')}>
+            去设置开启社交 Agent
+          </Button>
+          <p>两步都完成后，到「我的任务」打开这个任务按确认就会开始，任务会保留。</p>
+        </div>
       )}
       {pending ? (
         <div>

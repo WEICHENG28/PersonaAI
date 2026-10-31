@@ -278,6 +278,13 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜任務確認卡：未確認檔案時給入口｜Peter（AI 協助）
+- **做了什麼**：`TaskConfirmCard` 按「确认」被擋（對外檔案未確認或社交 Agent 沒開）時，除了錯誤訊息，多兩顆按鈕「去确认对外档案」「去设置开启社交 Agent」，並提示完成後到「我的任务」確認，任務會保留（`/tasks/:id` 本來就有確認按鈕）。
+- **為什麼**：Peter 實測時卡在這一步，只看到紅字不知道下一步。
+- **驗證**：`tsc -b`、vitest 全過、`npm run build`。
+
+---
+
 ### 2026-10-31｜B11 找人目的：評審依目的加權｜Peter（AI 協助）｜Closes #19
 - **做了什麼**：`CONFIG.JUDGE_WEIGHTS`（交友等權重；讀書伙伴 `condition_fit ×2`、`humor ×0.5`；運動伙伴 `condition_fit ×2`、`engagement ×1.2`；興趣同好 `topic_fit`、`condition_fit ×1.5`）；`directionScore` 改成依任務目的的加權平均；評審 Prompt 的輸入加上「這個目的要多看什麼」（照 02 F13 的表）。
 - **其他 B11 項目原本就有**：大廳只配對開啟該目的的人（B2 的篩選）、規劃器的開場話題依目的（Prompt 4 已帶入目的）。
