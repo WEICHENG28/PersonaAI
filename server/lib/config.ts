@@ -14,6 +14,7 @@ export const CONFIG = {
   MEMORY_LIMIT: 50,               // 「它記得的事」最多列幾筆（A3）
   PROFILE_EXTRACT_EVERY: 6,        // 用戶每說幾則話更新一次檔案
   REAL_USER_BONUS: 0.05,           // 挑人時真人略加分（現場 Demo 讓大家容易配對到彼此；不改顯示的相似度）
+  LOBBY_INVITE_MIN_MESSAGES: 8,    // 和阿澈說滿幾句、對外檔案也夠完整，才邀請真人進大廳
   ANOMALY_MIN_MESSAGES: 15,
   ANOMALY_CHECK_EVERY: 5,
   SEED_AUTO_RESPONSE: 'later',     // 種子用戶被請求真人時的自動回覆

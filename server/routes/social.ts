@@ -12,6 +12,8 @@ import { computeStats } from '../social/stats.js'
 import { getTaskStore } from '../social/taskStore.js'
 import { defaultRunnerDeps } from '../social/runnerDeps.js'
 import { requireUserId } from '../social/user.js'
+import { acceptLobbyInvite, getLobbyInvite } from '../social/lobbyInvite.js'
+import { supabaseLobbyInviteDeps } from '../social/lobbyInviteDeps.js'
 
 export const socialRoutes = new Hono()
 
@@ -25,6 +27,10 @@ socialRoutes.post('/tasks', (c) =>
     return createTaskFromText(userId, body.data.text)
   }),
 )
+
+/** 真人進大廳：能不能邀請（聊夠了＋對外檔案夠完整），以及用戶按「加入大厅」。 */
+socialRoutes.get('/lobby-invite', (c) => respond(c, (userId) => getLobbyInvite(userId, supabaseLobbyInviteDeps())))
+socialRoutes.post('/lobby-invite/accept', (c) => respond(c, (userId) => acceptLobbyInvite(userId, supabaseLobbyInviteDeps())))
 
 /** B10：我最近的任務（任務頁列表）。 */
 socialRoutes.get('/tasks', (c) => respond(c, (userId) => getTaskStore().listByUser(userId, 20)))
