@@ -75,9 +75,9 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      {/* 左（桌机）/ 上（手机）：chromabot 头像 */}
+      {/* 左（桌机）/ 上（手机）：chromabot 头像（占屏幕高度 60%） */}
       <div className="login-avatar-area">
-        <RiveAvatar name="chromabot" size={280} className="login-bot" />
+        <RiveAvatar name="chromabot" fill className="login-bot" />
       </div>
 
       {/* 右（桌机）/ 下（手机）：品牌 + 登录卡 */}

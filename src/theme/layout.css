@@ -18,14 +18,16 @@
   padding: var(--space-md) var(--gutter) var(--space-2xl);
 }
 
-/* 短页（登录）：内容不足一屏时垂直置中 */
+/* 短页（登录）：内容不足一屏时垂直置中，永不滚动 */
 .app-main.page-center {
   display: grid;
   place-content: center;
-  min-height: 100svh;
-  /* navbar 高度 + 小间距；手机下 login-page 自管 padding，这里只留最小值 */
-  padding-top: calc(var(--bar-h) + var(--space-sm));
+  /* 固定视口高度（navbar 之下），超出内容裁切 → 登录页不可滚动 */
+  height: calc(100svh - var(--bar-h));
+  box-sizing: border-box;
+  padding-top: var(--space-sm);
   padding-bottom: var(--space-sm);
+  overflow: hidden;
 }
 
 /* 有导航的页：手机让出底部 tab 拦高度 */

@@ -12,7 +12,10 @@ export type RiveName = keyof typeof SOURCES
 
 interface RiveAvatarProps {
   name: RiveName
+  /** 固定像素尺寸（fill 模式下忽略） */
   size?: number
+  /** 由外层 CSS 控制尺寸（canvas 填满容器）；用于 chromabot 占屏幕高度百分比等场景 */
+  fill?: boolean
   className?: string
   options?: Partial<UseRiveOptions>
 }
@@ -27,9 +30,11 @@ interface RiveAvatarProps {
  *
  * 修复：
  * 1. shouldResizeCanvasToContainer: false —— 不让 Rive 自动读容器
- * 2. useEffect 在 rive 加载后手动把 canvas.style 设为目标尺寸并触发重算
+ * 2. useEffect 在 rive 加载后手动把 canvas 尺寸设好并触发重算
+ *    - 默认：canvas = size × size 像素
+ *    - fill：canvas 填满容器（100%），尺寸由外层 CSS 决定（容器须有确定高度）
  */
-export function RiveAvatar({ name, size = 120, className, options }: RiveAvatarProps) {
+export function RiveAvatar({ name, size = 120, fill = false, className, options }: RiveAvatarProps) {
   const { rive, canvas, RiveComponent } = useRive(
     {
       src: SOURCES[name],
@@ -41,17 +46,22 @@ export function RiveAvatar({ name, size = 120, className, options }: RiveAvatarP
   )
 
   // Rive 加载后：强制设置 canvas 尺寸并触发重绘
-  // （Rive 内部会先按 artboard 原始尺寸设 style，我们在这里覆盖）
   useEffect(() => {
     if (!canvas || !rive) return
-    canvas.style.width = `${size}px`
-    canvas.style.height = `${size}px`
+    if (fill) {
+      // 填满模式：跟随容器（容器须由 CSS 给出确定尺寸）
+      canvas.style.width = '100%'
+      canvas.style.height = '100%'
+    } else {
+      canvas.style.width = `${size}px`
+      canvas.style.height = `${size}px`
+    }
     rive.resizeDrawingSurfaceToCanvas()
-  }, [rive, canvas, size])
+  }, [rive, canvas, size, fill])
 
   return (
     <RiveComponent
-      style={{ width: size, height: size }}
+      style={fill ? { width: '100%', height: '100%' } : { width: size, height: size }}
       className={className}
       aria-hidden
     />

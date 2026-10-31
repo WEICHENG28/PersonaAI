@@ -35,8 +35,6 @@ export function FriendPage() {
   // http 模式：后端建的待确认任务 ID（显示 B 的 TaskConfirmCard）；工作日志面板开关用后端 dev_mode
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
   const [httpDevMode, setHttpDevMode] = useState(false)
-  // nudge：最后一则消息是 AI 消息 + 用户 40s 没回复时，主动接话一次
-  const [nudgeSentAfter, setNudgeSentAfter] = useState<string | null>(null) // 上次 nudge 触发时的最后 AI 消息 id
 
   // 消息数量用于自动滚动（mock 或 http 模式均适用）
   const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
@@ -109,15 +107,23 @@ export function FriendPage() {
   }, [draft, s])
 
 
-  // Nudge：http 模式下，最后一则是 AI 消息 + 用户沉默 40s → 阿澈主动接话（每次沉默最多一次）
+  // Nudge：http 模式下，最后一则是 AI 消息 + 用户沉默 75s → 阿澈主动接话。
+  // 规则：使用者每次沉默最多 1 次——判断「最后一条 user 讯息之后有没有 meta.nudge 的讯息」，
+  // 有就不再设计时器（不靠本地 state，重新整理 / 多分頁也不会重复）。
+  // 分頁在背景（document.visibilityState !== 'visible'）时不发。
+  // 后端也有同样的防重复挡（meta.nudge 检查），双保险。
   useEffect(() => {
     if (!isHttpMode || httpMessages.length === 0) return
     const lastMsg = httpMessages[httpMessages.length - 1]
     if (!lastMsg || lastMsg.role !== 'friend') return // 最后一则是用户，不 nudge
-    if (nudgeSentAfter === lastMsg.id) return // 这段沉默已经 nudge 过了
-    const lastId = lastMsg.id
+    // 最后一条 user 讯息之后已经有过 nudge → 这段沉默已经接过话
+    const lastUserIdx = httpMessages.map((m) => m.role).lastIndexOf('user')
+    const afterUser = httpMessages.slice(lastUserIdx + 1)
+    if (afterUser.some((m) => m.meta?.nudge === true)) return
+    // 分頁在背景不发（等回到前景、effect 重跑时再计时）
+    if (document.visibilityState !== 'visible') return
     const timer = setTimeout(async () => {
-      setNudgeSentAfter(lastId)
+      if (document.visibilityState !== 'visible') return // 触发瞬间再确认一次
       setHttpTyping(true)
       try {
         await callFriendChat('', 'nudge')
@@ -126,10 +132,10 @@ export function FriendPage() {
       } catch { /* nudge 失败静默 */ } finally {
         setHttpTyping(false)
       }
-    }, 40_000) // 40 秒
+    }, 75_000) // 75 秒（60–90s 范围内）
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [httpMessages, nudgeSentAfter])
+  }, [httpMessages])
 
   const openReport = () => {
     s.dismissReport()
@@ -139,9 +145,9 @@ export function FriendPage() {
 
   return (
     <div className="page friend-page">
-      {/* 桌机左栏：chromabot 大头像（手机隐藏） */}
+      {/* 桌机左栏：chromabot 大头像（手机隐藏；占屏幕高度 60%） */}
       <aside className="friend-avatar-col" aria-hidden>
-        <RiveAvatar name="chromabot" size={260} className="friend-avatar-rive" />
+        <RiveAvatar name="chromabot" fill className="friend-avatar-rive" />
       </aside>
 
       {/* 聊天栏（无容器，直接融入页面；输入框固定底部） */}

@@ -26,6 +26,18 @@
 
 ## 共用與決策
 
+### 2026-10-31｜通知面板動畫修復 + nudge 無限發修復｜Vincent（AI 協助）｜PR a/friend-quality
+- **做了什麼**：
+  1. **通知鈴鐺面板動畫 bug**：打開面板時先出現在錯誤位置再跳到正確位置（flicker）。原因是 `pages.css` 新增的 `@keyframes toast-in`（app-toast 用，帶 `translate: -50%`）覆蓋了 `layout.css` 同名的通知面板 keyframes（帶 `translate: 0 12px`），CSS 同名 keyframes 後者覆蓋前者。修法：app-toast 改名為 `app-toast-in`，不再撞名。
+  2. **nudge 無限發**：使用者不回話，阿澈每 40 秒就再主動接話一次。原因是前端用 `nudgeSentAfter`（最後一則 AI 訊息 id）判斷，但 nudge 自己產生新訊息、最後 id 變了又重新觸發；後端也沒擋。修法：
+     - 後端 `friendChat`：nudge 訊息存 `meta: { nudge: true }`；nudge 模式開頭先查「最後一則 user 訊息之後有沒有 meta.nudge 訊息」，有就直接返回（不呼叫 LLM、不存訊息）——開多個分頁也不會重複。
+     - nudge 模式不處理 `task_intent`（之前會拿「（阿澈主动接话）」去 `createTaskFromText`）。
+     - 前端：改判斷「最後一則 user 訊息之後有沒有 nudge 訊息」；分頁在背景（`visibilityState !== 'visible'`）不發；等待時間 40s → 75s。
+- **為什麼這樣做**：防重複判斷放在後端（資料庫為準），前端只是第一道關；這樣重新整理、多分頁、多裝置都不會重複發。keyframes 撞名是 CSS 全域命名空間的坑，新增 keyframes 一律加前綴。
+- **改了哪些檔案**：`src/theme/pages.css`（keyframes 改名）、`server/friend/chat.ts`（meta.nudge + 防重複查詢 + 跳過 task_intent）、`src/features/friend/FriendPage.tsx`（nudge 判斷改寫 + 75s + 背景不發）、`tests/friend/nudge.test.ts`（重寫：8 個案例）。
+- **踩到的坑**：CSS `@keyframes` 是全域的，不同檔案同名會互相覆蓋（build 不會報錯，只有 runtime 動畫怪掉才會發現）。
+- **還沒做完／待辦**：無。
+
 ### 2026-10-31｜a/friend-quality：AI 朋友品質提升 + 登入頁重排｜Vincent（AI 協助）｜PR a/friend-quality
 - **做了什麼**：
   1. **登入頁（#login-scroll）**：移除 `page-center` 多餘 padding，桌機改為左（chromabot Rive）右（標題+副標題+登入卡）雙欄，手機改為 Rive 頭像上半螢幕、登入卡稍微遮住底部、副標題顯示在卡片下方；不再需要滾動。

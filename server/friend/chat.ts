@@ -100,6 +100,8 @@ export async function friendIntro(userId: string): Promise<void> {
 
 /** 主流程：POST /api/friend/chat。回傳給前端的訊息（含 task_card）。
  *  mode='nudge'：用户沉默后阿澈主动接话，不保存用户消息，text 可为空。
+ *  防重复：最后一次 user 讯息之后若已有 meta.nudge=true 的讯息，直接返回不呼叫 LLM
+ *  （使用者每次沉默最多 1 次；分頁開多個也不會重複發）。
  */
 export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   const db = getServiceClient()
@@ -109,6 +111,21 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     ? { text: text || '（阿澈主动接话）' }
     : chatBodySchema.parse({ text })
   const friend = await ensureFriendRow(userId)
+
+  // 0. nudge 防重复：拉最近几则（含 meta），看最后一条 user 讯息之后有没有 nudge 讯息
+  if (isNudge) {
+    const { data: recentRows } = await db
+      .from('friend_messages')
+      .select('role, kind, content, meta')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    const recentNudgeCheck = (recentRows ?? []) as Array<{ role: string; meta: { nudge?: boolean } | null }>
+    for (const row of recentNudgeCheck) {
+      if (row.role === 'user') break // 遇到 user 讯息还没看到 nudge → 这段沉默还没接过话，继续
+      if (row.meta?.nudge) return { reply: null, taskId: null, sharedEventId: null, nudged: true }
+    }
+  }
 
   // 1. 存用户讯息（nudge 模式不保存用户消息，阿澈主动开口）
   if (!isNudge) {
@@ -153,10 +170,19 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     schema: friendReplySchema,
   })
 
-  // 4. 存回复；shared_event_id 记入 ai_friends
+  // 4. 存回复；shared_event_id 记入 ai_friends；nudge 讯息标 meta.nudge=true（防重复用）
   const { error: rErr } = await db
     .from('friend_messages')
-    .insert({ user_id: userId, role: 'friend', kind: 'chat', content: reply.reply, meta: reply.shared_event_id ? { event_id: reply.shared_event_id } : {} })
+    .insert({
+      user_id: userId,
+      role: 'friend',
+      kind: 'chat',
+      content: reply.reply,
+      meta: {
+        ...(isNudge ? { nudge: true } : {}),
+        ...(reply.shared_event_id ? { event_id: reply.shared_event_id } : {}),
+      },
+    })
   if (rErr) throw new FriendChatError(`保存回复失败：${rErr.message}`)
 
   if (reply.shared_event_id && EVENTS.some((e) => e.id === reply.shared_event_id)) {
@@ -167,8 +193,9 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   }
 
   // 5. task_intent → B 的 createTaskFromText + task_card 消息
+  //    nudge 模式不处理 task_intent（LLM 可能误判，且 nudge 不该建任务）
   let taskId: string | null = null
-  if (reply.task_intent) {
+  if (reply.task_intent && !isNudge) {
     try {
       const task = await createTaskFromText(userId, body.text)
       taskId = task.id
