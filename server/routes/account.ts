@@ -23,6 +23,6 @@ accountRoutes.post('/account/enter', async (c) => {
     console.error('[account] enter failed', e instanceof Error ? e.message : e)
     return c.json({ ok: false, error: '登录失败了，请再试一次' }, 500)
   }
-  if (result.ok) return c.json({ ok: true, data: { displayName: result.displayName, tokenHash: result.tokenHash, created: result.created } })
+  if (result.ok) return c.json({ ok: true, data: { displayName: result.displayName, tokenHash: result.tokenHash, verificationType: result.verificationType, created: result.created } })
   return c.json({ ok: false, code: result.code, error: result.error, displayName: result.displayName }, result.code === 'invalid' ? 400 : 409)
 })
