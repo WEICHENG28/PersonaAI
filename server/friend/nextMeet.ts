@@ -119,20 +119,27 @@ export async function deliverPendingReports(userId: string): Promise<number> {
     if (!claimed || claimed.length === 0) continue
     try {
       const report = notif.payload as TaskReport
-      const out = await llmJson({
+      // AI 失敗時用固定句子回報，不讓通知一直卡在未讀
+      const reply = await llmJson({
         role: 'chat',
         system: renderReportSystem(JSON.stringify(report, null, 2)),
         messages: [{ role: 'user', content: '请用朋友口吻回报任务结果' }],
         temperature: 0.7,
         schema: reportReplySchema,
       })
-      await db.from('friend_messages').insert({
+        .then((out) => out.reply)
+        .catch((err: unknown) => {
+          console.error('[reports] Prompt 8 失败，改用固定句子', err)
+          return fallbackReportText(report)
+        })
+      const { error: insErr } = await db.from('friend_messages').insert({
         user_id: userId,
         role: 'friend',
         kind: 'report',
-        content: out.reply,
+        content: reply,
         meta: { task_id: report.task_id },
       })
+      if (insErr) throw insErr
       delivered++
     } catch (err) {
       console.error('[reports] 处理 report 失败', err)
@@ -140,4 +147,11 @@ export async function deliverPendingReports(userId: string): Promise<number> {
     }
   }
   return delivered
+}
+
+/** Prompt 8 失敗時的固定回報（朋友口吻、不含分數）。 */
+export function fallbackReportText(report: Pick<TaskReport, 'chats' | 'suitable' | 'saved_minutes'>): string {
+  const names = (report.suitable ?? []).map((s) => s.display_name)
+  const found = names.length > 0 ? `找到 ${names.length} 位合适的：${names.join('、')}，去「历史」或通知里看看吧。` : '这次还没遇到特别合拍的，别灰心，我们换个条件再找找。'
+  return `你交代的找人任务有结果了：社交 Agent 一共代聊了 ${report.chats ?? 0} 场，${found}`
 }
