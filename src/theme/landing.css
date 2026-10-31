@@ -1,7 +1,8 @@
 /* ── 落地页：Hum 构成（settled hero、卡纸 tile、梨黄 field、撕纸带） ── */
 
 .landing {
-  max-width: var(--container-wide, var(--container));
+  /* 與頂欄同寬（--container），內容左右緣對齊 navbar */
+  max-width: var(--container);
   margin-inline: auto;
   padding: 0 var(--gutter);
   display: grid;
