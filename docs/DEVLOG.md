@@ -443,6 +443,9 @@
 - **改了哪些檔案**：`server/twin/{twin,repeat,lobby,lobbyRoutes}.ts`、`server/prompts/{05_twin,11_lobby_assistant}.ts`、`server/routes/twin.ts`（掛上大廳路由）、`src/lib/api/twin.ts`、`src/features/twin/LobbyPage.tsx`、`src/features/twin/components/{LiveLobby.tsx,lobbyView.ts,lobby.css}`、`tests/twin/{twin-reply,repeat,lobby,lobby-routes,lobby-view}.test.ts`。沒有動共用檔。
 - **驗證**：`npx tsc -b`、vitest 579 項（合入最新 main、含 C8 後）、`npm run build` 通過。
   - **16 輪實跑**（`.local/try-duet-16.ts`，記憶體存對話、真的 LLM、守門直通、不寫資料庫）：小安×子晴（開場「登山」）、小安×阿哲（開場「最近爬过的山」）各 32 則，**整則、逐句、口頭禪都沒有重複**；工作日誌各 0～2 筆（只有阿哲提議一起去時雙方的「需要问本人」）。小安×子晴的對話回應具體、會換話題；小安×阿哲（慢慢走 vs 越野跑）小安仍會多次提起看展，兩人本來就不合，判不合適是合理的。
+  - **大廳真資料**（Jerry 同意寫入，`.local/lobby-real-e2e.ts`：用 c-test1 的 users.id 跑大廳路由，真資料庫＋真 LLM，只跳過 JWT）：列出 13 位、沒有分數；篩選「运动＋登山」剩小安、阿哲、子晴、小林；「帮我找 2 个喜欢动漫的人」建出待確認任務（測完已取消）；c-test1 沒開社交 Agent，「让分身去聊」回 403 與簡體原因；「自己聊」建出對話（我方本人、對方分身、manual），c-test1 問「你平时都去哪些山啊？」小安分身回「没有特别固定的地方，主要是周末去郊区走走。你平时也常去郊区吗？」（不再答非所問）；這段對話只有一筆「开始代聊」日誌。
+    - 實測找到兩個問題並修正：① 問「小安和子晴谁比较适合我？」時，依問題搜尋的前 5 名沒有這兩人，助手推薦了別人 → 先搜 20 位，問題裡點名的人優先（`pickForQuestion`）；② 用整份檔案當查詢，13 人裡 7 人「很可能合得来」（連興趣不同的雨晴也是），B 的日誌也把多行檔案寫進去 → 查詢改成一行「兴趣：…；想找：…」（有共同興趣 0.60～0.82、沒有 0.43～0.53）。修正後重跑：6 位很可能合得来（都有共同興趣）、2 位可以聊聊看、5 位差异较大；點名比較時兩人各一句理由。
+    - 留下的資料：對話 `ce86c4ac-…`（c-test1 本人 × 小安分身，4 則訊息）、已取消的任務 `a851ecee-…`、B 的「搜索大厅」日誌 7 筆。
   - **瀏覽器**（headless Chrome＋CDP，`.local/c-lobby-cdp.ts`，`/api` 在瀏覽器裡攔截回假資料，不登入、不碰資料庫）14 項通過：大廳顯示後端的候選人、AI 預估是文字、卡片與助手回答沒有任何數字、小卡片兩個按鈕、「自己聊」打 `POST /api/conversations` 並跳到聊天室、「让分身去聊」跳到任務頁、失敗顯示在那張卡片、「帮我找…」顯示任務確認卡、助手失敗顯示簡體錯誤、375px 不橫向捲動。
 - **踩到的坑／注意事項**：
   - B 的 `searchLobby` 每次都會寫一筆「搜索大厅」日誌，所以**每次打開大廳頁、每問一次助手都會多一筆 social 日誌**。要的話請 B 加一個不寫日誌的選項（改簽名要三人同意）。
@@ -450,7 +453,7 @@
   - B 的 `TaskError` 不能直接 import（內部檔案），大廳用 `err.name === 'TaskError'` 和 `status` 辨認，原樣回給用戶。
 - **還沒做完／待辦**：
   - 大廳還沒有篩選（目的、興趣關鍵字），後端 `GET /api/lobby?purpose=&q=` 已支援；卡片快取（Prompt 10、`user_profiles.card`）和自填 MBTI 沒做（沒有 MBTI 欄位）。
-  - 大廳真後端沒有實測（會寫 B 的「搜索大厅」日誌、`POST /api/conversations` 會建對話），需要 Jerry 同意後用 c-test1 測：打開 `/lobby`、問助手、按兩個按鈕。
+  - 大廳在真瀏覽器＋真登入（JWT）還沒點過；後端邏輯已用真資料測過，畫面已用假資料測過。
   - C5（#76）、C6（#80）已在 2026-10-30 合併，歷史頁「看对话纪录」的 `/chat/<id>/result` 路由已存在。
 
 ### 2026-10-31｜C8 言行異常提醒｜Jerry（AI 協助）｜PR #83｜Closes #28

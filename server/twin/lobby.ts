@@ -12,17 +12,21 @@ import type {
 } from '../../shared/types'
 import type { LlmJsonOptions } from '../lib/llm'
 import { lobbyAssistantSchema, renderLobbyAssistantSystem } from '../prompts/11_lobby_assistant'
-import { shareableToText } from './seed'
 
 /** 大廳卡片上的 AI 預估（07C C9：依 similarity 分三級，不顯示數字）。 */
 export type LobbyFit = 'likely' | 'maybe' | 'different'
 
-/** 門檻依實際資料定（2026-10-31 種子用戶兩兩比：同興趣 0.62～0.69，其他 0.44～0.55）。 */
+/**
+ * 門檻依實際資料定（2026-10-31，c-test1 用 myQueryText 查大廳 13 人：有共同興趣的 0.60～0.82，沒有的 0.43～0.53）。
+ * 用整份檔案（shareableToText）當查詢時兩群會混在一起（雨晴 0.62），所以改用興趣＋想找。
+ */
 export const FIT_LIKELY = 0.6
 export const FIT_MAYBE = 0.5
 /** 大廳列表最多幾位、助手參考幾位、助手附幾張卡片。 */
 export const LOBBY_LIST_LIMIT = 20
 export const ASSISTANT_SEARCH_LIMIT = 5
+/** 助手先多搜幾位，問題裡點名的人才找得到（「小安和子晴谁比较适合我？」）。 */
+export const ASSISTANT_POOL_LIMIT = 20
 export const ASSISTANT_CARD_LIMIT = 3
 const ASSISTANT_TEMPERATURE = 0.5
 
@@ -136,20 +140,33 @@ async function withTaskErrors<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** 用自己的興趣與想找的人當查詢（一行，B 的「搜索大厅」日誌也比較好讀）。 */
+export function myQueryText(me: ShareableProfile): string {
+  return `兴趣：${me.interests.join('、')}；想找：${me.looking_for}`
+}
+
+/** 問題裡點名的人排最前面，其他照相似度補到 limit 位。 */
+export function pickForQuestion(found: readonly LobbyCandidate[], question: string, limit: number): LobbyCandidate[] {
+  const named = found.filter((c) => c.display_name.length >= 2 && question.includes(c.display_name))
+  const rest = found.filter((c) => !named.includes(c))
+  return [...named, ...rest].slice(0, Math.max(limit, named.length))
+}
+
 async function list(deps: LobbyDeps, userId: string, filter: LobbyFilter = {}): Promise<LobbyCardView[]> {
   const me = await deps.getShareableProfile(userId)
-  // 有關鍵字就照關鍵字找；沒有就用自己的對外檔案找，AI 預估才是「跟我合不合」
-  const text = filter.q || (me ? shareableToText(me) : undefined)
+  // 有關鍵字就照關鍵字找；沒有就用自己的興趣找，AI 預估才是「跟我合不合」
+  const text = filter.q || (me ? myQueryText(me) : undefined)
   const conditions = filter.q ? [filter.q] : []
   const found = await deps.searchLobby(userId, { text, purpose: filter.purpose, conditions, limit: LOBBY_LIST_LIMIT })
   return found.map((c) => toCard(c, !filter.q))
 }
 
 async function answerQuestion(deps: LobbyDeps, userId: string, question: string): Promise<AssistantView> {
-  const [me, found] = await Promise.all([
+  const [me, pool] = await Promise.all([
     deps.getShareableProfile(userId),
-    deps.searchLobby(userId, { text: question, limit: ASSISTANT_SEARCH_LIMIT }),
+    deps.searchLobby(userId, { text: question, limit: ASSISTANT_POOL_LIMIT }),
   ])
+  const found = pickForQuestion(pool, question, ASSISTANT_SEARCH_LIMIT)
   const system = renderLobbyAssistantSystem(me, found)
   const ask = (content: string) =>
     deps.llmJson({ role: 'chat', system, messages: [{ role: 'user', content }], temperature: ASSISTANT_TEMPERATURE, schema: lobbyAssistantSchema })

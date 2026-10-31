@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AgentTask, LobbyCandidate, ShareableProfile } from '../../shared/types'
 import {
   createLobbyApi,
+  pickForQuestion,
   fitOf,
   hasScoreNumber,
   isTaskRequest,
@@ -53,10 +54,10 @@ describe('fitOf', () => {
 })
 
 describe('大廳列表 list', () => {
-  it('用自己的對外檔案搜尋，卡片有名字、介紹、興趣、聊天風格與 AI 預估，沒有 similarity', async () => {
+  it('用自己的興趣與想找的人搜尋（一行），卡片有名字、介紹、興趣、聊天風格與 AI 預估，沒有 similarity', async () => {
     const { deps, api } = harness()
     const cards = await api.list(ME)
-    expect(deps.searchLobby).toHaveBeenCalledWith(ME, expect.objectContaining({ text: expect.stringContaining('登山、摄影'), conditions: [] }))
+    expect(deps.searchLobby).toHaveBeenCalledWith(ME, expect.objectContaining({ text: '兴趣：登山、摄影；想找：山友', conditions: [] }))
     expect(cards.map((c) => [c.name, c.fit])).toEqual([
       ['小安', 'likely'],
       ['子晴', 'maybe'],
@@ -90,10 +91,10 @@ describe('大廳助手 ask', () => {
     expect(deps.llmJson).not.toHaveBeenCalled()
   })
 
-  it('其他問題 → 用問題搜尋 5 位 → Prompt 11 → 回答＋模型引用的卡片（照引用順序，最多 3 張、沒有預估）', async () => {
+  it('其他問題 → 用問題搜尋（先多搜 20 位，取 5 位）→ Prompt 11 → 回答＋模型引用的卡片（照引用順序，最多 3 張、沒有預估）', async () => {
     const { deps, api } = harness()
     const view = await api.ask(ME, '谁适合一起爬山？')
-    expect(deps.searchLobby).toHaveBeenCalledWith(ME, { text: '谁适合一起爬山？', limit: 5 })
+    expect(deps.searchLobby).toHaveBeenCalledWith(ME, { text: '谁适合一起爬山？', limit: 20 })
     const call = (deps.llmJson as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { role: string; temperature: number; system: string }
     expect(call.role).toBe('chat')
     expect(call.temperature).toBe(0.5)
@@ -105,6 +106,16 @@ describe('大廳助手 ask', () => {
       answer: '小安和子晴都爱登山，小安更慢热。',
       cards: [expect.objectContaining({ userId: 'u-qing', fit: null }), expect.objectContaining({ userId: 'u-an', fit: null })],
     })
+  })
+
+  it('問題點名的人即使相似度排在 5 名外，也會給助手參考（實測：「小安和子晴谁比较适合我？」）', async () => {
+    const others = ['甲甲', '乙乙', '丙丙', '丁丁', '戊戊', '己己'].map((n, i) => candidate(`u-${i}`, n, 0.8 - i * 0.01))
+    const { deps, api } = harness({ searchLobby: vi.fn(async () => [...others, AN, QING]) })
+    await api.ask(ME, '小安和子晴谁比较适合我？')
+    const system = ((deps.llmJson as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { system: string }).system
+    expect(system).toContain('名字：小安')
+    expect(system).toContain('名字：子晴')
+    expect(system).not.toContain('名字：戊戊')
   })
 
   it('模型引用的 id 不在候選人裡就忽略；都沒有時附前 3 位', async () => {
@@ -190,5 +201,12 @@ describe('isTaskRequest', () => {
     expect(isTaskRequest('帮我找 2 个喜欢动漫的人')).toBe(true)
     expect(isTaskRequest('帮我约个山友')).toBe(true)
     expect(isTaskRequest('谁适合一起爬山？')).toBe(false)
+  })
+})
+
+describe('pickForQuestion', () => {
+  it('點名的排前面，其他照順序補滿；點名超過上限時全部保留', () => {
+    expect(pickForQuestion([XIA, QING, AN], '小安呢', 2).map((c) => c.display_name)).toEqual(['小安', '夏夏'])
+    expect(pickForQuestion([XIA, QING, AN], '小安和子晴还有夏夏', 2)).toHaveLength(3)
   })
 })
