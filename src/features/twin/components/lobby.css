@@ -1,6 +1,0 @@
-/* C9／C10 大厅（http 模式）新增的几个小样式；卡片本身沿用 pages.css 的 .cand-card／.lobby-grid。只用 tokens.css 的 token。拥有者：C。 */
-.lobby-actions { display: flex; gap: var(--space-sm); align-items: center; flex-wrap: wrap; margin-top: auto; }
-.lobby-note { font-size: var(--text-sm); color: var(--color-muted); }
-.lobby-mini { gap: var(--space-xs); }
-.lobby-mini strong { font-size: var(--text-md); }
-.lobby-task { display: grid; gap: var(--space-sm); }
