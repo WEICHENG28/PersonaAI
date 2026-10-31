@@ -151,7 +151,7 @@ describe('runTaskStep', () => {
     expect(await runTaskStep('t1', deps)).toBe('notified')
     expect(store.attempts[0]).toMatchObject({ target_user_id: 'xiaoan', result: 'mutual', origin: 'auto' })
     expect(deps.markWaitingHuman).toHaveBeenCalledWith('conv-1')
-    expect(store.notifications[0]?.payload).toEqual({ conversationId: 'conv-1', targetName: 'xiaoan', mutual: true, taskId: 't1' })
+    expect(store.notifications[0]?.payload).toEqual({ conversationId: 'conv-1', targetName: 'xiaoan（真人）', targetIsSeed: false, mutual: true, taskId: 't1' })
     expect(store.tasks.get('t1')).toMatchObject({ active_conversation_id: null, progress: { suitable: 1 } })
   })
 

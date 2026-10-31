@@ -22,6 +22,12 @@ export function supabaseChatRoomStore(): ChatRoomStore {
       return (data?.display_name as string | undefined) ?? '用户'
     },
 
+    async isSeedUser(userId) {
+      const { data, error } = await getServiceClient().from('users').select('is_seed').eq('id', userId).maybeSingle()
+      if (error) throw new Error(`读取用户资料失败：${error.message}`)
+      return data?.is_seed === true
+    },
+
     async listMessages(conversationId) {
       const { data, error } = await getServiceClient()
         .from('messages')

@@ -4,6 +4,7 @@ import { Button, Chip } from '@components/ui/Button'
 import { Card, CardHead } from '@components/ui/Card'
 import { t } from '@i18n/t'
 import { ApiError, getHistory, reopenHistory, type HistoryEntry } from '@lib/api/social'
+import { PersonKindChip } from '@components/PersonKindChip'
 
 const RESULT: Record<HistoryEntry['result'], { key: string; tone: 'mint' | 'pear' | 'coral' | 'well' }> = {
   mutual: { key: 'history.resultMutual', tone: 'mint' },
@@ -64,7 +65,11 @@ export function HistoryList() {
         <Card key={item.id}>
           <CardHead
             title={t('proxyChat.withWho', { name: item.target_name })}
-            right={<Chip tone={RESULT[item.result].tone}>{t(RESULT[item.result].key)}</Chip>}
+            right={
+              <>
+                <PersonKindChip isSeed={item.target_is_seed} /> <Chip tone={RESULT[item.result].tone}>{t(RESULT[item.result].key)}</Chip>
+              </>
+            }
           />
           <p className="hist-line">
             {item.origin === 'auto' ? t('history.initiatedAuto') : t('history.initiatedManual')} · {new Date(item.created_at).toLocaleString()}
@@ -95,7 +100,9 @@ export function HistoryList() {
         </Card>
       ))}
 
-      {restartId && (
+      {restartId && (() => {
+        const restartTarget = data.items.find((i) => i.id === restartId)
+        return (
         <div className="modal-scrim" onClick={() => setRestartId(null)} role="presentation">
           <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <header className="modal__head">
@@ -109,14 +116,18 @@ export function HistoryList() {
                 <Button block variant="secondary" disabled={busy} onClick={() => restart('human')}>
                   {t('history.restartSelf')}
                 </Button>
-                <Button block disabled={busy} onClick={() => restart('request_human')}>
-                  {t('history.restartRequestHuman')}
-                </Button>
+                {/* 示範用戶是虛構角色，請求本人上線沒有意義 */}
+                {!restartTarget?.target_is_seed && (
+                  <Button block disabled={busy} onClick={() => restart('request_human')}>
+                    {t('history.restartRequestHuman')}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

@@ -89,6 +89,8 @@ export interface LobbyCardView {
   mbti: string | null
   /** 我還沒確認對外檔案時、以及助手附的小卡片是 null。 */
   fit: FitLevel | null
+  /** 示範用戶（虛構角色）；畫面標「示范用户」，真人標「真人」。 */
+  isSeed: boolean
 }
 
 export type LobbyAssistantView = AssistantView<LobbyCardView>
@@ -199,6 +201,7 @@ export function createLobbyApi(deps: LobbyDeps): LobbyApi {
           // 自填 MBTI 以檔案為準（用戶可能改過），不用快取裡的
           mbti: row?.self_mbti ?? null,
           fit: withFit ? fitLevel(c.similarity) : null,
+          isSeed: c.is_seed === true,
         }
       }),
     )

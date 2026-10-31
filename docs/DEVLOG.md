@@ -313,6 +313,20 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜標示「真人／示范用户」＋挑人時真人優先｜Peter（AI 協助）
+- **做了什麼**：示範用戶（種子用戶）是虛構角色，接手聊天不會有真人回覆，所以每個看得到對方的地方都標出來：
+  - 阿澈回報：`buildReport` 的名字變成「小安（真人）」「子晴（示范用户）」，真人排前面；`suitable` 多 `is_seed`。
+  - 配對通知：`targetName` 帶標示（鈴鐺顯示「找到合适的人：子晴（示范用户）」），payload 多 `targetIsSeed`。
+  - 歷史頁：每筆加標籤；示範用戶的「重啟對話」不顯示「請求本人上線」。
+  - 大廳卡片（含大廳助手小卡）：名字旁標籤（`LobbyCardView.isSeed`）。
+  - 聊天室標題：標籤＋一行說明「对方是示范用户（虚构角色），由 AI 扮演；接手聊天也不会有真人回复」。
+- **挑人**：`rankCandidates` 真人加 `CONFIG.REAL_USER_BONUS`（0.05）再排序，只影響順序、顯示的相似度不變，現場的人比較容易配對到彼此。
+- **共用／跨線**（Peter 同意直接改）：`shared/types.ts`（`LobbyCandidate.is_seed?`、`TaskReport.suitable[].is_seed?`，都是選填）；C 的 `server/twin/{lobby,chatRoom,chatRoomStore}.ts`、`LobbyCard`、`LiveChatRoom`、`src/lib/api/twin.ts`（`ChatRoomStore.isSeedUser` 是選填，舊的 store 不受影響）。新元件 `src/components/PersonKindChip.tsx`。
+- **改了哪些檔案**：B：`server/social/{personKind,lobby,report,runner,agentStore}.ts`、`server/lib/config.ts`、`src/lib/api/social.ts`、`HistoryList.tsx`；其他如上；測試 `lobby`、`report`、`runner`。
+- **驗證**：`tsc -b`；vitest 643/643（真人排前面、顯示相似度不變、回報標示與排序、通知帶標示）；build。
+
+---
+
 ### 2026-10-31｜任務確認卡關掉後的通知｜Peter（AI 協助）
 - **做了什麼**（http 模式的 AI 朋友頁）：
   - 按「再想想」或點旁邊關掉：任務**保留**在「我的任务」等確認（原本「再想想」會取消任務），右下角通知「任务先帮你留着…点这里去看看」。

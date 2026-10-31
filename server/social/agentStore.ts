@@ -35,6 +35,8 @@ export interface AttemptRecord {
 export interface HistoryItem extends AttemptRecord {
   id: string
   target_name: string
+  /** 對方是示範用戶（虛構角色）。 */
+  target_is_seed?: boolean
   reopened_at: string | null
   created_at: string
 }
@@ -286,12 +288,13 @@ function supabaseStore(db: Db): AgentStore {
 }
 
 const HISTORY_COLUMNS =
-  'id,user_id,target_user_id,conversation_id,task_id,origin,result,reason_type,reason_text,outline,reopened_at,created_at,target:users!match_attempts_target_user_id_fkey(display_name)'
+  'id,user_id,target_user_id,conversation_id,task_id,origin,result,reason_type,reason_text,outline,reopened_at,created_at,target:users!match_attempts_target_user_id_fkey(display_name,is_seed)'
 
-type HistoryRow = Omit<HistoryItem, 'target_name'> & { target: { display_name: string } | { display_name: string }[] | null }
+type TargetRow = { display_name: string; is_seed: boolean | null }
+type HistoryRow = Omit<HistoryItem, 'target_name'> & { target: TargetRow | TargetRow[] | null }
 
 function toHistoryItem(row: HistoryRow): HistoryItem {
   const { target, ...rest } = row
   const t = Array.isArray(target) ? target[0] : target
-  return { ...rest, target_name: t?.display_name ?? '对方' }
+  return { ...rest, target_name: t?.display_name ?? '对方', target_is_seed: t?.is_seed === true }
 }

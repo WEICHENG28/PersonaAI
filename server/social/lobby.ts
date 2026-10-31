@@ -4,6 +4,7 @@ import { embed } from '../lib/llm/index.js'
 import { writeLog } from '../lib/log.js'
 import { SEED_USERS } from '../fixtures/seed-users.js'
 import { getAdminDb } from './db.js'
+import { CONFIG } from '../lib/config.js'
 import { PURPOSE_LABEL } from './task.js'
 
 const DEFAULT_LIMIT = 5
@@ -16,6 +17,8 @@ export interface LobbyEntry {
   purposes: Purpose[]
   shareable: ShareableProfile
   embedding: number[] | null
+  /** 示範用戶（虛構角色）。 */
+  is_seed: boolean
 }
 
 export type LobbySource = () => Promise<LobbyEntry[]>
@@ -52,9 +55,14 @@ export function rankCandidates(entries: LobbyEntry[], queryVector: number[] | nu
     .map((e) => {
       const base = queryVector && e.embedding ? cosineSimilarity(queryVector, e.embedding) : 0
       const bonus = matchesKeyword(conditions, e.shareable.interests) ? KEYWORD_BONUS : 0
-      return { user_id: e.user_id, display_name: e.display_name, shareable: e.shareable, similarity: round(base + bonus) }
+      return { user_id: e.user_id, display_name: e.display_name, shareable: e.shareable, similarity: round(base + bonus), is_seed: e.is_seed }
     })
-    .sort((a, b) => b.similarity - a.similarity)
+    // 真人略加分再排序（只影響順序，顯示的相似度不變）
+    .sort((a, b) => rankScore(b) - rankScore(a))
+}
+
+function rankScore(c: { similarity: number; is_seed: boolean }): number {
+  return c.similarity + (c.is_seed ? 0 : CONFIG.REAL_USER_BONUS)
 }
 
 export async function searchLobby(userId: string, q: LobbyQuery): Promise<LobbyCandidate[]> {
@@ -95,7 +103,7 @@ async function defaultSource(): Promise<LobbyEntry[]> {
   if (!db) return seedFixtureSource()
   const { data, error } = await db
     .from('users')
-    .select('id, display_name, purposes, user_profiles!inner(shareable_profile, shareable_confirmed, embedding)')
+    .select('id, display_name, purposes, is_seed, user_profiles!inner(shareable_profile, shareable_confirmed, embedding)')
     .eq('social_agent_enabled', true)
     .eq('user_profiles.shareable_confirmed', true)
   if (error) throw error
@@ -109,6 +117,7 @@ async function defaultSource(): Promise<LobbyEntry[]> {
         purposes: (row.purposes ?? []) as Purpose[],
         shareable: profile.shareable_profile as ShareableProfile,
         embedding: parseVector(profile.embedding),
+        is_seed: row.is_seed === true,
       },
     ]
   })
@@ -123,6 +132,7 @@ function seedFixtureSource(): Promise<LobbyEntry[]> {
       purposes: [...u.purposes],
       shareable: u.shareable,
       embedding: null,
+      is_seed: true,
     })),
   )
 }

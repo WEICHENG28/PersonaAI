@@ -24,7 +24,7 @@ export interface ChatRoomView {
   conversationId: string
   status: ConversationStatus
   me: { userId: string; controller: Controller }
-  other: { userId: string; name: string; controller: Controller }
+  other: { userId: string; name: string; controller: Controller; isSeed?: boolean }
   messages: ChatMessageView[]
 }
 
@@ -141,6 +141,8 @@ export interface LobbyCardView {
   mbti: string | null
   /** 我的档案还没确认时、以及助手附的小卡片是 null。 */
   fit: FitLevel | null
+  /** 示范用户（虚构角色）；mock 资料没有这栏就不标。 */
+  isSeed?: boolean
 }
 
 /** C10 大厅助手：像交办任务就回 taskId（显示任务确认卡），否则回答＋候选人小卡片（都没有分数）。 */
