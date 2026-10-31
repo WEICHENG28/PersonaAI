@@ -72,6 +72,8 @@ export interface ChatRoomDeps {
   store: ChatRoomStore
   twinReply: TwinReplyFn
   writeLog(entry: AgentLogInput): Promise<void>
+  /** C8：本人訊息存好後通知（言行異常檢查）；不等它、也不讓它影響發言。 */
+  afterHumanMessage?(conversationId: string, userId: string): void
 }
 
 export interface ChatRoomApi {
@@ -170,6 +172,14 @@ async function askOtherTwin(deps: ChatRoomDeps, conv: ConversationRow, otherUser
   }
 }
 
+function notifyAfterHumanMessage(deps: ChatRoomDeps, conversationId: string, userId: string): void {
+  try {
+    deps.afterHumanMessage?.(conversationId, userId)
+  } catch (err) {
+    console.error('[twin] 本人发言后的检查启动失败', conversationId, err)
+  }
+}
+
 async function sendHumanMessage(deps: ChatRoomDeps, conversationId: string, userId: string, text: string): Promise<SendResult> {
   const body = messageBodySchema.safeParse({ text })
   if (!body.success) throw new ChatRoomError(`消息要在 1–${MESSAGE_MAX} 字之间`, 400)
@@ -178,6 +188,7 @@ async function sendHumanMessage(deps: ChatRoomDeps, conversationId: string, user
   if (me.controller !== 'human') throw new ChatRoomError('现在由你的分身在聊，接手后才能发言', 409)
 
   const message = await deps.store.insertHumanMessage({ conversation_id: conv.id, sender_id: me.userId, content: body.data.text })
+  notifyAfterHumanMessage(deps, conv.id, me.userId)
   const shouldReply = other.controller === 'twin' && conv.status === 'active'
   if (!shouldReply) return { message, replied: false, replyFailed: false }
   const replied = await askOtherTwin(deps, conv, other.userId)

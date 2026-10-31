@@ -2,6 +2,7 @@
 // 用 A0b 的 service role client，只在後端使用；每個查詢都限定通知的主人。
 import { getServiceClient } from '../lib/supabase'
 import { supabaseChatRoomStore } from './chatRoomStore'
+import type { AnomalyChoice } from './anomaly'
 import type { NotificationStore } from './notifications'
 import type { NotificationRow, RequestHumanStore } from './requestHuman'
 
@@ -74,6 +75,16 @@ export function supabaseNotificationStore(): RequestHumanStore & NotificationSto
     async clearResponse(id) {
       const { error } = await getServiceClient().from('notifications').update({ response: null, read_at: null }).eq('id', id)
       if (error) throw new Error(`改回未回应失败：${error.message}`)
+    },
+
+    async getAnomalyChoices(userId, flagIds) {
+      const { data, error } = await getServiceClient()
+        .from('anomaly_flags')
+        .select('id, user_choice')
+        .eq('notify_user_id', userId)
+        .in('id', flagIds)
+      if (error) throw new Error(`读取言行异常纪录失败：${error.message}`)
+      return Object.fromEntries((data ?? []).map((r) => [r.id as string, (r.user_choice as AnomalyChoice | null) ?? null]))
     },
 
     async listNotifications(userId, limit) {

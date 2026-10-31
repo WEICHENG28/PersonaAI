@@ -35,6 +35,8 @@ describe('toNotificationView', () => {
       conversationId: 'conv-1',
       name: '小安',
       mutual: true,
+      evidence: [],
+      choice: null,
     })
   })
 
@@ -51,6 +53,12 @@ describe('toNotificationView', () => {
     expect(JSON.stringify(view)).not.toContain('120')
   })
 
+  it('anomaly：行為摘要（最多 3 點）與選擇；其他類型沒有 evidence', () => {
+    const view = toNotificationView(row({ type: 'anomaly', payload: { conversationId: 'c', flagId: 'f', evidence: ['a', 'b', 'c', 'd'] } }), 'report')
+    expect(view).toMatchObject({ conversationId: 'c', evidence: ['a', 'b', 'c'], choice: 'report' })
+    expect(toNotificationView(row()).evidence).toEqual([])
+  })
+
   it('payload 欄位型別不對：當作沒有，不丟錯', () => {
     const view = toNotificationView(row({ payload: { conversationId: 42, targetName: ['x'], mutual: 'yes' } }))
     expect(view).toMatchObject({ conversationId: null, name: null, mutual: false })
@@ -59,7 +67,12 @@ describe('toNotificationView', () => {
 
 function harness(note: NotificationRow | null) {
   const store: NotificationStore = {
-    listNotifications: vi.fn(async () => [row(), row({ id: 'n-2', type: 'friend_report', payload: {} })]),
+    listNotifications: vi.fn(async () => [
+      row(),
+      row({ id: 'n-2', type: 'friend_report', payload: {} }),
+      row({ id: 'n-3', type: 'anomaly', payload: { conversationId: 'conv-9', flagId: 'flag-9', evidence: ['多次辱骂'] } }),
+    ]),
+    getAnomalyChoices: vi.fn(async () => ({ 'flag-9': 'end' as const })),
     getNotification: vi.fn(async () => note),
     markRead: vi.fn(async () => undefined),
   }
@@ -71,8 +84,10 @@ describe('通知 API', () => {
   it('list：只讀自己的、最多 NOTIFICATION_LIST_LIMIT 則', async () => {
     const h = harness(null)
     const list = await h.api.list(ME)
-    expect(list.map((n) => n.id)).toEqual(['n-1', 'n-2'])
+    expect(list.map((n) => n.id)).toEqual(['n-1', 'n-2', 'n-3'])
     expect(h.store.listNotifications).toHaveBeenCalledWith(ME, NOTIFICATION_LIST_LIMIT)
+    expect(h.store.getAnomalyChoices).toHaveBeenCalledWith(ME, ['flag-9'])
+    expect(list[2]).toMatchObject({ type: 'anomaly', conversationId: 'conv-9', evidence: ['多次辱骂'], choice: 'end' })
   })
 
   it('markRead：match 設為已讀', async () => {

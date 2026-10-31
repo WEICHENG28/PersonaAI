@@ -99,6 +99,8 @@ export interface TakeoverView {
 }
 
 export type HumanResponse = 'now' | 'later' | 'decline'
+/** C8 言行异常提醒的选择。 */
+export type AnomalyChoice = 'continue' | 'end' | 'report'
 export type NotificationType = 'match' | 'request_human' | 'friend_report' | 'anomaly'
 
 /** C7 通知铃铛的一则通知：只有铃铛要显示的栏位，没有报告内容和分数。 */
@@ -112,6 +114,10 @@ export interface NotificationView {
   /** match 是对方名字、request_human 是请求的人。 */
   name: string | null
   mutual: boolean
+  /** anomaly 才有：对方的具体行为摘要。 */
+  evidence: string[]
+  /** anomaly 才有：你选了什么（还没选是 null）。 */
+  choice: AnomalyChoice | null
 }
 
 /** C7 回应请求真人的结果；now 且这次真的接手时带接手卡片。 */
@@ -174,6 +180,11 @@ export function listNotifications(): Promise<NotificationView[]> {
 /** C7 回应请求真人；now 要整理接手卡片，大约十几秒。 */
 export function respondNotification(notificationId: string, response: HumanResponse): Promise<RespondView> {
   return request('POST', `/api/notifications/${encodeURIComponent(notificationId)}/respond`, { response })
+}
+
+/** C8 回应言行异常提醒：继续聊／结束对话／检举（检举只记录）。 */
+export function respondAnomaly(notificationId: string, choice: AnomalyChoice): Promise<{ choice: AnomalyChoice; conversationId: string }> {
+  return request('POST', `/api/notifications/${encodeURIComponent(notificationId)}/respond`, { response: choice })
 }
 
 /** C7「找到合适的人」点开后设为已读。 */

@@ -7,6 +7,7 @@ import type { ResultApi } from '../../server/twin/result'
 import type { HandoffApi, TakeoverView } from '../../server/twin/handoff'
 import type { RequestHumanApi } from '../../server/twin/requestHuman'
 import type { NotificationApi } from '../../server/twin/notifications'
+import type { AnomalyApi } from '../../server/twin/anomaly'
 
 const CONV_ID = '6f1c2a5e-7d1b-4c3a-9e2f-1a2b3c4d5e6f'
 const NOTE_ID = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d'
@@ -25,6 +26,7 @@ interface AppOpts {
   handoff?: Partial<HandoffApi>
   requestHuman?: Partial<RequestHumanApi>
   notifications?: Partial<NotificationApi>
+  anomaly?: Partial<AnomalyApi>
 }
 
 function app(opts: AppOpts = {}) {
@@ -52,7 +54,13 @@ function app(opts: AppOpts = {}) {
     ...opts.requestHuman,
   }
   const notifications: NotificationApi = { list: vi.fn(async () => []), markRead: vi.fn(async () => undefined), ...opts.notifications }
+  const anomaly: AnomalyApi = {
+    checkAfterHumanMessage: vi.fn(async () => 'skipped' as const),
+    respond: vi.fn(async (_id: string, _u: string, choice) => ({ choice, conversationId: CONV_ID })),
+    ...opts.anomaly,
+  }
   const routes = createTwinRoutes({
+    anomaly: () => anomaly,
     chatRoom: () => api,
     result: () => result,
     handoff: () => handoff,
@@ -60,7 +68,7 @@ function app(opts: AppOpts = {}) {
     notifications: () => notifications,
     resolveUserId,
   })
-  return { routes, api, result, handoff, requestHuman, notifications }
+  return { routes, api, result, handoff, requestHuman, notifications, anomaly }
 }
 
 describe('twin 路由', () => {
@@ -219,12 +227,22 @@ describe('twin 路由：C7 請求真人與通知', () => {
     expect(await res.json()).toEqual({ ok: false, error: '已经请求过了，等对方回应' })
   })
 
+  it('C8 回應言行異常提醒：continue／end／report 交給 anomaly.respond，不交給請求真人', async () => {
+    const { routes, anomaly, requestHuman } = app()
+    for (const choice of ['continue', 'end', 'report']) {
+      const res = await routes.request(`/notifications/${NOTE_ID}/respond`, post({ response: choice }))
+      expect(await res.json()).toEqual({ ok: true, data: { choice, conversationId: CONV_ID } })
+      expect(anomaly.respond).toHaveBeenLastCalledWith(NOTE_ID, 'user-me', choice)
+    }
+    expect(requestHuman.respond).not.toHaveBeenCalled()
+  })
+
   it('回應：response 不是 now／later／decline → 400，不呼叫', async () => {
     const { routes, requestHuman } = app()
     for (const body of [undefined, {}, { response: 'maybe' }]) {
       const res = await routes.request(`/notifications/${NOTE_ID}/respond`, post(body))
       expect(res.status).toBe(400)
-      expect(await res.json()).toEqual({ ok: false, error: '请选择现在聊、稍后聊或拒绝' })
+      expect(await res.json()).toEqual({ ok: false, error: '请选择一个选项' })
     }
     expect(requestHuman.respond).not.toHaveBeenCalled()
   })

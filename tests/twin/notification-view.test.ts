@@ -1,6 +1,7 @@
 // C7 通知鈴鐺前端純函數：各類型的文字、點了去哪、未讀數、等我回應的請求、不改原陣列。
 import { describe, expect, it } from 'vitest'
 import {
+  isPendingAnomaly,
   isPendingRequest,
   notificationLink,
   notificationTitle,
@@ -9,6 +10,7 @@ import {
   panelPlacement,
   timeLabel,
   unreadCount,
+  withChoice,
   withRead,
   withResponse,
 } from '../../src/features/twin/components/notificationView'
@@ -24,6 +26,8 @@ function n(overrides: Partial<NotificationView> = {}): NotificationView {
     conversationId: 'conv-1',
     name: '小明',
     mutual: false,
+    evidence: [],
+    choice: null,
     ...overrides,
   }
 }
@@ -63,9 +67,10 @@ describe('notificationLink', () => {
     expect(notificationLink(n({ response: 'decline' }))).toBeNull()
   })
 
-  it('沒有對話 id 的 match、anomaly 不跳轉', () => {
+  it('anomaly → 回到聊天室；沒有對話 id 的 match、anomaly 不跳轉', () => {
+    expect(notificationLink(n({ type: 'anomaly' }))).toBe('/chat/conv-1')
     expect(notificationLink(n({ type: 'match', conversationId: null }))).toBeNull()
-    expect(notificationLink(n({ type: 'anomaly' }))).toBeNull()
+    expect(notificationLink(n({ type: 'anomaly', conversationId: null }))).toBeNull()
   })
 })
 
@@ -89,6 +94,17 @@ describe('未讀與等待回應', () => {
     const read = withRead(list, 'n-2')
     expect(read[1]!.read).toBe(true)
     expect(list[1]!.read).toBe(false)
+  })
+
+  it('isPendingAnomaly：言行異常提醒、還沒選；withChoice 回新陣列', () => {
+    const a = n({ type: 'anomaly', evidence: ['多次辱骂'] })
+    expect(isPendingAnomaly(a)).toBe(true)
+    expect(isPendingAnomaly(n({ type: 'anomaly', choice: 'continue', read: true }))).toBe(false)
+    expect(isPendingAnomaly(n())).toBe(false)
+    const list = [a]
+    expect(withChoice(list, 'n-1', 'end')[0]).toMatchObject({ choice: 'end', read: true })
+    expect(list[0]).toMatchObject({ choice: null, read: false })
+    expect(NOTIFY_TEXT.chosen.report).toBe('已记录检举')
   })
 
   it('回應後的文字', () => {
