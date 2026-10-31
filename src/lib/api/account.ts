@@ -15,6 +15,25 @@ export class NameExistsError extends Error {
   }
 }
 
+const LAST_NAME_KEY = 'personaai:lastName'
+
+/** 這個瀏覽器上次登入用的名字（登入頁自動填入）。讀不到就回 null。 */
+export function lastUsedName(): string | null {
+  try {
+    return localStorage.getItem(LAST_NAME_KEY)
+  } catch {
+    return null
+  }
+}
+
+function rememberName(name: string): void {
+  try {
+    localStorage.setItem(LAST_NAME_KEY, name)
+  } catch {
+    /* 無痕模式等存不了，不影響登入 */
+  }
+}
+
 export async function enterWithName(mode: EnterMode, name: string, confirmExisting = false): Promise<{ displayName: string; created: boolean }> {
   let res: Response
   try {
@@ -41,5 +60,6 @@ export async function enterWithName(mode: EnterMode, name: string, confirmExisti
     console.error('[account] verifyOtp failed', error.message)
     throw new Error('登录失败，请再试一次')
   }
+  rememberName(json.data.displayName)
   return { displayName: json.data.displayName, created: json.data.created }
 }
