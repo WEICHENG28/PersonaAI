@@ -416,12 +416,14 @@
 - **改了哪些檔案**：`server/prompts/09_anomaly.ts`（新）、`server/twin/{anomaly,anomalyStore}.ts`（新）、`server/twin/{chatRoom,conversation,notifications,notificationStore}.ts`、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/components/{NotificationBell.tsx,notificationView.ts,useNotifications.ts,notificationBell.css}`、`tests/twin/anomaly.test.ts`（新）、`tests/twin/{chat-room,chat-room-routes,notifications,notification-view}.test.ts`。沒有動共用檔。
 - **驗證**：vitest 523 項、`tsc -b`、`npm run build` 通過。
   - **真的呼叫 LLM 跑 Prompt 9**（`.local/try-anomaly.ts`，不碰資料庫），4 種情況各 3 次共 12 次全對：「心情不好＋回很短」「慢熱、偶爾有落差」3／3 都是正常；「頻繁辱罵」3／3 判 abuse，「施壓要個資和錢」3／3 判 pressure，evidence 是具體行為摘要（例「持续索取手机号、微信号与支付宝等个人敏感信息」），沒有貼原句。
+  - **真資料端到端**（Jerry 同意寫入，`.local/c8-real-e2e.ts`）：C7 留下的瀏覽器登入 session 已經刪掉、匿名帳號登不回去，所以不經過 HTTP，直接以 c-test1（`68ebcf2d-…`）、c-test2（`4bb978ce-…`）呼叫後端同一套函式（真資料庫＋真 LLM，組法同 `server/routes/twin.ts`）。23 項通過：本人 × 本人對話（c-test2 用 C6 接手）；正常聊（心情不好、回很短）第 14 則不檢查、第 15 則檢查判正常、沒有標記也沒有通知；新對話一直罵人到第 15 則判 abuse，`anomaly_flags` 一筆（標 c-test1、提醒 c-test2，evidence「频繁使用人身攻击和辱骂性词汇」「言语极具攻击性和敌意」），c-test2 收到一則 anomaly 通知、鈴鐺列表有具體行為；c-test1 沒有任何通知或檢查日誌；c-test2 選結束對話 → 對話 ended、`user_choice = end`、通知已讀；之後 c-test1 發言 409、再選 409。c-test1 的對外描述是「轻松自然，句子不长」（不是 07C 寫的「溫和有禮」），沒有改 A 的資料，辱罵照樣被判出來。
   - 瀏覽器（`.local/c8-cdp.ts`，`/api` 攔截回假資料，NavBar 暫時掛上鈴鐺、測完還原）14 項通過：標題、具體行為、「只有你看得到」；三個選項都能按；結束對話失敗顯示錯誤、可以重按，重按成功顯示「已结束对话」；继续聊／检举各自顯示結果；選完未讀數歸零、不再顯示選項；回到聊天室；375px 面板在畫面內。
 - **踩到的坑／注意事項**：
   - 檢查在本人發言後背景執行，Prompt 9 要幾秒；被提醒的人的鈴鐺靠 Realtime 跳出，不會跟著這則訊息同時出現。
   - 一段對話標過一次就不再檢查同一個人（不重複提醒，也省 LLM）；用戶選「继续聊」後對方再變本加厲也不會再提醒。
 - **還沒做完／待辦**：
-  - 真資料端到端（07C精簡版 C8 第 1～5 步：兩個真人帳號、聊 15 則、看鈴鐺、選結束對話、查 `anomaly_flags`）要寫入資料庫，等 Jerry 同意。
+  - 實測留下的資料：對話 `69fbecb6-…`（正常聊）、`fb415a35-…`（辱罵，已結束），c-test1 本人訊息 30 則，`handoffs` 2 筆，`anomaly_flags` 1 筆，notifications 1 筆，日誌數筆。
+  - 真資料只測了後端；鈴鐺在真瀏覽器裡的顯示用假資料驗過（兩個帳號要能重新登入才能測）。
   - 鈴鐺還是等 A 放進 NavBar（C7 待辦）。
 
 ### 2026-10-31｜C7 請求真人＋通知元件｜Jerry（AI 協助）｜PR #82｜Closes #27
