@@ -301,6 +301,15 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜登入頁自動填入上次的名字｜Peter（AI 協助）
+- **做了什麼**：登入成功後把名字記在這個瀏覽器（localStorage `personaai:lastName`）；下次打開登入頁（例如登出後）自動填入，顯示「这是你上次用的名字」，按開始直接回到原帳號、不再問「是你吗」。改名字或按隨機就照原本流程。
+- **為什麼**：用戶不用記自己的名字、也不用重打。同一個瀏覽器視為本人（Demo 取捨，和名字帳號一致）。
+- **補充**：登入狀態本來就會在重新整理後還原；這裡處理的是登出或 session 過期之後。#97 修好登入：Peter 在 Supabase 開了 Email 登入方式（名字帳號內部用 email 帳號）。
+- **改了哪些檔案**：`src/lib/api/account.ts`、`src/features/friend/LoginPage.tsx`。
+- **驗證**：`tsc -b`、vitest 612/612、build；請在 Vercel 登出再進來確認。
+
+---
+
 ### 2026-10-31｜修正：名字帳號登入失敗｜Peter（AI 協助）
 - **問題**：#95 上線後所有人登入都顯示「登录失败，请再试一次」（前端 `verifyOtp` 失敗）。
 - **原因（推斷）**：新帳號是讓 `generateLink(magiclink)` 順便建立，Supabase 這時給的是 signup 類型的憑證，前端用 magiclink 換就被拒。
