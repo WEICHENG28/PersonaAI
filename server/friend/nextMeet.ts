@@ -77,55 +77,67 @@ export async function nextMeet(userId: string): Promise<void> {
   }
 
   // 4. 若有未讀的 friend_report 通知：逐筆呼叫 Prompt 8
-  const { data: reports, error: nErr } = await db
-    .from('notifications')
-    .select('id, payload')
-    .eq('user_id', userId)
-    .eq('type', 'friend_report')
-    .is('read_at', null)
-    .order('created_at', { ascending: true })
-
-  if (nErr) console.error('[nextMeet] 读取通知失败', nErr.message)
-
-  if (reports && reports.length > 0) {
-    for (const notif of reports) {
-      try {
-        const report = notif.payload as TaskReport
-        const reportJson = JSON.stringify(report, null, 2)
-        const out = await llmJson({
-          role: 'chat',
-          system: renderReportSystem(reportJson),
-          messages: [{ role: 'user', content: '请用朋友口吻回报任务结果' }],
-          temperature: 0.7,
-          schema: reportReplySchema,
-        })
-
-        // 存入 report 訊息
-        await db.from('friend_messages').insert({
-          user_id: userId,
-          role: 'friend',
-          kind: 'report',
-          content: out.reply,
-          meta: { task_id: report.task_id },
-        })
-
-        // 設為已讀
-        await db
-          .from('notifications')
-          .update({ read_at: new Date().toISOString() })
-          .eq('id', notif.id)
-      } catch (err) {
-        console.error('[nextMeet] 处理 report 失败', err)
-        // 單筆失敗不中斷
-      }
-    }
-  }
+  const delivered = await deliverPendingReports(userId)
 
   // 5. 寫日誌
   await writeLog({
     user_id: userId,
     agent: 'friend',
     action: '模拟下次见面',
-    reason: `stage ${friend.story_stage} → ${newStage}，处理了 ${reports?.length ?? 0} 个回报`,
+    reason: `stage ${friend.story_stage} → ${newStage}，处理了 ${delivered} 个回报`,
   })
+}
+
+/**
+ * 把未讀的任務回報（friend_report）由阿澈用朋友口吻說出來，存成 kind = 'report' 並設已讀。
+ * AI 朋友頁打開時也會呼叫（不必等「模擬下次見面」），鈴鐺的「阿澈有事想跟你说」才會消失。
+ * 先搶到這筆（read_at 由 null 改成現在）才產生，兩個分頁同時打開也不會說兩次；產生失敗就還原成未讀。
+ * 回傳這次說了幾筆。
+ */
+export async function deliverPendingReports(userId: string): Promise<number> {
+  const db = getServiceClient()
+  const { data: reports, error } = await db
+    .from('notifications')
+    .select('id, payload')
+    .eq('user_id', userId)
+    .eq('type', 'friend_report')
+    .is('read_at', null)
+    .order('created_at', { ascending: true })
+  if (error) {
+    console.error('[reports] 读取通知失败', error.message)
+    return 0
+  }
+
+  let delivered = 0
+  for (const notif of reports ?? []) {
+    const { data: claimed } = await db
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('id', notif.id)
+      .is('read_at', null)
+      .select('id')
+    if (!claimed || claimed.length === 0) continue
+    try {
+      const report = notif.payload as TaskReport
+      const out = await llmJson({
+        role: 'chat',
+        system: renderReportSystem(JSON.stringify(report, null, 2)),
+        messages: [{ role: 'user', content: '请用朋友口吻回报任务结果' }],
+        temperature: 0.7,
+        schema: reportReplySchema,
+      })
+      await db.from('friend_messages').insert({
+        user_id: userId,
+        role: 'friend',
+        kind: 'report',
+        content: out.reply,
+        meta: { task_id: report.task_id },
+      })
+      delivered++
+    } catch (err) {
+      console.error('[reports] 处理 report 失败', err)
+      await db.from('notifications').update({ read_at: null }).eq('id', notif.id)
+    }
+  }
+  return delivered
 }

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { isAuthFailure, requireAuth } from '../lib/auth.js'
 import { initUserProfile } from '../lib/profile.js'
 import { friendChat, friendIntro, getFriendMessages, FriendChatError } from '../friend/chat.js'
-import { nextMeet, NextMeetError } from '../friend/nextMeet.js'
+import { deliverPendingReports, nextMeet, NextMeetError } from '../friend/nextMeet.js'
 import { deleteMemory, editMemory, listMemories, markNotLikeMe, memoryIdSchema, memoryContentSchema, MemoryError } from '../friend/memory.js'
 import { getSettings, updateSettings, settingsUpdateSchema, SettingsError } from '../friend/settings.js'
 import { generateFunLabels, getFunLabels, setUserMbti, userMbtiSchema, FunLabelsError } from '../friend/funLabels.js'
@@ -220,6 +220,22 @@ friendRoutes.post('/profile/extract', async (c) => {
   } catch (err) {
     console.error('[friend] profile extract', err)
     return c.json({ ok: false, error: err instanceof ProfileError ? err.message : '档案更新失败，稍后再试' }, 500)
+  }
+})
+
+/**
+ * POST /api/friend/reports/deliver
+ * AI 朋友頁打開時呼叫：把未讀的任務回報由阿澈說出來（回傳說了幾筆），鈴鐺的通知同時變已讀。
+ */
+friendRoutes.post('/friend/reports/deliver', async (c) => {
+  const authed = await requireAuth(c)
+  if (isAuthFailure(authed)) return authed
+  try {
+    const userId = await appUserId(authed)
+    return c.json({ ok: true, data: { delivered: await deliverPendingReports(userId) } })
+  } catch (err) {
+    console.error('[friend] reports/deliver', err)
+    return c.json({ ok: false, error: '阿澈暂时没办法回报，稍后再试' }, 500)
   }
 })
 
