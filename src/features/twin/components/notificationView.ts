@@ -92,7 +92,7 @@ export function withRead(list: readonly NotificationView[], id: string): Notific
   return list.map((n) => (n.id === id ? { ...n, read: true } : n))
 }
 
-/** 面板最宽多少、离视窗边缘与铃铛多远（px）。 */
+/** 面板最宽多少、離視窗邊緣與錨點多遠（px）。 */
 export const PANEL_MAX_WIDTH = 380
 export const PANEL_EDGE = 16
 export const PANEL_GAP = 12
@@ -103,10 +103,19 @@ export interface PanelPlacement {
   width: number
 }
 
-/** 面板放在铃铛下方、右缘对齐铃铛；放不下时往右推，左右都至少留 PANEL_EDGE。 */
-export function panelPlacement(anchor: { bottom: number; right: number }, viewportWidth: number): PanelPlacement {
+/**
+ * 面板放在錨點（按鈕）下方、右緣對齊；放不下時往右推，左右都至少留 PANEL_EDGE。
+ * minTop：面板 top 的下限——傳入頂欄 (.topbar) 的 bottom，
+ * 按鈕在加高的頂欄裡垂直置中時，錨點 bottom + GAP 仍可能在頂欄內，會蓋住撕紙下緣，用這個參數擋住。
+ */
+export function panelPlacement(
+  anchor: { bottom: number; right: number },
+  viewportWidth: number,
+  minTop = 0,
+): PanelPlacement {
   const width = Math.max(0, Math.min(PANEL_MAX_WIDTH, viewportWidth - PANEL_EDGE * 2))
   const alignRight = viewportWidth - anchor.right
   const right = Math.max(PANEL_EDGE, Math.min(alignRight, viewportWidth - width - PANEL_EDGE))
-  return { top: Math.round(anchor.bottom + PANEL_GAP), right: Math.round(right), width }
+  const top = Math.max(Math.round(minTop + PANEL_GAP), Math.round(anchor.bottom + PANEL_GAP))
+  return { top, right, width }
 }

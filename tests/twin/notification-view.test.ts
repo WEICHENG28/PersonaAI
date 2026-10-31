@@ -136,4 +136,11 @@ describe('panelPlacement', () => {
   it('鈴鐺貼著右邊：至少留 PANEL_EDGE', () => {
     expect(panelPlacement({ bottom: 40, right: 1280 }, 1280).right).toBe(PANEL_EDGE)
   })
+
+  it('加高頂欄：按鈕置中使錨點 bottom + GAP 落在頂欄內時，面板 top 至少在頂欄下緣 + GAP', () => {
+    // 按鈕 bottom 78px，但頂欄下緣 88px → 面板不可蓋住頂欄
+    expect(panelPlacement({ bottom: 78, right: 900 }, 1280, 88).top).toBe(88 + 12)
+    // 錨點本來就在頂欄外時 minTop 不影響結果
+    expect(panelPlacement({ bottom: 96, right: 900 }, 1280, 88).top).toBe(96 + 12)
+  })
 })

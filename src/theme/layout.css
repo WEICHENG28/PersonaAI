@@ -62,7 +62,10 @@
   position: sticky;
   top: 0;
   z-index: 300;
-  /* drop-shadow 在父層：跟著子層撕紙形狀走 */
+  /* drop-shadow 在父層：跟著子層撕紙形狀走。
+     will-change: filter 讓此層維持獨立合成層——點按鈕觸發 re-render 時
+     不會重新柵格化 filter，修掉「點一下頂欄陰影閃一下」的問題 */
+  will-change: filter;
   filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--color-ink) 12%, transparent))
     drop-shadow(0 8px 16px color-mix(in oklab, var(--color-ink) 16%, transparent));
 }
