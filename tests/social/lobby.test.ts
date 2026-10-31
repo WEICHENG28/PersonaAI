@@ -25,6 +25,7 @@ const entry = (id: string, interests: string[], embedding: number[] | null, purp
   purposes,
   shareable: profile(interests),
   embedding,
+  is_seed: true,
 })
 
 let logs: AgentLogInput[] = []
@@ -68,6 +69,13 @@ describe('rankCandidates', () => {
     expect(ranked.map((r) => r.user_id)).toEqual(['b', 'a', 'c'])
     expect(ranked[0]?.similarity).toBeCloseTo(1.05, 2)
     expect(ranked[1]?.similarity).toBe(1)
+  })
+
+  it('真人略加分排前面，但顯示的相似度不變', () => {
+    const real = { ...entry('real', ['看书'], [0.99, 0.141]), is_seed: false }
+    const ranked = rankCandidates([entry('seed', ['看书'], [1, 0]), real], [1, 0], [])
+    expect(ranked.map((r) => [r.user_id, r.is_seed])).toEqual([['real', false], ['seed', true]])
+    expect(ranked[0]?.similarity).toBeCloseTo(0.99, 2)
   })
 
   it('沒有向量時只看關鍵字', () => {

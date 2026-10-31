@@ -31,10 +31,15 @@ export function supabaseNameLoginDeps(): NameLoginDeps {
       const { error } = await db.auth.admin.updateUserById(authId, { email, email_confirm: true })
       if (error) throw error
     },
-    async issueLogin(email, displayName) {
-      const { data, error } = await db.auth.admin.generateLink({ type: 'magiclink', email, options: { data: { display_name: displayName } } })
-      if (error || !data.user || !data.properties?.hashed_token) throw error ?? new Error('产生登录凭证失败')
-      return { authId: data.user.id, tokenHash: data.properties.hashed_token }
+    async createAccount(email, displayName) {
+      const { data, error } = await db.auth.admin.createUser({ email, email_confirm: true, user_metadata: { display_name: displayName } })
+      if (error || !data.user) throw error ?? new Error('建立帐号失败')
+      return data.user.id
+    },
+    async issueLogin(email) {
+      const { data, error } = await db.auth.admin.generateLink({ type: 'magiclink', email })
+      if (error || !data.properties?.hashed_token) throw error ?? new Error('产生登录凭证失败')
+      return { tokenHash: data.properties.hashed_token, verificationType: data.properties.verification_type ?? 'magiclink' }
     },
     async ensureProfile(authId, email, displayName) {
       await initUserProfile({ authId, email, displayName })

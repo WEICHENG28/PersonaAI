@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { nameLogin, type NameLoginDeps } from '../../server/account/nameLogin'
 
 function fakeDeps(accounts: Record<string, { authId: string; email: string | null }>, reserved: string[] = []) {
-  const calls = { setEmail: [] as string[], issued: [] as string[], profiles: [] as string[] }
+  const calls = { setEmail: [] as string[], issued: [] as string[], created: [] as string[], profiles: [] as string[] }
   let n = 0
   const deps: NameLoginDeps = {
     async findAccount(name) {
@@ -14,9 +14,13 @@ function fakeDeps(accounts: Record<string, { authId: string; email: string | nul
     async setEmail(authId, email) {
       calls.setEmail.push(`${authId}:${email}`)
     },
-    async issueLogin(email, displayName) {
-      calls.issued.push(`${email}:${displayName}`)
-      return { authId: `auth-${++n}`, tokenHash: `hash-${n}` }
+    async createAccount(email, displayName) {
+      calls.created.push(displayName)
+      return `auth-${++n}`
+    },
+    async issueLogin(email) {
+      calls.issued.push(email)
+      return { tokenHash: `hash-${email}`, verificationType: 'magiclink' }
     },
     async ensureProfile(_authId, _email, name) {
       calls.profiles.push(name)
@@ -31,7 +35,9 @@ describe('名字帳號', () => {
     const { deps, calls } = fakeDeps({})
     const r = await nameLogin({ mode: 'name', name: ' 小明 ' }, deps)
     expect(r).toMatchObject({ ok: true, displayName: '小明', created: true })
+    expect(calls.created).toEqual(['小明'])
     expect(calls.profiles).toEqual(['小明'])
+    expect(calls.issued).toHaveLength(1)
   })
 
   it('名字已有帳號：先提示重複，不登入', async () => {
@@ -46,7 +52,8 @@ describe('名字帳號', () => {
     const r = await nameLogin({ mode: 'name', name: '小明', confirmExisting: true }, deps)
     expect(r).toMatchObject({ ok: true, created: false })
     expect(calls.setEmail).toEqual(['a1:a1@users.personaai.app'])
-    expect(calls.issued).toEqual(['a1@users.personaai.app:小明'])
+    expect(calls.issued).toEqual(['a1@users.personaai.app'])
+    expect(calls.created).toEqual([])
     expect(calls.profiles).toEqual([])
   })
 

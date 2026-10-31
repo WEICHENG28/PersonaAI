@@ -5,6 +5,7 @@ import { t } from '@i18n/t'
 import type { LobbyCardView } from '@lib/api/twin'
 import { LOBBY_TEXT, fitText } from './lobbyView'
 import type { LobbyAction, StartChatState } from './useLobby'
+import { PersonKindChip } from '@components/PersonKindChip'
 
 interface LobbyCardProps {
   card: LobbyCardView
@@ -21,7 +22,7 @@ export function LobbyCard({ card, chat, onStart, showFit = true }: LobbyCardProp
   return (
     <Card className="cand-card">
       <div className="cand-head">
-        <strong>{card.name}</strong>
+        <strong>{card.name}</strong> <PersonKindChip isSeed={card.isSeed} />
       </div>
       <p className="cand-intro">{card.headline}</p>
       <div className="chips">

@@ -19,6 +19,8 @@ import {
   statusChip,
   verdictText,
 } from './chatRoomView'
+import { usePrivacyCheck } from '@components/PrivacyWarning'
+import { PersonKindChip } from '@components/PersonKindChip'
 import { HandoffCard } from './HandoffCard'
 import { HANDOFF_TEXT, readHandoffState, takeoverBlockOf } from './handoffView'
 import { useChatRoom, type ChatRoomState } from './useChatRoom'
@@ -82,16 +84,24 @@ function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
   const anyTwin = room.me.controller === 'twin' || room.other.controller === 'twin'
   const notice = state.notice ?? state.loadError
 
-  const send = async () => {
+  // 送出前檢查隱私：和真人聊天，訊息會直接被對方看到
+  const privacy = usePrivacyCheck('human')
+  const send = () => {
     const text = draft.trim()
     if (!text || state.sending) return
-    if (await state.send(text)) setDraft('')
+    privacy.guard(text, () => {
+      void state.send(text).then((ok) => ok && setDraft(''))
+    })
   }
 
   return (
     <div className="page">
+      {privacy.dialog}
       <div className="page-head">
-        <h1>{t('proxyChat.withWho', { name: room.other.name })}</h1>
+        <h1>
+          {t('proxyChat.withWho', { name: room.other.name })} <PersonKindChip isSeed={room.other.isSeed} />
+        </h1>
+        {room.other.isSeed && <p className="hint-inline">对方是示范用户（虚构角色），由 AI 扮演；接手聊天也不会有真人回复。</p>}
         <p>
           {chip && <Chip tone="coral">{chip}</Chip>} {!chip && anyTwin && <Chip tone="ink">{t('common.aiChatting')}</Chip>}
         </p>
@@ -128,10 +138,10 @@ function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
               value={draft}
               maxLength={1000}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && void send()}
+              onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && send()}
               disabled={!typable || state.sending}
             />
-            <Button small onClick={() => void send()} disabled={!typable || state.sending || !draft.trim()}>
+            <Button small onClick={send} disabled={!typable || state.sending || !draft.trim()}>
               {CHAT_TEXT.send}
             </Button>
           </div>

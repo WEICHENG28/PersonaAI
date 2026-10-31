@@ -47,11 +47,24 @@ describe('buildReport', () => {
 
     const report = await buildReport(task, store)
     expect(report.suitable).toEqual([
-      { user_id: 'an', display_name: 'an', mutual: true, conversation_id: 'c-an' },
-      { user_id: 'qing', display_name: 'qing', mutual: false, conversation_id: 'c-qing' },
+      { user_id: 'an', display_name: 'an（真人）', mutual: true, conversation_id: 'c-an', is_seed: false },
+      { user_id: 'qing', display_name: 'qing（真人）', mutual: false, conversation_id: 'c-qing', is_seed: false },
     ].reverse())
     expect(report.unsuitable_reasons).toEqual([{ reason_type: 'friction', reason_text: '节奏没对上' }])
     expect(report).toMatchObject({ screened: 20, chats: 3, saved_minutes: 60, basis: '代聊 3 场 × 人工平均 20 分钟' })
     expect(JSON.stringify(report)).not.toMatch(/score/)
+  })
+
+  it('名字標「真人／示范用户」，真人排前面', async () => {
+    const store = new MemoryAgentStore()
+    store.seedUserIds.add('seed-qing')
+    for (const target of ['seed-qing', 'real-an']) {
+      await store.recordAttempt({ user_id: 'me', target_user_id: target, conversation_id: `c-${target}`, task_id: 't1', origin: 'auto', result: 'mutual', reason_type: null, reason_text: null, outline })
+    }
+    const report = await buildReport(task, store)
+    expect(report.suitable.map((s) => [s.display_name, s.is_seed])).toEqual([
+      ['real-an（真人）', false],
+      ['seed-qing（示范用户）', true],
+    ])
   })
 })

@@ -106,6 +106,10 @@ export interface Notification {
   title: string
   body: string
   at: number
+  /** 點通知要去的頁面（例如 /tasks/<id>）；沒有就只是關掉 */
+  link?: string
+  /** 幾毫秒後自動消失；沒有就一直留著到用戶點掉 */
+  ttlMs?: number
 }
 
 /** 大厅候选人卡片（02 §F4） */

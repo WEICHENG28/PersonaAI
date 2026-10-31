@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { NavBar } from '@components/ui/NavBar'
 import { useDemoStore } from '@store/useDemoStore'
 
@@ -15,6 +15,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const notifications = useDemoStore((s) => s.notifications)
   const dismissNotification = useDemoStore((s) => s.dismissNotification)
   const location = useLocation()
+  const navigate = useNavigate()
+
+  // 有設 ttlMs 的通知時間到自動消失
+  useEffect(() => {
+    const timers = notifications
+      .filter((n) => n.ttlMs)
+      .map((n) => window.setTimeout(() => dismissNotification(n.id), Math.max(0, n.at + (n.ttlMs ?? 0) - Date.now())))
+    return () => timers.forEach((id) => window.clearTimeout(id))
+  }, [notifications, dismissNotification])
 
   const isCenter = CENTER_PAGES.includes(location.pathname)
 
@@ -42,7 +51,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* 通知吐司（右下角，不挡输入） */}
       <div className="toasts" aria-live="polite">
         {notifications.map((n) => (
-          <button key={n.id} className="toast" onClick={() => dismissNotification(n.id)}>
+          <button
+            key={n.id}
+            className="toast"
+            onClick={() => {
+              dismissNotification(n.id)
+              if (n.link) navigate(n.link)
+            }}
+          >
             <strong>{n.title}</strong>
             <span>{n.body}</span>
           </button>

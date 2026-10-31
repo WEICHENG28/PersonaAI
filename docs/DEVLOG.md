@@ -325,6 +325,90 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜標示「真人／示范用户」＋挑人時真人優先｜Peter（AI 協助）
+- **做了什麼**：示範用戶（種子用戶）是虛構角色，接手聊天不會有真人回覆，所以每個看得到對方的地方都標出來：
+  - 阿澈回報：`buildReport` 的名字變成「小安（真人）」「子晴（示范用户）」，真人排前面；`suitable` 多 `is_seed`。
+  - 配對通知：`targetName` 帶標示（鈴鐺顯示「找到合适的人：子晴（示范用户）」），payload 多 `targetIsSeed`。
+  - **雙向合適且對方是真人時，對方也收到配對通知**（原本只通知發起任務的人）；單向合適或對方是示範用戶不通知對方。
+  - 歷史頁：每筆加標籤；示範用戶的「重啟對話」不顯示「請求本人上線」。
+  - 大廳卡片（含大廳助手小卡）：名字旁標籤（`LobbyCardView.isSeed`）。
+  - 聊天室標題：標籤＋一行說明「对方是示范用户（虚构角色），由 AI 扮演；接手聊天也不会有真人回复」。
+- **挑人**：`rankCandidates` 真人加 `CONFIG.REAL_USER_BONUS`（0.05）再排序，只影響順序、顯示的相似度不變，現場的人比較容易配對到彼此。
+- **共用／跨線**（Peter 同意直接改）：`shared/types.ts`（`LobbyCandidate.is_seed?`、`TaskReport.suitable[].is_seed?`，都是選填）；C 的 `server/twin/{lobby,chatRoom,chatRoomStore}.ts`、`LobbyCard`、`LiveChatRoom`、`src/lib/api/twin.ts`（`ChatRoomStore.isSeedUser` 是選填，舊的 store 不受影響）。新元件 `src/components/PersonKindChip.tsx`。
+- **改了哪些檔案**：B：`server/social/{personKind,lobby,report,runner,agentStore}.ts`、`server/lib/config.ts`、`src/lib/api/social.ts`、`HistoryList.tsx`；其他如上；測試 `lobby`、`report`、`runner`。
+- **驗證**：`tsc -b`；vitest 643/643（真人排前面、顯示相似度不變、回報標示與排序、通知帶標示）；build。
+
+---
+
+### 2026-10-31｜真人一鍵進大廳（和種子用戶混在一起配對）｜Peter（AI 協助）
+- **做了什麼**：和阿澈說滿 8 句（`CONFIG.LOBBY_INVITE_MIN_MESSAGES`）、對外檔案有一句話介紹且至少 2 個興趣時，AI 朋友頁跳出「你可以进大厅了」，顯示自己的對外檔案與加入後會發生什麼；按「加入大厅」＝確認對外檔案（含算向量）＋開啟社交 Agent，之後 `searchLobby` 與大廳就會把他和種子用戶一起配對、他也會被別人找到。「先不要」這個瀏覽器不再問；「先改改档案」去檔案頁。
+- **為什麼**：現場 Demo 要讓大家互相配對；原本真人要自己去檔案頁確認、再去設定開社交 Agent，幾乎沒人會做。仍要本人按加入（對外資料要本人同意，02 F4）。
+- **API**：`GET /api/lobby-invite`（`in_lobby`／`not_yet`＋原因／`invite`＋對外檔案）、`POST /api/lobby-invite/accept`。說夠了但還沒有檔案時會補撷取一次（背景撷取在 Vercel 可能被中斷）。
+- **跨線**：撷取與確認直接用 A 的 `extractProfile`、`updateShareable`、`updateSettings`（同一套規則）；`FriendPage` 加 2 行掛元件。混合配對不用改：B 的 `searchLobby` 與 C 的大廳本來就是「開了社交 Agent＋檔案已確認」的人都算，種子和真人一樣。
+- **注意**：真人被配對後，雙方分身代聊要靠 worker 推進，Demo 時 Peter 電腦要開 `npm run worker`。
+- **改了哪些檔案**：`server/social/{lobbyInvite,lobbyInviteDeps}.ts`、`server/routes/social.ts`、`server/lib/config.ts`、`src/lib/api/social.ts`、`src/features/social/components/LobbyInvite.tsx`、`src/features/friend/FriendPage.tsx`、`tests/social/lobby-invite.test.ts`。
+- **驗證**：`tsc -b`；vitest 648/648（聊不夠、邀請、補撷取、檔案不完整、已在大廳、加入、不符合不加入）；build。
+
+---
+
+### 2026-10-31｜任務確認卡關掉後的通知｜Peter（AI 協助）
+- **做了什麼**（http 模式的 AI 朋友頁）：
+  - 按「再想想」或點旁邊關掉：任務**保留**在「我的任务」等確認（原本「再想想」會取消任務），右下角通知「任务先帮你留着…点这里去看看」。
+  - 按「确认，开始找人」：留在聊天頁（原本跳到任務頁），通知「已开始找人，进度和结果都在「我的任务」…」。
+  - 通知點了就到 `/tasks/<id>`，10 秒後自動消失。真任務的確認視窗拿掉「Demo」標籤。
+- **怎麼做**：`Notification` 加選填 `link`、`ttlMs`；`AppShell` 吐司點擊導頁、時間到自動關（沒設的通知行為不變）；`Modal` 加 `demo`（預設 true，不影響其他視窗）；`TaskConfirmCard` 加 `onLater`（有給時「再想想」只關卡片，大廳助手沒給、行為不變）。
+- **跨線**：經 Peter 同意改 A 的 `FriendPage`、`AppShell`、`Modal` 與 `src/lib/api/types.ts`（只加選填欄位）。
+- **改了哪些檔案**：上述 5 檔＋`src/features/social/components/TaskConfirmCard.tsx`。
+- **驗證**：`tsc -b`、vitest、build；畫面請 Peter 在瀏覽器確認。
+
+---
+
+### 2026-10-31｜隱私警告：多認「想交換聯絡方式」與沒寫平台的帳號｜Peter（AI 協助）
+- **問題**：Peter 實測「我的id 1245631」「給你我的微信嗎」都沒跳警告（原規則要寫平台名＋帳號才算；「加我微信」那條還少了反斜線，等於沒作用）。
+- **修正**（只在警告用，不影響 C2 遮蔽）：
+  - 「联系方式」：加／给／发／留／换／交换／要／告诉＋6 字內出現微信、vx、QQ、电话、手机号、号码、联系方式、邮箱、地址等（簡繁都認）。
+  - 「社交账号」：id／账号／用户名／号码＋英文帳號或 5 位以上數字。
+- **改了哪些檔案**：`src/lib/privacy/rules.ts`、`tests/social/privacy-warning.test.ts`（新增 7 種要警告、4 句不誤報，例如「我想要一个新手机壳」「我的idea 是…」）。
+- **限制**：規則比對，換個說法（例如「我 V 是…」「扣扣」）仍可能漏；之後可視需要加 LLM 判斷。
+
+---
+
+### 2026-10-31｜修正：隱私警告按 Enter 一閃就關｜Peter（AI 協助）
+- **問題**：在輸入框按 Enter，警告視窗跳出後立刻被同一次 Enter 觸發「返回修改」關掉，看起來像 Enter 沒反應（按送出按鈕正常）。
+- **修正**：「返回修改」改成等這次按鍵事件跑完（setTimeout 0）才取得焦點，不用 autoFocus。三個聊天輸入框都靠這個元件，一起修好。
+- **改了哪些檔案**：`src/components/PrivacyWarning.tsx`。
+- **驗證**：`tsc -b`、vitest、build；畫面請 Peter 在瀏覽器確認（這台無頭 Chrome 無法截圖）。
+
+---
+
+### 2026-10-31｜送出前隱私警告｜Peter（AI 協助）
+- **做了什麼**：和真人聊天（http 的 `LiveChatRoom`、mock 接手後的 `ProxyChatPage`）和阿澈聊天（`FriendPage`）按送出前先檢查；有微信號／QQ 等帳號、手機號、座機、身份證號、地址、email、網址、銀行卡號、密碼／驗證碼、「加我微信」時，跳出紅色警告視窗（偵測到什麼、誰會看到、防詐提醒），選「返回修改」或「我确定，仍要发送」。只提醒不擋。
+- **怎麼做**：C2 隱私守門的規則（`maskByRules`）原封不動搬到 `src/lib/privacy/rules.ts`，前後端共用一套；`server/twin/guard.ts` 改成從那裡 import 並 re-export（行為不變，C 的 59 則測試照過）。警告另外多認銀行卡號、密碼／驗證碼、「加我微信」，只用在警告、不影響 C2 遮蔽。元件 `src/components/PrivacyWarning.tsx`（`usePrivacyCheck('human'|'friend')`）。
+- **跨線**：Peter 同意由 B 的 AI 直接改 A（`FriendPage`）、C（`guard.ts`、`LiveChatRoom`、`ProxyChatPage`），每處只加幾行。Jerry 的 `c/ux-audit-fixes` 合併時，這幾個檔案的送出函式要保留 `privacy.guard(...)` 和 `{privacy.dialog}`。
+- **改了哪些檔案**：`src/lib/privacy/rules.ts`、`src/components/PrivacyWarning.tsx`、`server/twin/guard.ts`、`src/features/friend/FriendPage.tsx`、`src/features/twin/ProxyChatPage.tsx`、`src/features/twin/components/LiveChatRoom.tsx`、`tests/social/privacy-warning.test.ts`。
+- **驗證**：`tsc -b`、vitest 631/631（10 種要警告、5 句一般句子不誤報、身份證不重複算成銀行卡）、build。
+
+---
+
+### 2026-10-31｜登入頁自動填入上次的名字｜Peter（AI 協助）
+- **做了什麼**：登入成功後把名字記在這個瀏覽器（localStorage `personaai:lastName`）；下次打開登入頁（例如登出後）自動填入，顯示「这是你上次用的名字」，按開始直接回到原帳號、不再問「是你吗」。改名字或按隨機就照原本流程。
+- **為什麼**：用戶不用記自己的名字、也不用重打。同一個瀏覽器視為本人（Demo 取捨，和名字帳號一致）。
+- **補充**：登入狀態本來就會在重新整理後還原；這裡處理的是登出或 session 過期之後。#97 修好登入：Peter 在 Supabase 開了 Email 登入方式（名字帳號內部用 email 帳號）。
+- **改了哪些檔案**：`src/lib/api/account.ts`、`src/features/friend/LoginPage.tsx`。
+- **驗證**：`tsc -b`、vitest 612/612、build；請在 Vercel 登出再進來確認。
+
+---
+
+### 2026-10-31｜修正：名字帳號登入失敗｜Peter（AI 協助）
+- **問題**：#95 上線後所有人登入都顯示「登录失败，请再试一次」（前端 `verifyOtp` 失敗）。
+- **原因（推斷）**：新帳號是讓 `generateLink(magiclink)` 順便建立，Supabase 這時給的是 signup 類型的憑證，前端用 magiclink 換就被拒。
+- **修正**：新帳號先用 `admin.createUser`（email 已驗證）建好，再產生登入憑證；後端回傳 `verificationType`，前端照它 `verifyOtp`（失敗時在 console 印原因）。之前失敗時留下的帳號也能用「是我，进入」登入。
+- **重新整理**：`RequireAuth` 本來就會從 Supabase session 還原登入；之前要重登是因為根本沒登入成功。
+- **改了哪些檔案**：`server/account/{nameLogin,supabaseDeps}.ts`、`server/routes/account.ts`、`src/lib/api/account.ts`、`tests/social/name-login.test.ts`。
+- **驗證**：`tsc -b`、vitest、build；真實登入要 Peter 在 Vercel 測（AI 不建帳號）。
+
+---
+
 ### 2026-10-31｜名字帳號：同名回到原帳號、隨機名字不重複｜Peter（AI 協助）
 - **做了什麼**：新增 `POST /api/account/enter`（`server/routes/account.ts`、`server/account/`）。登入頁（http 模式）改成：自己打的名字 → 有帳號就先提示「已经有帐号了」，按「是我，进入」回到原帳號、記錄都在；按「不是我」換名字。沒改過的隨機名字 → 後端保證不和現有帳號、種子用戶重複。這個瀏覽器已登入過就直接進。mock 模式不變。
 - **怎麼做到**：後端用 Supabase admin `generateLink(magiclink)` 產生一次性 token（不寄信，內部 email `<uuid>@users.personaai.app`），前端 `verifyOtp` 換成登入狀態。舊的匿名帳號第一次「是我」時補上內部 email。種子用戶的名字保留不能用。

@@ -5,10 +5,12 @@ import { Button, Chip } from '@components/ui/Button'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { Modal } from '@components/ui/Modal'
 import { useDemoStore } from '@store/useDemoStore'
+import { usePrivacyCheck } from '@components/PrivacyWarning'
 import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
+import { useLobbyInvite } from '@features/social/components/LobbyInvite'
 import {
   isHttpMode,
   callFriendIntro,
@@ -25,6 +27,8 @@ import {
  */
 export function FriendPage() {
   const s = useDemoStore()
+  // 送出前檢查隱私（微信號、手機號等），有就先跳警告
+  const privacy = usePrivacyCheck('friend')
   const navigate = useNavigate()
   const [draft, setDraft] = useState('')
 
@@ -38,6 +42,8 @@ export function FriendPage() {
 
   // 消息数量用于自动滚动（mock 或 http 模式均适用）
   const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
+  // 聊夠了、對外檔案也夠完整 → 邀請一鍵加入大廳（B 的元件）
+  const lobbyInvite = useLobbyInvite(httpMessages.filter((m) => m.role === 'user').length)
   const chatRef = useAutoScrollBottom<HTMLDivElement>(msgCount)
 
   // http 模式：挂载时拉消息 + 首次见面
@@ -137,6 +143,17 @@ export function FriendPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [httpMessages])
 
+  // 任務卡先關掉（再想想／點旁邊）：任務留著等確認，用通知告訴用戶去哪裡找
+  const taskLater = (taskId: string) => {
+    setPendingTaskId(null)
+    s.pushNotification({
+      title: '任务先帮你留着',
+      body: '还没开始找人。想好了到「我的任务」按确认就会开始，点这里去看看',
+      link: `/tasks/${taskId}`,
+      ttlMs: 10_000,
+    })
+  }
+
   const openReport = () => {
     s.dismissReport()
     navigate('/chat/lin/result')
@@ -145,6 +162,8 @@ export function FriendPage() {
 
   return (
     <div className="page friend-page">
+      {privacy.dialog}
+      {lobbyInvite}
       {/* 桌机左栏：chromabot 大头像（手机隐藏；占屏幕高度 60%） */}
       <aside className="friend-avatar-col" aria-hidden>
         <RiveAvatar name="chromabot" fill className="friend-avatar-rive" />
@@ -197,12 +216,12 @@ export function FriendPage() {
             placeholder={t('friend.inputPlaceholder')}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void send()}
+            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && privacy.guard(draft, () => void send())}
             disabled={isHttpMode ? httpTyping : s.friendTyping}
           />
           <Button
             small
-            onClick={() => void send()}
+            onClick={() => privacy.guard(draft, () => void send())}
             disabled={!draft.trim() || (isHttpMode ? httpTyping : s.friendTyping)}
           >
             {t('friend.send')}
@@ -236,7 +255,8 @@ export function FriendPage() {
       {isHttpMode && pendingTaskId && (
         <Modal
           open
-          onClose={() => setPendingTaskId(null)}
+          demo={false}
+          onClose={() => taskLater(pendingTaskId)}
           title={t('friend.taskCard')}
           sub="Agent 理解的任务如下，确认后开始执行"
         >
@@ -244,8 +264,14 @@ export function FriendPage() {
             taskId={pendingTaskId}
             onStarted={(task) => {
               setPendingTaskId(null)
-              navigate(`/tasks/${task.id}`)
+              s.pushNotification({
+                title: '已开始找人',
+                body: '进度和结果都在「我的任务」，有合适的人阿澈会告诉你。点这里去看看',
+                link: `/tasks/${task.id}`,
+                ttlMs: 10_000,
+              })
             }}
+            onLater={(task) => taskLater(task.id)}
             onCancelled={() => setPendingTaskId(null)}
           />
         </Modal>

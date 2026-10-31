@@ -5,6 +5,7 @@ import { CONFIG } from '../lib/config.js'
 import { writeLog } from '../lib/log.js'
 import type { AgentStore } from './agentStore.js'
 import { attemptResult, decideGuard, isTaskDone, reachedDailyLimit, unsuitableReason, type DecideAction } from './guards.js'
+import { withPersonTag } from './personKind.js'
 
 export interface PickResult {
   target: LobbyCandidate | null
@@ -245,12 +246,24 @@ async function decideNext(task: AgentTask, conversationId: string, ev: Evaluatio
     await recordAttempts(task, conversationId, targetId, ev, { ended: false, forced: null }, deps)
     await deps.markWaitingHuman(conversationId)
     // 通知格式照 07B 的 B8，由 C 的通知元件顯示「找到合适的人：{名字}」
+    const targetIsSeed = await deps.store.isSeedUser(targetId)
     await deps.store.notifyMatch(task.user_id, {
       conversationId,
-      targetName: await deps.store.displayName(targetId),
+      // 「找到合适的人：子晴（示范用户）」：示範用戶是虛構角色，接手後不會有真人回覆
+      targetName: withPersonTag(await deps.store.displayName(targetId), targetIsSeed),
+      targetIsSeed,
       mutual: result === 'mutual',
       taskId: task.id,
     })
+    // 雙向合適、對方又是真人：也通知對方（他的分身替他聊、他的評審也說合適）。單向合適不通知對方。
+    if (result === 'mutual' && !targetIsSeed) {
+      await deps.store.notifyMatch(targetId, {
+        conversationId,
+        targetName: withPersonTag(await deps.store.displayName(task.user_id), await deps.store.isSeedUser(task.user_id)),
+        targetIsSeed: false,
+        mutual: true,
+      })
+    }
     await deps.store.updateTask(task.id, { active_conversation_id: null, progress: { ...task.progress, suitable: task.progress.suitable + 1 } })
     await log(task, result === 'mutual' ? '双向合适，通知你' : '对你来说合适，通知你', plannerReason ?? `第 ${ev.round} 轮判定`, { conversation_id: conversationId })
     return 'notified'

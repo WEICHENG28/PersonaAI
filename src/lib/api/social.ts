@@ -94,6 +94,8 @@ export interface HistoryEntry {
   id: string
   target_user_id: string
   target_name: string
+  /** 對方是示範用戶（虛構角色）。 */
+  target_is_seed?: boolean
   conversation_id: string
   origin: 'auto' | 'manual'
   result: AttemptResult
@@ -156,6 +158,28 @@ export function updateTask(id: string, action: TaskAction): Promise<TaskView> {
 }
 
 /** 帶上登入的 Supabase JWT（A0b），後端用它認出是誰。 */
+// ── 真人進大廳的邀請 ──
+
+export interface LobbyShareable {
+  intro: string
+  interests: string[]
+  chat_style: string
+  looking_for: string
+}
+
+export type LobbyInviteView =
+  | { status: 'in_lobby' }
+  | { status: 'not_yet'; userMessages: number; need: number; reason: string }
+  | { status: 'invite'; shareable: LobbyShareable }
+
+export function getLobbyInvite(): Promise<LobbyInviteView> {
+  return request('GET', '/api/lobby-invite')
+}
+
+export function acceptLobbyInvite(): Promise<LobbyInviteView> {
+  return request('POST', '/api/lobby-invite/accept')
+}
+
 async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
   const token = (await supabase.auth.getSession()).data.session?.access_token
   const headers: Record<string, string> = {}

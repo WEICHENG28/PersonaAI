@@ -19,15 +19,22 @@ export interface NameLoginDeps {
   isReservedName(name: string): Promise<boolean>
   /** 幫舊帳號補上內部 email（只用來產生登入連結，不會寄信）。 */
   setEmail(authId: string, email: string): Promise<void>
-  /** 產生一次性登入憑證；帳號不存在時 Supabase 會順便建立。回傳 auth id 與 token_hash。 */
-  issueLogin(email: string, displayName: string): Promise<{ authId: string; tokenHash: string }>
+  /** 建立已驗證的新帳號（不寄信），回傳 auth id。 */
+  createAccount(email: string, displayName: string): Promise<string>
+  /** 產生已存在帳號的一次性登入憑證（不寄信）。verificationType 給前端 verifyOtp 用。 */
+  issueLogin(email: string): Promise<LoginToken>
   /** 建立 users 列（冪等），佔住這個名字。 */
   ensureProfile(authId: string, email: string, displayName: string): Promise<void>
   random?: () => number
 }
 
+export interface LoginToken {
+  tokenHash: string
+  verificationType: string
+}
+
 export type NameLoginResult =
-  | { ok: true; displayName: string; tokenHash: string; created: boolean }
+  | { ok: true; displayName: string; tokenHash: string; verificationType: string; created: boolean }
   | { ok: false; code: 'invalid' | 'reserved' | 'exists'; error: string; displayName?: string }
 
 /** 舊的匿名帳號補 email 用：不寄信、不給人看，只是 Supabase 登入需要一個 email。 */
@@ -61,16 +68,18 @@ export async function nameLogin(
 
   const email = existing.email ?? internalEmail(existing.authId)
   if (!existing.email) await deps.setEmail(existing.authId, email)
-  const { tokenHash } = await deps.issueLogin(email, name)
-  return { ok: true, displayName: name, tokenHash, created: false }
+  const token = await deps.issueLogin(email)
+  return { ok: true, displayName: name, ...token, created: false }
 }
 
 async function enterNew(name: string, deps: NameLoginDeps): Promise<NameLoginResult> {
   // 內部 email 用隨機 id，不放名字（名字可能是中文、也可能之後改）
   const email = `${crypto.randomUUID()}@users.personaai.app`
-  const { authId, tokenHash } = await deps.issueLogin(email, name)
+  // 先建好「已驗證」的帳號再產生登入憑證：讓 Supabase 自動建帳號時，憑證類型會變成 signup，前端換不到登入狀態
+  const authId = await deps.createAccount(email, name)
   await deps.ensureProfile(authId, email, name)
-  return { ok: true, displayName: name, tokenHash, created: true }
+  const token = await deps.issueLogin(email)
+  return { ok: true, displayName: name, ...token, created: true }
 }
 
 /** 前端建議的隨機名字沒人用就照用；被用掉了就重抽，再不行加數字。 */

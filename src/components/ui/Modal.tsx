@@ -11,10 +11,12 @@ interface ModalProps {
   footer?: ReactNode
   sheet?: 'pear' | 'paper'
   wide?: boolean
+  /** 右上角的 Demo 標籤；真資料的視窗傳 false */
+  demo?: boolean
 }
 
 /** Hum 卡片式弹窗：纸卡 + 梨黄 sticker 头 */
-export function Modal({ open, onClose, title, sub, children, footer, sheet = 'paper', wide }: ModalProps) {
+export function Modal({ open, onClose, title, sub, children, footer, sheet = 'paper', wide, demo = true }: ModalProps) {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -40,7 +42,7 @@ export function Modal({ open, onClose, title, sub, children, footer, sheet = 'pa
             {title && <h2 className="modal__title">{title}</h2>}
             {sub && <p className="modal__sub">{sub}</p>}
           </div>
-          <Chip tone="well">Demo</Chip>
+          {demo && <Chip tone="well">Demo</Chip>}
         </header>
         <div className="modal__body">{children}</div>
         {footer && <footer className="modal__foot">{footer}</footer>}

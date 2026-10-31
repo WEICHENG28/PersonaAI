@@ -57,7 +57,10 @@ export interface AgentTask {
   attempted_user_ids: string[]
 }
 export interface LobbyQuery { text?: string; purpose?: Purpose; conditions?: string[]; excludeIds?: string[]; limit?: number }
-export interface LobbyCandidate { user_id: string; display_name: string; shareable: ShareableProfile; similarity: number }
+export interface LobbyCandidate {
+  user_id: string; display_name: string; shareable: ShareableProfile; similarity: number
+  is_seed?: boolean                // 示範用戶（虛構角色）；畫面要標「示范用户」
+}
 
 // ---- 判定（B）----
 export interface JudgeScores {
@@ -88,7 +91,7 @@ export interface TaskReport {
   purpose: Purpose
   screened: number
   chats: number
-  suitable: { user_id: string; display_name: string; mutual: boolean; conversation_id: string }[]
+  suitable: { user_id: string; display_name: string; mutual: boolean; conversation_id: string; is_seed?: boolean }[]
   unsuitable_reasons: { reason_type: ReasonType; reason_text: string }[]
   saved_minutes: number
   basis: string                    // 例：「代聊 6 場 × 人工平均 20 分鐘」

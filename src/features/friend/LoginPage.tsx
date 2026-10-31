@@ -6,7 +6,7 @@ import { ShuffleIcon } from '@components/ui/Icons'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { currentUser, isHttpMode, initProfile } from '@lib/api/friend'
-import { NameExistsError, enterWithName } from '@lib/api/account'
+import { NameExistsError, enterWithName, lastUsedName } from '@lib/api/account'
 import { randomName } from './randomName'
 
 /**
@@ -20,9 +20,12 @@ import { randomName } from './randomName'
 export function LoginPage() {
   const login = useDemoStore((s) => s.login)
   const navigate = useNavigate()
-  const [name, setName] = useState(randomName)
+  // 这个浏览器上次用的名字（http 模式）：自动填入，直接开始就回到原帐号，不用再问「是你吗」
+  const [remembered] = useState(() => (isHttpMode ? lastUsedName() : null))
+  const [name, setName] = useState(() => remembered ?? randomName())
   // 用户自己改过名字＝用这个名字（找回或新建）；没改过＝随机名字（保证不重复）
-  const [typed, setTyped] = useState(false)
+  const [typed, setTyped] = useState(Boolean(remembered))
+  const isRemembered = Boolean(remembered) && name.trim() === remembered
   const [existsName, setExistsName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -55,7 +58,7 @@ export function LoginPage() {
     setError(null)
     try {
       if (isHttpMode) {
-        await enterWithName(typed ? 'name' : 'random', nickname, confirmExisting)
+        await enterWithName(typed ? 'name' : 'random', nickname, confirmExisting || isRemembered)
         setExistsName(null)
         await finish()
       } else {
@@ -117,7 +120,9 @@ export function LoginPage() {
             </div>
           </label>
 
-          {isHttpMode && <p className="login-hint" style={{ color: 'var(--color-muted)', fontSize: 'var(--text-sm)' }}>想之后继续用同一个帐号，请记住你的名字，下次输入一样的名字就会回到原来的记录。</p>}
+          {isRemembered && <p className="login-hint" style={{ color: 'var(--color-muted)', fontSize: 'var(--text-sm)' }}>这是你上次用的名字，直接开始就会回到原来的记录。</p>}
+
+          {isHttpMode && !isRemembered && <p className="login-hint" style={{ color: 'var(--color-muted)', fontSize: 'var(--text-sm)' }}>想之后继续用同一个帐号，请记住你的名字，下次输入一样的名字就会回到原来的记录。</p>}
 
           {existsName && (
             <div className="login-exists" role="alert" style={{ display: 'grid', gap: 'var(--space-sm)' }}>
