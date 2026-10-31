@@ -140,6 +140,17 @@ export function FriendPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [httpMessages])
 
+  // 任務卡先關掉（再想想／點旁邊）：任務留著等確認，用通知告訴用戶去哪裡找
+  const taskLater = (taskId: string) => {
+    setPendingTaskId(null)
+    s.pushNotification({
+      title: '任务先帮你留着',
+      body: '还没开始找人。想好了到「我的任务」按确认就会开始，点这里去看看',
+      link: `/tasks/${taskId}`,
+      ttlMs: 10_000,
+    })
+  }
+
   const openReport = () => {
     s.dismissReport()
     navigate('/chat/lin/result')
@@ -240,7 +251,8 @@ export function FriendPage() {
       {isHttpMode && pendingTaskId && (
         <Modal
           open
-          onClose={() => setPendingTaskId(null)}
+          demo={false}
+          onClose={() => taskLater(pendingTaskId)}
           title={t('friend.taskCard')}
           sub="Agent 理解的任务如下，确认后开始执行"
         >
@@ -248,8 +260,14 @@ export function FriendPage() {
             taskId={pendingTaskId}
             onStarted={(task) => {
               setPendingTaskId(null)
-              navigate(`/tasks/${task.id}`)
+              s.pushNotification({
+                title: '已开始找人',
+                body: '进度和结果都在「我的任务」，有合适的人阿澈会告诉你。点这里去看看',
+                link: `/tasks/${task.id}`,
+                ttlMs: 10_000,
+              })
             }}
+            onLater={(task) => taskLater(task.id)}
             onCancelled={() => setPendingTaskId(null)}
           />
         </Modal>
