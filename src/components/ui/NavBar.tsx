@@ -4,6 +4,7 @@ import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { NotificationBell } from '@features/twin/components/NotificationBell'
 import { GearIcon } from './Icons'
+import { isHttpMode } from '@lib/api/friend'
 
 const TABS = [
   { to: '/friend', key: 'nav.friend' as const, match: /^\/(friend|chat)/ },
@@ -106,17 +107,18 @@ function ProfileKnob() {
   )
 }
 
-/** 设置按钮（顶栏右端，齿轮 SVG 图标） */
+/** 设置按钮（顶栏右端，齿轮 SVG）。mock（演示）模式下底色浅绿，替代原「演示模式」标签 */
 function SettingsKnob() {
   const navigate = useNavigate()
   const location = useLocation()
   const isActive = /^\/settings/.test(location.pathname)
   return (
     <button
-      className={`knob knob--settings ${isActive ? 'is-on' : ''}`}
+      className={`knob knob--icon knob--settings ${isActive ? 'is-on' : ''}`}
+      style={isHttpMode ? undefined : { backgroundColor: 'var(--color-mint)' }}
       onClick={() => navigate('/settings')}
-      title="设置"
-      aria-label="设置"
+      title={isHttpMode ? '设置' : '设置（演示模式）'}
+      aria-label={isHttpMode ? '设置' : '设置（演示模式）'}
     >
       <GearIcon size={18} />
     </button>
@@ -143,7 +145,7 @@ function FriendKnob({ unread }: { unread: number }) {
       onClick={() => navigate('/friend')}
       title={reportReady ? '阿澈有事想跟你说' : '阿澈'}
     >
-      <RiveAvatar name="robot" size={26} />
+      <RiveAvatar name="chromabot" size={26} />
       <span className="knob__meta">{reportReady ? '有新回报' : '阿澈'}</span>
       {unread > 0 && <span className="notif-count">{unread}</span>}
     </button>

@@ -26,6 +26,19 @@
 
 ## 共用與決策
 
+### 2026-10-31｜a/friend-quality：AI 朋友品質提升 + 登入頁重排｜Vincent（AI 協助）｜PR a/friend-quality
+- **做了什麼**：
+  1. **登入頁（#login-scroll）**：移除 `page-center` 多餘 padding，桌機改為左（chromabot Rive）右（標題+副標題+登入卡）雙欄，手機改為 Rive 頭像上半螢幕、登入卡稍微遮住底部、副標題顯示在卡片下方；不再需要滾動。
+  2. **ProfilePage (#profile-fix)**：「保存并确认对外使用」按鈕改呼叫 `saveShareable(shareable)` 而非 `extract`；狀態 chip 從紅色（`coral`）改為中性（`well`），文字從「即将上线」改成「未确认（确认后才对外）」／「已确认」；mock 模式同步修正。
+  3. **FriendPage 任務卡（#task-card-fix）**：http 模式 `canAssignTask` 改用真實 `httpMessages` 的 user 計數；掛載時從 `listTasks()` 拉最近任務，顯示狀態與「看进度」連結；無任務時顯示「跟阿澈说：帮我找 2 个喜欢登山的人聊聊」；記憶側欄改從 `GET /api/memory` 拉真實資料（修復 http 模式永遠顯示「还没有记忆」）；僅 mock 模式顯示「模擬下次見面」按鈕。
+  4. **Prompt 1 朋友感（#prompt1-nudge）**：加「朋友感：延伸而非總結」規則（不只復述，要分享小經歷或問具體問題，留「鉤子」）；加 nudge 模式說明；前端加 40 秒 `setTimeout` 計時器，最後一則是 AI 訊息 + 用戶沉默 40 秒 → 呼叫 `POST /api/friend/chat { mode: 'nudge' }`，每段沉默最多一次。
+  5. **Prompt 3 不喜歡（#prompt3-dislikes）**：加「喜歡 vs 不喜歡的區分」規則；不喜歡的事物進 `agent_profile.avoidance`，不進 `interests`；`profileExtractSchema` 新增 `avoidance: z.array(z.string()).default([])` 欄位。
+  6. **記憶擷取（#memory-trigger）**：根本原因是前端 FriendPage 的「它記得的事」側欄在 http 模式從未呼叫 `GET /api/memory`，一直讀 demo store；新增 `listMemories()` API 函式，掛載與每次 AI 回覆後更新。
+- **為什麼這樣做**：直接修最小路徑；Prompt 改動用同一支 `/api/friend/chat` 加 `mode` 參數，不新增端點；nudge 計時器用純 React `useEffect` + `setTimeout`，不需要 WebSocket；記憶側欄直接拉 REST，不需要 Realtime。
+- **改了哪些檔案**：`src/features/friend/LoginPage.tsx`、`src/theme/pages.css`、`src/theme/layout.css`、`src/features/friend/ProfilePage.tsx`、`src/features/friend/FriendPage.tsx`、`src/lib/api/friend.ts`、`server/prompts/01_friend.ts`、`server/prompts/03_profile.ts`、`server/friend/chat.ts`、`server/routes/friend.ts`、`tests/friend/nudge.test.ts`（新）、`tests/friend/dislikes.test.ts`（新）。
+- **踩到的坑**：（1）`FriendMessage.role` 是 `'user' | 'friend'`，不是 `'assistant'`，nudge 條件要用 `'friend'`。（2）`TaskStatus` 沒有 `'stopped'`，過濾要用 `'cancelled'`。（3）`extractProfile` 回傳 `{ shareable, confirmed, exists }`，不是 `{ shareable_profile }` 。
+- **還沒做完／待辦**：記憶提取背景觸發沒有 Realtime 推送，每次聊天後手動 refetch 有約 1 秒延遲，後續可接 Supabase Realtime 解決。
+
 ### 2026-10-31｜修正：Vercel 上 /api 全部 FUNCTION_INVOCATION_FAILED｜Peter（AI 協助）
 - **問題**：#89 部署後，Vercel 上連 `/api/health` 都回 500（`FUNCTION_INVOCATION_FAILED`）。Vercel 把每個 TS 檔各自編成 Node ESM，ESM 的相對 import 必須寫副檔名，`import { app } from '../server/app'` 會找不到模組（本機用 tsc 照 Vercel 方式編譯後實際重現：`ERR_MODULE_NOT_FOUND ... server\app`）。本機的 tsx／vitest／Vite 會自動補，所以一直沒發現。
 - **修正**：`server/`、`shared/`、`api/` 所有相對 import／export 補上 `.js`（例如 `'./routes/friend'` → `'./routes/friend.js'`、資料夾 → `'/index.js'`），共 64 個檔案、259 處，**只改 import 路徑、沒改任何邏輯**。TypeScript、tsx、vitest、Vite 都認得 `.js` 對到 `.ts`。新增測試 `tests/social/esm-imports.test.ts`：之後有人寫了沒副檔名的相對 import，`npm test` 會失敗並列出位置。

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router'
-import { Button, Chip } from '@components/ui/Button'
+import { Button } from '@components/ui/Button'
 import { Card, CardHead } from '@components/ui/Card'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
@@ -114,17 +114,7 @@ export function SettingsPage() {
               <CardHead
                 title={t('settings.socialAgent')}
                 sub={t('settings.socialAgentNote')}
-                right={<Chip tone={socialAgent ? 'mint' : 'well'}>{socialAgent ? '开' : '关'}</Chip>}
-              />
-              <div className="stack" style={{ gap: '0.5rem' }}>
-                <p className="hint-inline">
-                  {socialAgent
-                    ? '已开启：分身和大厅会使用你的对外档案，可随时关闭'
-                    : shareableConfirmed
-                      ? '关闭中：开启后分身和大厅会使用你的对外档案'
-                      : '请先到「我的档案」确认对外档案，才能开启'}
-                </p>
-                <div>
+                right={
                   <Button
                     small
                     variant={socialAgent ? 'danger' : 'primary'}
@@ -133,8 +123,15 @@ export function SettingsPage() {
                   >
                     {socialAgent ? '点击关闭' : '点击开启'}
                   </Button>
-                </div>
-              </div>
+                }
+              />
+              <p className="hint-inline">
+                {socialAgent
+                  ? '已开启：分身和大厅会使用你的对外档案，可随时关闭'
+                  : shareableConfirmed
+                    ? '关闭中：开启后分身和大厅会使用你的对外档案'
+                    : '请先到「我的档案」确认对外档案，才能开启'}
+              </p>
             </Card>
 
             {/* 每日代聊上限（http 模式） */}
@@ -212,16 +209,17 @@ export function SettingsPage() {
               <CardHead
                 title={t('settings.devMode')}
                 sub={t('settings.devModeHint')}
-                right={<Chip tone={devMode ? 'pear' : 'well'}>{devMode ? '开' : '关'}</Chip>}
+                right={
+                  <Button
+                    small
+                    variant={devMode ? 'danger' : 'primary'}
+                    onClick={toggleDevMode}
+                    disabled={saving}
+                  >
+                    {devMode ? '点击关闭' : '点击开启'}
+                  </Button>
+                }
               />
-              <Button
-                small
-                variant={devMode ? 'danger' : 'primary'}
-                onClick={toggleDevMode}
-                disabled={saving}
-              >
-                {devMode ? '关闭' : '开启'}
-              </Button>
             </Card>
 
             {/* 人工平均时间 */}

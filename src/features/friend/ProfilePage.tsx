@@ -109,9 +109,9 @@ function HttpProfileSection({ memoriesSection }: { memoriesSection: React.ReactN
               title={t('profile.shareable')}
               right={
                 view?.confirmed ? (
-                  <Chip tone="mint">{t('profile.confirmed')}</Chip>
+                  <Chip tone="mint">已确认</Chip>
                 ) : shareable ? (
-                  <Chip tone="coral">{t('common.comingSoonBadge')}</Chip>
+                  <Chip tone="well">未确认（确认后才对外）</Chip>
                 ) : null
               }
             />
@@ -188,8 +188,8 @@ function HttpProfileSection({ memoriesSection }: { memoriesSection: React.ReactN
                   <Button small variant="secondary" onClick={busy ? undefined : extract} disabled={busy}>
                     {busy ? t('login.loading') : '重新撷取'}
                   </Button>
-                  {!view?.confirmed && (
-                    <Button small onClick={busy ? undefined : extract} disabled={busy}>
+                  {!view?.confirmed && shareable && (
+                    <Button small onClick={busy ? undefined : () => void saveShareable(shareable).then(setView).catch((e: unknown) => setError(e instanceof Error ? e.message : '确认失败'))} disabled={busy}>
                       {t('profile.saveConfirm')}
                     </Button>
                   )}
@@ -198,22 +198,11 @@ function HttpProfileSection({ memoriesSection }: { memoriesSection: React.ReactN
               </div>
             )}
           </Card>
-
-          {/* 说话风格说明（分身模仿用） */}
-          <Card>
-            <CardHead title={t('profile.styleTitle')} sub={t('profile.styleNote')} />
-            <ul className="suggest-list">
-              <li>句长：中短句为主</li>
-              <li>语气：温和、偶尔冷幽默</li>
-              <li>emoji：少量使用</li>
-            </ul>
-          </Card>
         </div>
 
         {/* 它记得的事（mock demo 数据；http 接入留给 A3 后续批次） */}
         {memoriesSection}
-      </div>
-    </div>
+      </div>    </div>
   )
 }
 
@@ -348,9 +337,9 @@ function MockProfileSection() {
             title={t('profile.shareable')}
             right={
               s.profile.confirmed ? (
-                <Chip tone="mint">{t('profile.confirmed')}</Chip>
+                <Chip tone="mint">已确认</Chip>
               ) : (
-                <Chip tone="coral">{t('common.comingSoonBadge')}</Chip>
+                <Chip tone="well">未确认（确认后才对外）</Chip>
               )
             }
           />
@@ -425,16 +414,6 @@ function MockProfileSection() {
               )}
             </div>
           )}
-        </Card>
-
-        {/* 说话风格说明（分身模仿用） */}
-        <Card>
-          <CardHead title={t('profile.styleTitle')} sub={t('profile.styleNote')} />
-          <ul className="suggest-list">
-            <li>句长：中短句为主</li>
-            <li>语气：温和、偶尔冷幽默</li>
-            <li>emoji：少量使用</li>
-          </ul>
         </Card>
         </div>
 

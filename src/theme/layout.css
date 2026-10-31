@@ -23,7 +23,9 @@
   display: grid;
   place-content: center;
   min-height: 100svh;
-  padding-top: calc(var(--bar-h) + var(--space-lg));
+  /* navbar 高度 + 小间距；手机下 login-page 自管 padding，这里只留最小值 */
+  padding-top: calc(var(--bar-h) + var(--space-sm));
+  padding-bottom: var(--space-sm);
 }
 
 /* 有导航的页：手机让出底部 tab 拦高度 */
@@ -131,6 +133,8 @@
 .knob:active { --edge: 1px; translate: 0 2px; }
 .knob.is-on { --edge: 1px; translate: 0 2px; background: var(--color-ink); color: var(--color-paper); }
 .knob--friend { margin-left: var(--space-md); }
+/* 纯图标 knob（设置、铃铛、换一个等）：正方形，无文字内边距 */
+.knob--icon { padding: 0; width: 44px; justify-content: center; }
 .knob__meta { font-size: var(--text-sm); }
 
 /* ── 手机底部 tab 拦 ── */
