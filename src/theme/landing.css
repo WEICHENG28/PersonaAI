@@ -275,6 +275,10 @@
 
 @media (min-width: 56rem) {
   .landing-feature { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
+  /* 左右互換變體：桌機把 demo 組件放左邊、文字放右邊（記憶掌控區），文字靠右對齊 */
+  .landing-feature--flip { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
+  .landing-feature--flip .landing-feature__text { order: 2; justify-items: end; text-align: right; }
+  .landing-feature--flip .landing-mock { order: 1; }
 }
 
 .landing-feature__text .landing-sec__sub { margin-bottom: 0; }

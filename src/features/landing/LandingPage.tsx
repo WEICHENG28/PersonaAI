@@ -37,7 +37,6 @@ export function LandingPage() {
               开始使用
             </Button>
           </div>
-          <p className="landing-note">AI 永远标示 · 角色生活是虚构设定 · 你掌控对外行为</p>
         </div>
 
         {/* 产品卡：一句对话示意（卡纸 + 卷角） */}
@@ -144,8 +143,8 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ── 记忆与掌控：记忆列表的缩小渲染 ── */}
-      <section className="landing-feature">
+      {/* ── 记忆与掌控：记忆列表的缩小渲染（桌機組件在左、文字在右） ── */}
+      <section className="landing-feature landing-feature--flip">
         <div className="landing-feature__text">
           <h2>它记得什么，你说了算</h2>
           <p className="landing-sec__sub">
