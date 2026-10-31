@@ -157,6 +157,36 @@ export function updateTask(id: string, action: TaskAction): Promise<TaskView> {
   return useHttp ? request('POST', `/api/tasks/${id}/${action}`) : mock.update(id, action)
 }
 
+/** 確認卡上改的內容（只在待確認時能改）。 */
+export interface TaskEdit {
+  purpose: TaskPurpose
+  conditions: string[]
+  count: number
+  suitable_count: number
+  max_chats: number
+}
+
+export function editTask(id: string, edit: TaskEdit): Promise<TaskView> {
+  return useHttp ? request('POST', `/api/tasks/${id}/edit`, edit) : mock.edit(id, edit)
+}
+
+// ── 頂欄「我的聊天」 ──
+
+export type ChatState = 'twin_chatting' | 'waiting_you' | 'chatting'
+
+export interface ChatListItem {
+  conversationId: string
+  otherName: string
+  otherIsSeed: boolean
+  state: ChatState
+  lastMessage: string | null
+  lastAt: string
+}
+
+export function listChats(): Promise<ChatListItem[]> {
+  return request('GET', '/api/chats')
+}
+
 /** 帶上登入的 Supabase JWT（A0b），後端用它認出是誰。 */
 // ── 真人進大廳的邀請 ──
 
@@ -231,6 +261,21 @@ const mock = (() => {
       const task = tasks.get(id)
       if (!task) throw new ApiError('找不到这个任务')
       return { ...task }
+    },
+    async edit(id: string, e: TaskEdit): Promise<TaskView> {
+      const task = tasks.get(id)
+      if (!task) throw new ApiError('找不到这个任务')
+      const cond = e.conditions.length ? `${e.conditions.join('、')}的` : ''
+      const next: TaskView = {
+        ...task,
+        purpose: e.purpose,
+        conditions: e.conditions,
+        target_count: e.count,
+        done_condition: { ...task.done_condition, suitable_count: e.suitable_count, max_chats: e.max_chats },
+        restatement: `帮你找 ${e.count} 位${cond}${PURPOSE_LABEL[e.purpose]}，找到 ${e.suitable_count} 位合适就停，最多代聊 ${e.max_chats} 场，可以吗？`,
+      }
+      tasks.set(id, next)
+      return { ...next }
     },
     async update(id: string, action: TaskAction): Promise<TaskView> {
       const task = tasks.get(id)

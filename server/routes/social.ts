@@ -3,7 +3,7 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { LlmError } from '../lib/llm/index.js'
-import { TaskError, changeTaskStatus, createTaskFromText, getOwnTask, type TaskAction } from '../social/task.js'
+import { TaskError, changeTaskStatus, createTaskFromText, editTask, getOwnTask, type TaskAction } from '../social/task.js'
 import { startConversation } from '../contracts/twin.js'
 import { getAgentStore } from '../social/agentStore.js'
 import { listHistory, reopenAttempt } from '../social/history.js'
@@ -12,6 +12,7 @@ import { computeStats } from '../social/stats.js'
 import { getTaskStore } from '../social/taskStore.js'
 import { defaultRunnerDeps } from '../social/runnerDeps.js'
 import { requireUserId } from '../social/user.js'
+import { listMyChats } from '../social/chats.js'
 import { acceptLobbyInvite, getLobbyInvite } from '../social/lobbyInvite.js'
 import { supabaseLobbyInviteDeps } from '../social/lobbyInviteDeps.js'
 
@@ -32,6 +33,9 @@ socialRoutes.post('/tasks', (c) =>
 socialRoutes.get('/lobby-invite', (c) => respond(c, (userId) => getLobbyInvite(userId, supabaseLobbyInviteDeps())))
 socialRoutes.post('/lobby-invite/accept', (c) => respond(c, (userId) => acceptLobbyInvite(userId, supabaseLobbyInviteDeps())))
 
+/** 頂欄「我的聊天」：還沒結束、和我有關的對話。 */
+socialRoutes.get('/chats', (c) => respond(c, (userId) => listMyChats(userId)))
+
 /** B10：我最近的任務（任務頁列表）。 */
 socialRoutes.get('/tasks', (c) => respond(c, (userId) => getTaskStore().listByUser(userId, 20)))
 
@@ -41,6 +45,22 @@ socialRoutes.get('/tasks/:id/stats', (c) =>
     const task = await getOwnTask(userId, c.req.param('id'))
     const { manual_minutes_per_chat } = await getAgentStore().userSettings(userId)
     return computeStats(task.progress, manual_minutes_per_chat)
+  }),
+)
+
+/** 確認卡上修改任務（只在待確認時）。 */
+const editBody = z.object({
+  purpose: z.enum(['friend', 'study', 'sport', 'hobby']),
+  conditions: z.array(z.string().max(30)).max(8),
+  count: z.number().int(),
+  suitable_count: z.number().int(),
+  max_chats: z.number().int(),
+})
+socialRoutes.post('/tasks/:id/edit', (c) =>
+  respond(c, async (userId) => {
+    const body = editBody.safeParse(await c.req.json().catch(() => null))
+    if (!body.success) throw new TaskError('任务内容格式不对，请再检查一次')
+    return editTask(userId, c.req.param('id'), body.data)
   }),
 )
 
