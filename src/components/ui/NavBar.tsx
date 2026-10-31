@@ -2,6 +2,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router'
 import { RiveAvatar } from './RiveAvatar'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
+import { NotificationBell } from '@features/twin/components/NotificationBell'
 
 const TABS = [
   { to: '/friend', key: 'nav.friend' as const, match: /^\/(friend|chat)/ },
@@ -47,6 +48,7 @@ export function NavBar() {
 
           {user ? (
             <div className="topbar__right">
+              <NotificationBell />
               <FriendKnob unread={unread} />
               <ProfileKnob />
               <SettingsKnob />
