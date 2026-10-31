@@ -27,15 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isCenter = CENTER_PAGES.includes(location.pathname)
 
-  // 滚动后顶栏加强阴影（.is-scrolled）
-  useEffect(() => {
-    const onScroll = () => {
-      document.querySelector('.app-shell')?.classList.toggle('is-scrolled', window.scrollY > 8)
-    }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+  // 滚动阴影已禁用：顶栏阴影保持静态，不随滚动加深
 
   return (
     <div className="app-shell">
