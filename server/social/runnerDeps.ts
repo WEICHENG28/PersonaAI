@@ -12,7 +12,7 @@ export { pickMostSimilar } from './planner'
 
 export function defaultRunnerDeps(): RunnerDeps {
   const store = getAgentStore()
-  const planner = { store, getAgentProfile }
+  const planner = { store, getAgentProfile, getShareableProfile }
   const judge = { store, getTranscript, getShareableProfile, guardText }
   return {
     store,

@@ -17,11 +17,14 @@ export const socialRoutes = new Hono()
 
 const createBody = z.object({ text: z.string().trim().min(1).max(200) })
 
-socialRoutes.post('/tasks', async (c) => {
-  const body = createBody.safeParse(await c.req.json().catch(() => null))
-  if (!body.success) return c.json({ ok: false, error: '请用一句话说说想找什么样的人（200 字以内）' }, 400)
-  return respond(c, (userId) => createTaskFromText(userId, body.data.text))
-})
+// 先驗身分再看內容：沒登入一律 401，不先回內容格式錯誤
+socialRoutes.post('/tasks', (c) =>
+  respond(c, async (userId) => {
+    const body = createBody.safeParse(await c.req.json().catch(() => null))
+    if (!body.success) throw new TaskError('请用一句话说说想找什么样的人（200 字以内）')
+    return createTaskFromText(userId, body.data.text)
+  }),
+)
 
 /** B10：我最近的任務（任務頁列表）。 */
 socialRoutes.get('/tasks', (c) => respond(c, (userId) => getTaskStore().listByUser(userId, 20)))
@@ -59,11 +62,13 @@ socialRoutes.get('/history', (c) => respond(c, (userId) => listHistory(userId, g
 const reopenBody = z.object({ mode: z.enum(['human', 'request_human']) })
 
 /** B6：重啟對話。human → 本人去聊；request_human → 本人去聊並通知對方本人。前端導向 /chat/:conversationId。 */
-socialRoutes.post('/history/:id/reopen', async (c) => {
-  const body = reopenBody.safeParse(await c.req.json().catch(() => null))
-  if (!body.success) return c.json({ ok: false, error: '请选择本人去聊或直接请求真人' }, 400)
-  return respond(c, (userId) => reopenAttempt(userId, c.req.param('id'), body.data.mode, { store: getAgentStore(), startConversation }))
-})
+socialRoutes.post('/history/:id/reopen', (c) =>
+  respond(c, async (userId) => {
+    const body = reopenBody.safeParse(await c.req.json().catch(() => null))
+    if (!body.success) throw new TaskError('请选择本人去聊或直接请求真人')
+    return reopenAttempt(userId, c.req.param('id'), body.data.mode, { store: getAgentStore(), startConversation })
+  }),
+)
 
 const logsQuery = z.object({
   task_id: z.string().optional(),

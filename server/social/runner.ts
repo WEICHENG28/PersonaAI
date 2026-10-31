@@ -307,8 +307,13 @@ async function recordAttempts(
 
 async function finishTask(task: AgentTask, status: Extract<TaskStatus, 'done' | 'paused'>, reason: string, deps: RunnerDeps): Promise<void> {
   const updated = await deps.store.updateTask(task.id, { status })
-  const report = await deps.buildReport(updated)
-  await deps.deliverReport(task.user_id, report)
+  // 回報失敗不影響任務狀態（任務已經結束），只記日誌
+  try {
+    await deps.deliverReport(task.user_id, await deps.buildReport(updated))
+  } catch (err) {
+    console.error('[runner] deliverReport', err)
+    await log(task, '回报没送到 AI 朋友', '写入回报失败，任务结果仍保留在任务页与历史')
+  }
   await log(task, status === 'done' ? '任务完成，交给 AI 朋友回报' : '任务暂停，交给 AI 朋友回报', reason)
 }
 
