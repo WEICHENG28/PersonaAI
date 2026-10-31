@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   getChatRoom,
   getChatStatus,
+  requestHuman,
   sendChatMessage,
   subscribeChatMessages,
   takeOver,
@@ -32,6 +33,11 @@ export interface ChatRoomState {
   takingOver: boolean
   /** 本人接手；成功回接手卡片，失败回 null（错误放在 notice）。 */
   takeOver(): Promise<TakeoverView | null>
+  /** C7 正在请求对方本人。 */
+  requestingHuman: boolean
+  /** C7 这次打开聊天室后已经请求过。 */
+  humanRequested: boolean
+  requestHuman(): Promise<void>
 }
 
 function messageOf(err: unknown): string {
@@ -47,6 +53,8 @@ export function useChatRoom(conversationId: string): ChatRoomState {
   const [twinTyping, setTwinTyping] = useState(false)
   const [realtimeDown, setRealtimeDown] = useState(false)
   const [takingOver, setTakingOver] = useState(false)
+  const [requestingHuman, setRequestingHuman] = useState(false)
+  const [humanRequested, setHumanRequested] = useState(false)
 
   const addMessages = useCallback((incoming: readonly ChatMessageView[]) => {
     setRoom((prev) => (prev ? { ...prev, messages: mergeMessages(prev.messages, incoming) } : prev))
@@ -142,6 +150,20 @@ export function useChatRoom(conversationId: string): ChatRoomState {
     }
   }, [conversationId, reload, refreshStatus])
 
+  const requestHumanNow = useCallback(async () => {
+    setRequestingHuman(true)
+    setNotice(null)
+    try {
+      await requestHuman(conversationId)
+      setHumanRequested(true)
+      setNotice(CHAT_TEXT.humanRequestedNotice)
+    } catch (err) {
+      setNotice(messageOf(err))
+    } finally {
+      setRequestingHuman(false)
+    }
+  }, [conversationId])
+
   return {
     room: live,
     verdict: status?.verdict ?? null,
@@ -152,5 +174,8 @@ export function useChatRoom(conversationId: string): ChatRoomState {
     send,
     takingOver,
     takeOver: takeOverNow,
+    requestingHuman,
+    humanRequested,
+    requestHuman: requestHumanNow,
   }
 }

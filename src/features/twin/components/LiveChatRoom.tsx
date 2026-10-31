@@ -1,6 +1,7 @@
 // C4 聊天室（http 模式，真资料）。版面沿用 A 做好的代聊页（friend-layout／friend-chat／verdict-live），只换资料来源。拥有者：C。
 // C6：按「我来聊」→ 本人接手 → 先显示接手卡片，按「开始由本人聊」关闭后就能输入。
-import { useState } from 'react'
+// C7：对方是分身时可以「请求真人」；从通知铃铛选「现在聊」过来时，接手卡片也放在路由 state。
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
@@ -10,6 +11,7 @@ import { t } from '@i18n/t'
 import type { ChatRoomView, TakeoverView } from '@lib/api/twin'
 import {
   CHAT_TEXT,
+  canRequestHuman,
   canType,
   placeholderOf,
   sideLabel,
@@ -31,6 +33,11 @@ export function LiveChatRoom({ conversationId }: LiveChatRoomProps) {
   const location = useLocation()
   // 从结果页接手过来时，接手卡片放在路由 state 里
   const [handoff, setHandoff] = useState<TakeoverView | null>(() => readHandoffState(location.state, conversationId))
+  // 已经在这个聊天室时从铃铛选「现在聊」：网址不变、元件不重建，要另外接住新的路由 state
+  useEffect(() => {
+    const view = readHandoffState(location.state, conversationId)
+    if (view) setHandoff(view)
+  }, [location.state, conversationId])
 
   const closeHandoff = () => {
     setHandoff(null)
@@ -130,7 +137,7 @@ function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
           </div>
         </Card>
 
-        <ChatActions room={room} takingOver={state.takingOver} onTakeOver={onTakeOver} />
+        <ChatActions room={room} state={state} onTakeOver={onTakeOver} />
       </div>
     </div>
   )
@@ -138,23 +145,28 @@ function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
 
 interface ChatActionsProps {
   room: ChatRoomView
-  takingOver: boolean
+  state: ChatRoomState
   onTakeOver(): void
 }
 
-/** 「我来聊」（C6，接手后就消失，不能交回分身）、「请求真人」（C7，做好前先显示「即将上线」）、「查看结果」（C5）。 */
-function ChatActions({ room, takingOver, onTakeOver }: ChatActionsProps) {
+/** 「我来聊」（C6，接手后就消失，不能交回分身）、「请求真人」（C7，对方是分身时）、「查看结果」（C5）。 */
+function ChatActions({ room, state, onTakeOver }: ChatActionsProps) {
   const navigate = useNavigate()
   return (
     <div className="friend-side stack">
       {takeoverBlockOf(room) === null && (
-        <Button block variant="secondary" onClick={onTakeOver} disabled={takingOver}>
-          {takingOver ? HANDOFF_TEXT.taking : CHAT_TEXT.takeOver}
+        <Button block variant="secondary" onClick={onTakeOver} disabled={state.takingOver}>
+          {state.takingOver ? HANDOFF_TEXT.taking : CHAT_TEXT.takeOver}
         </Button>
       )}
-      {room.other.controller === 'twin' && room.status !== 'ended' && (
-        <Button block variant="secondary" disabled title={CHAT_TEXT.comingSoon}>
-          {CHAT_TEXT.requestHuman} · {CHAT_TEXT.comingSoon}
+      {canRequestHuman(room) && (
+        <Button
+          block
+          variant="secondary"
+          onClick={() => void state.requestHuman()}
+          disabled={state.requestingHuman || state.humanRequested}
+        >
+          {requestHumanLabel(state)}
         </Button>
       )}
       <Button block onClick={() => navigate(`/chat/${encodeURIComponent(room.conversationId)}/result`)}>
@@ -162,4 +174,9 @@ function ChatActions({ room, takingOver, onTakeOver }: ChatActionsProps) {
       </Button>
     </div>
   )
+}
+
+function requestHumanLabel(state: ChatRoomState): string {
+  if (state.requestingHuman) return CHAT_TEXT.requestingHuman
+  return state.humanRequested ? CHAT_TEXT.humanRequested : CHAT_TEXT.requestHuman
 }

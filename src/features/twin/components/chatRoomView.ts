@@ -29,8 +29,10 @@ export const CHAT_TEXT = {
   typing: '对方的分身正在输入…',
   takeOver: '我来聊',
   requestHuman: '请求真人',
+  requestingHuman: '正在通知对方本人…',
+  humanRequested: '已通知对方本人',
+  humanRequestedNotice: '已经通知对方本人，等对方选择现在聊、稍后聊或拒绝',
   viewResult: '查看结果',
-  comingSoon: '即将上线',
   replyFailed: '对方的分身暂时没有回应，稍后再发一条试试',
   statusFailed: '目前判定暂时更新不了，稍后会自动重试',
   loadFailedTitle: '打不开这段对话',
@@ -62,6 +64,11 @@ export function withStatus(room: ChatRoomView, status: ChatStatusView | null): C
     me: { ...room.me, controller: status.myController },
     other: { ...room.other, controller: status.otherController },
   }
+}
+
+/** 可以请求对方本人：对方是分身、对话没结束（07C C4「对方是 twin 时」）。 */
+export function canRequestHuman(room: ChatRoomView): boolean {
+  return room.other.controller === 'twin' && room.status !== 'ended'
 }
 
 export function canType(room: ChatRoomView): boolean {
