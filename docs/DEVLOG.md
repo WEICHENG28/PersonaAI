@@ -325,6 +325,15 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜進大廳進度條＋空聊天室提示｜Peter（AI 協助）
+- **進大廳進度**：Peter 新帳號聊了好幾句沒看到邀請，也不知道還差什麼。AI 朋友頁上方加一條「进大厅进度 N%：再和阿澈聊 X 句／阿澈还不太了解你的兴趣…」＋進度條；句數夠了但檔案不完整時給「去「我的档案」整理」按鈕。每多說一句就重問 `GET /api/lobby-invite`（原本要滿 8 句才問，沒達標時畫面上什麼都沒有）。`useLobbyInvite` 改回傳 `{ dialog, banner }`。
+- **空聊天室顯示「加载中…」**：自己去找對方分身聊、還沒人開口時，聊天室其實已載入完，卻寫「加载中…」。改成「还没有消息。先打个招呼吧，对方的分身会回你。」（`emptyChatHint`）。
+- **worker 一直「读取任务失败」**：錯誤是 `fetch failed … ECONNRESET`（TLS 連線被中斷），是當下這台電腦連 Supabase 的網路問題，不是程式；之後測試 Node 與 curl 都正常。worker 會自己重試，網路恢復就繼續。
+- **改了哪些檔案**：`src/features/social/{lobbyProgress.ts,components/LobbyInvite.tsx}`、`FriendPage.tsx`（A）、`src/features/twin/components/{chatRoomView.ts,LiveChatRoom.tsx}`（C），Peter 同意；`tests/social/lobby-invite.test.ts`。
+- **驗證**：`tsc -b`、vitest 664/664、build。
+
+---
+
 ### 2026-10-31｜回報通知一定會清掉＋任務進度條｜Peter（AI 協助）
 - **通知「阿澈有事想跟你说」點了不消失**：#109 之後打開 AI 朋友頁會讓阿澈說回報並設已讀，但 Prompt 8 失敗時會還原成未讀。改成 AI 失敗就用固定句子回報（`fallbackReportText`：代聊幾場、合適的人名含真人／示范用户），只有寫入訊息失敗才還原。Peter 截圖時 #109 可能還沒部署完，部署後請重新整理再試。
 - **進度條不動**：原本只有「合適人數」一條，合適數為 0 時整個任務都看起來沒動；而且只靠 Realtime，沒開或斷線就不更新。改成兩條（代聊 x / 最多場數、合適 y / 目標），進行中每 10 秒備援重抓；已完成但 0 位合適時說明「已经代聊满 N 场，这次没有遇到合适的」。

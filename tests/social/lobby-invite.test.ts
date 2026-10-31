@@ -66,3 +66,12 @@ describe('acceptLobbyInvite', () => {
     expect(calls.join).toBe(0)
   })
 })
+
+import { lobbyProgress } from '../../src/features/social/lobbyProgress'
+
+describe('lobbyProgress', () => {
+  it('依句數算到 90%，檔案整理好才進大廳', () => {
+    expect(lobbyProgress({ status: 'not_yet', userMessages: 4, need: 8, reason: '' })).toBe(45)
+    expect(lobbyProgress({ status: 'not_yet', userMessages: 12, need: 8, reason: '' })).toBe(90)
+  })
+})
