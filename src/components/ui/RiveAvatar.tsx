@@ -59,6 +59,18 @@ export function RiveAvatar({ name, size = 120, fill = false, className, options 
     rive.resizeDrawingSurfaceToCanvas()
   }, [rive, canvas, size, fill])
 
+  // 容器尺寸变化时重算画布分辨率（fill 模式容器会随视口变）：
+  // shouldResizeCanvasToContainer 关掉后 Rive 不会自己重算，
+  // 只在 mount 时算一次的话，容器变大只会把旧位图拉伸（模糊、不会更大）
+  useEffect(() => {
+    if (!canvas || !rive) return
+    const ro = new ResizeObserver(() => {
+      rive.resizeDrawingSurfaceToCanvas()
+    })
+    ro.observe(canvas)
+    return () => ro.disconnect()
+  }, [rive, canvas])
+
   return (
     <RiveComponent
       style={fill ? { width: '100%', height: '100%' } : { width: size, height: size }}

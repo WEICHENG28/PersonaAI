@@ -1,17 +1,20 @@
 /* ── 落地页：Hum 构成（settled hero、卡纸 tile、梨黄 field、撕纸带） ── */
 
 .landing {
-  max-width: var(--container-wide, var(--container));
+  /* 與頂欄同寬（--container），內容左右緣對齊 navbar */
+  max-width: var(--container);
   margin-inline: auto;
   padding: 0 var(--gutter);
   display: grid;
+  /* --space-3xl 尚未進 tokens.css（全站只在此頁使用），先局部定義：96px＝2xl(64) 的下一級 */
+  --space-3xl: 96px;
   gap: var(--space-3xl);
   padding-block: var(--space-lg) var(--space-3xl);
 }
 
 /* 每个 section 的主标与副标 */
 .landing h2 {
-  font-size: var(--text-title);
+  font-size: var(--text-2xl);
   margin-bottom: var(--space-xs);
 }
 
@@ -33,7 +36,8 @@
 @media (min-width: 64rem) {
   .landing-hero {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    padding-block: var(--space-3xl);
+    /* 桌機 hero 收緊一點：3xl(96px)→2xl(64px)，其餘區塊間距不變 */
+    padding-block: var(--space-2xl);
   }
 }
 
@@ -262,30 +266,215 @@
   text-align: center;
 }
 
-/* ── 细节区（档位/记忆/大厅）：小卡三联 ── */
-.landing-detail__grid {
+/* ── 细节区（档位/记忆/大厅）→ 组件化展示：左讲功能、右渲染产品组件缩小版 ── */
+.landing-feature {
   display: grid;
-  gap: var(--space-md);
+  gap: var(--space-lg);
+  align-items: center;
 }
 
-@media (min-width: 40rem) {
-  .landing-detail__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 56rem) {
+  .landing-feature { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
+  /* 左右互換變體：桌機把 demo 組件放左邊、文字放右邊（記憶掌控區），文字靠右對齊 */
+  .landing-feature--flip { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
+  .landing-feature--flip .landing-feature__text { order: 2; justify-items: end; text-align: right; }
+  .landing-feature--flip .landing-mock { order: 1; }
 }
 
-.detail-card {
+.landing-feature__text .landing-sec__sub { margin-bottom: 0; }
+
+/* mock 外壳：产品画面的缩小版（卡纸、撕纸条、与真画面同构） */
+.landing-mock {
+  position: relative;
   display: grid;
-  gap: var(--space-2xs);
-  align-content: start;
-  padding: var(--space-lg);
-  border-radius: var(--radius-stock);
+  border-radius: var(--radius-card);
   background: var(--grain), var(--fibre), var(--color-card);
   box-shadow: var(--shadow-card);
-  box-sizing: border-box;
+  overflow: clip;
 }
 
-.detail-card h3 { font-size: var(--text-md); }
-.detail-card p { font-size: var(--text-sm); color: var(--color-ink-2); line-height: 1.45; }
-.detail-card__hint { color: var(--color-muted); }
+/* mock 顶条：视窗标题栏（像真画面的 CardHead） */
+.landing-mock__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  font: 600 var(--text-xs)/1 var(--font-body);
+  color: var(--color-ink);
+  background: var(--fibre), var(--color-paper-2);
+  box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--color-rule) 80%, transparent);
+}
+
+.landing-mock__body {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.landing-mock__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-lg);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  background: var(--fibre), var(--color-fringe);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--color-rule) 60%, transparent);
+}
+
+/* 档位选择器（复刻 .gear-opt 的按压物理） */
+.landing-mock__gears { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+
+.mock-gear {
+  --edge: 4px;
+  display: grid;
+  gap: var(--space-3xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-stock);
+  background: var(--fibre), var(--color-card);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 12%, transparent),
+    0 var(--edge) 0 0 var(--color-edge);
+}
+
+.mock-gear strong { font: 600 var(--text-md)/1.2 var(--font-body); color: var(--color-ink); }
+.mock-gear span { font-size: var(--text-xs); color: var(--color-muted); }
+
+.mock-gear.is-on {
+  --edge: 1px;
+  translate: 0 3px;
+  background: var(--color-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 12%, transparent);
+}
+.mock-gear.is-on strong { color: var(--color-paper); }
+.mock-gear.is-on span { color: color-mix(in oklab, var(--color-paper) 72%, var(--color-ink)); }
+
+/* 记忆列表（复刻 .mem：paper-2 纸片 + 来源/置信度脚注） */
+.mock-mems { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-sm); }
+
+.mock-mems li {
+  display: grid;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-stock);
+  background: var(--fibre), var(--color-paper-2);
+}
+
+.mock-mems p { font-size: var(--text-sm); color: var(--color-ink-2); }
+
+.mock-mems footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.mock-mems footer .chip { min-height: 22px; padding: 0 var(--space-sm); font-size: 11px; }
+.mock-mems footer em {
+  margin-left: auto;
+  font-style: normal;
+  color: var(--color-accent-2);
+  text-decoration: underline;
+}
+
+/* 大厅卡片（复刻 .cand-card）＋ AI 导购输入框 */
+.mock-cand {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-radius: var(--radius-stock);
+  background: var(--fibre), var(--color-card);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 10%, transparent),
+    var(--shadow-card);
+}
+
+.mock-cand__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.mock-cand__head strong { font-size: var(--text-lg); }
+.mock-cand__head span { font-size: var(--text-xs); color: var(--color-mint-deep); }
+.mock-cand > p { font-size: var(--text-sm); }
+.mock-cand .chips { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
+
+/* 缩小版按钮：静态样式仿 .btn--small（真按钮太重，落体页仅示意） */
+.mock-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-md);
+  border-radius: 13px;
+  font: 600 var(--text-sm)/1 var(--font-body);
+  color: var(--color-accent-ink);
+  background: var(--fibre), var(--color-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent-deep) 40%, transparent),
+    0 3px 0 0 var(--color-accent-deep);
+}
+
+.mock-btn--ghost {
+  color: var(--color-ink);
+  background: var(--fibre), var(--color-card);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 13%, transparent),
+    0 3px 0 0 var(--color-edge);
+}
+
+/* AI 导购：问答 + 输入框（复刻 .input 的蓝 focus 感） */
+.mock-ask { display: grid; gap: var(--space-sm); }
+
+.mock-ask__q {
+  justify-self: start;
+  max-width: 88%;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 18px;
+  border-bottom-left-radius: 5px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  background: var(--grain), var(--fibre), var(--bubble-friend);
+}
+
+.mock-ask__input {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: 0 var(--space-xs) 0 var(--space-md);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-focus);
+  background: var(--fibre), var(--color-paper);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-focus) 25%, transparent);
+}
+
+.mock-ask__input span { font-size: var(--text-sm); color: var(--color-muted); }
+.mock-ask__input b {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  border-radius: 10px;
+  font: 600 var(--text-xs)/1 var(--font-body);
+  color: var(--color-accent-ink);
+  background: var(--fibre), var(--color-accent);
+  box-shadow: 0 2px 0 0 var(--color-accent-deep);
+}
+
+/* mock 脚注里的纯 CSS 小图标（不引新资源） */
+.mock-bell,
+.mock-shield {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--color-accent-deep);
+  rotate: 45deg;
+}
+
+.mock-shield { background: var(--color-mint-deep); border-radius: 50% 50% 3px 3px; rotate: 0deg; }
 
 /* ── 数字：梨黄 field ── */
 .landing-stats {
@@ -352,4 +541,7 @@
   }
   .landing-hero { padding-block: var(--space-xl); }
   .landing-card { rotate: -1deg; padding: var(--space-md); }
+  .mock-cand { padding: var(--space-sm); }
+  .mock-btn { min-height: 32px; padding: 0 var(--space-sm); }
+  .landing-mock__body { padding: var(--space-md); }
 }

@@ -224,6 +224,18 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-31｜02 概念調整（分身→AI 人設）＋落地頁組件化重構｜Vincent（AI 協助）｜分支 a/friend-quality
+- **做了什麼**：
+  1. **`docs/02` 概念轉向**：對外角色從「分身」（AI 從你的聊天推斷你）改為「**AI 人設**」（用戶自己編寫、想怎麼被認識就怎麼寫）。改了 §1 原則、§2 角色表（含新增「人設不是被解讀的你」與誠實底線：可美化表達、不編造事實）、§3 流程圖與對話組合、§4 Agent 分工（分身 Agent→人設 Agent）、F3 整節重寫（人設編寫＋起草輔助）、F4/F5/F7/F8、§7 隱私分層（`shareable_profile`＋人設）、§8 待討論（加人設編輯器欄位一條）。
+  2. **落地頁組件化重構**（仿 [Hallmark Hum 模板](https://www.usehallmark.com/themes/hum/#top)「One round, four moments」的構成）：判定檔位／記憶掌控／大廳三個 section 從純文字三聯小卡，改為「左講功能＋右渲染產品組件縮小版」——檔位選擇器（仿 `.gear-opt` 按壓物理、`is-on` 反白）、記憶列表（仿 `.mem` 紙片＋來源/置信度/刪除）、大廳卡片＋AI 導購輸入框（仿 `.cand-card` 與 focus 中的 `.input`）。角色 section 與流程 tile 同步改成「AI 人設」措辭；Hero／數字／CTA 不變。
+- **為什麼這樣做**：概念上用戶不該被動「被解讀」，人設讓用戶主動塑造對外形象（落地頁文案「形象由你編寫，不是被 AI 解讀」）。組件化展示讓訪客直接看到產品長相，比形容詞更有說服力；mock 全用既有 token 與既有構成（紙面三件套、`--edge` 按壓），零新增顏色/字體。
+- **改了哪些檔案**：`docs/02_核心邏輯與功能.md`（共用檔，見下）、`src/features/landing/LandingPage.tsx`、`src/theme/landing.css`。
+- **踩到的坑／注意事項**：
+  - `docs/02` 是共用檔——本次由 Vincent 直接指示修改，**請 B/C 線 review**（尤其 B 的判定文案、C 的分身/大廳實作對應章節）。C 線程式碼與 `messages/strings.json` 仍用「分身」一詞，屬預期內未動。
+  - 落地頁 mock 是靜態展示（`aria-hidden` 的裝飾性交互按鈕用 `span` 不用 `button`），避免 SEO/無障礙誤導可點擊。
+- **還沒做完／待辦**：`strings.json` 與各頁面的「分身」措辭全站替換（跨 B/C 檔案，需三人同意）；人設編輯器 UI（新功能，見 02 §8 待討論）。
+- **驗證**：tsc 0 errors；vitest 615/615；瀏覽器實測桌機 1280／手機 390（無橫向溢出）、三個 mock 截圖檢查。
+
 ### 2026-10-31｜设置／通知按钮改 SVG 图标｜Vincent（AI 協助）｜分支 a/icon-buttons
 - **做了什麼**：新增 `src/components/ui/Icons.tsx`（`GearIcon`／`BellIcon`，內聯 SVG、`stroke=currentColor` 隨文字色、無新依賴）；NavBar 設置鈕的 ⚙ emoji 換成 `GearIcon`；通知鈴的文字標籤「通知」換成 `BellIcon`＋`aria-label`（徽章不變）。
 - **為什麼不用 @icon-park/react**：該 repo 已於 2025-12 封存（read-only）；且只為兩顆按鈕加一個依賴不划算，AGENTS.md 規定新套件由 A 統一決定。Feather 風 path（MIT 同源）夠用。

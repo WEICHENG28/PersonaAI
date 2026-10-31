@@ -53,7 +53,7 @@ function RequireAuth() {
 
   if (restoring) return null // 等 session 检查完再决定去向，避免闪跳
   if (!user) {
-    queueMicrotask(() => navigate('/', { replace: true }))
+    queueMicrotask(() => navigate('/login', { replace: true }))
     return null
   }
   return <Outlet />
@@ -81,8 +81,8 @@ export const routes = [
       </AppShell>
     ),
     children: [
-      { index: true, element: <LoginPage /> },
-      { path: 'landing', element: <LandingPage /> },
+      { index: true, element: <LandingPage /> },
+      { path: 'login', element: <LoginPage /> },
       {
         element: <RequireAuth />,
         children: [

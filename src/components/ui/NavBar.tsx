@@ -32,7 +32,7 @@ export function NavBar() {
     <>
       <header className="topbar safe-top">
         <nav className="topbar__inner">
-          <NavLink to="/landing" className="wordmark">
+          <NavLink to="/" className="wordmark">
             PersonaAI
           </NavLink>
 
@@ -131,22 +131,22 @@ function SettingsKnob() {
   )
 }
 
-/** 未登录：顶栏 CTA — 登录页上显示「返回」（回落地页），其他页显示「开始使用」（去登录页） */
+/** 未登录：顶栏 CTA — 登录页（/login）上显示「返回」（回落地页），其他页显示「开始使用」（去登录页） */
 function StartNowKnob() {
   const navigate = useNavigate()
   const location = useLocation()
-  const isLoginPage = location.pathname === '/'
+  const isLoginPage = location.pathname === '/login'
   return isLoginPage ? (
     <button
       className="btn btn--secondary btn--small topbar__cta"
-      onClick={() => navigate('/landing')}
+      onClick={() => navigate('/')}
       aria-label="返回落地页"
     >
       <ArrowLeftIcon size={15} />
       返回
     </button>
   ) : (
-    <button className="btn btn--primary btn--small topbar__cta" onClick={() => navigate('/')}>
+    <button className="btn btn--primary btn--small topbar__cta" onClick={() => navigate('/login')}>
       开始使用
     </button>
   )
