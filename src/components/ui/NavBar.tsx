@@ -3,6 +3,7 @@ import { RiveAvatar } from './RiveAvatar'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { NotificationBell } from '@features/twin/components/NotificationBell'
+import { ChatListButton } from '@features/social/components/ChatListButton'
 import { GearIcon, ArrowLeftIcon } from './Icons'
 import { isHttpMode } from '@lib/api/friend'
 
@@ -56,6 +57,7 @@ export function NavBar() {
 
           {user ? (
             <div className="topbar__right">
+              <ChatListButton />
               <NotificationBell />
               <ProfileKnob />
               <SettingsKnob />

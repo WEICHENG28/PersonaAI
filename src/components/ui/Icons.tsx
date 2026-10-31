@@ -40,6 +40,25 @@ export function BellIcon({ size = 18 }: { size?: number }) {
   )
 }
 
+/** 聊天气泡：顶栏「我的聊天」 */
+export function ChatIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
 /** 换一个（骰子／循环箭头）：登录页随机名字 */
 export function ArrowLeftIcon({ size = 18 }: { size?: number }) {
   return (
