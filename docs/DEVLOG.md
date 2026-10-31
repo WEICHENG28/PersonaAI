@@ -301,6 +301,16 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜名字帳號：同名回到原帳號、隨機名字不重複｜Peter（AI 協助）
+- **做了什麼**：新增 `POST /api/account/enter`（`server/routes/account.ts`、`server/account/`）。登入頁（http 模式）改成：自己打的名字 → 有帳號就先提示「已经有帐号了」，按「是我，进入」回到原帳號、記錄都在；按「不是我」換名字。沒改過的隨機名字 → 後端保證不和現有帳號、種子用戶重複。這個瀏覽器已登入過就直接進。mock 模式不變。
+- **怎麼做到**：後端用 Supabase admin `generateLink(magiclink)` 產生一次性 token（不寄信，內部 email `<uuid>@users.personaai.app`），前端 `verifyOtp` 換成登入狀態。舊的匿名帳號第一次「是我」時補上內部 email。種子用戶的名字保留不能用。
+- **安全取捨**：Peter 決定「只用名字」，沒有密碼——任何人輸入你的名字都能進你的帳號，只適合 Demo。之後要正式上線需加密碼或驗證碼。
+- **跨線**：登入頁是 A 的檔案（`LoginPage.tsx`），照 Peter 需求只改登入邏輯、沿用 Vincent 的版面；`server/app.ts` 加一行掛路由。
+- **改了哪些檔案**：`server/account/{nameLogin,supabaseDeps}.ts`、`server/routes/account.ts`、`server/app.ts`、`src/lib/api/account.ts`、`src/features/friend/LoginPage.tsx`、`tests/social/name-login.test.ts`。
+- **驗證**：`tsc -b`；vitest 612/612（新名字、重複提示、確認回原帳號＋補 email、保留名字、隨機不重複、加數字）；`npm run build`。真實登入要在 Vercel 上測（AI 不建帳號）。
+
+---
+
 ### 2026-10-31｜任務確認卡：未確認檔案時給入口｜Peter（AI 協助）
 - **做了什麼**：`TaskConfirmCard` 按「确认」被擋（對外檔案未確認或社交 Agent 沒開）時，除了錯誤訊息，多兩顆按鈕「去确认对外档案」「去设置开启社交 Agent」，並提示完成後到「我的任务」確認，任務會保留（`/tasks/:id` 本來就有確認按鈕）。
 - **為什麼**：Peter 實測時卡在這一步，只看到紅字不知道下一步。
