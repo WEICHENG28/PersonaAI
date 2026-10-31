@@ -89,6 +89,18 @@ function TaskDetail({ id }: { id: string }) {
     return subscribeTask(id, (next) => setTask((prev) => (prev ? { ...prev, ...next } : next)))
   }, [id])
 
+  // 備援：即時推送沒開或斷線時，進行中的任務每 10 秒重抓一次
+  const live = task?.status === 'running' || task?.status === 'paused'
+  useEffect(() => {
+    if (!live) return
+    const timer = window.setInterval(() => {
+      getTask(id)
+        .then(setTask)
+        .catch(() => {})
+    }, POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [id, live])
+
   // 進度變了就重新算效率統計
   const chats = task?.progress.chats
   useEffect(() => {
@@ -113,6 +125,7 @@ function TaskDetail({ id }: { id: string }) {
   if (!task) return error ? <ErrorText text={error} /> : <p className="empty">…</p>
 
   const target = task.done_condition.suitable_count ?? task.target_count
+  const maxChats = task.done_condition.max_chats ?? task.target_count * 2
   const active = task.status === 'running' || task.status === 'paused' || task.status === 'pending_confirm'
   return (
     <div className="stack">
@@ -134,11 +147,18 @@ function TaskDetail({ id }: { id: string }) {
           <div>
             <dt>{t('task.progress')}</dt>
             <dd>
-              合适 {task.progress.suitable} / {target} 位
+              代聊 {task.progress.chats} / {maxChats} 场 · 合适 {task.progress.suitable} / {target} 位
             </dd>
           </div>
         </dl>
-        <div className="grow" style={{ ['--g' as string]: String(Math.min(1, task.progress.suitable / Math.max(1, target))) }} />
+        {/* 兩條進度：代聊場數（每聊完一場就動）、合適人數（找到才動） */}
+        <p className="hint-inline">代聊进度</p>
+        <div className="grow" style={{ ['--g' as string]: String(ratio(task.progress.chats, maxChats)) }} />
+        <p className="hint-inline">合适人数</p>
+        <div className="grow" style={{ ['--g' as string]: String(ratio(task.progress.suitable, target)) }} />
+        {task.status === 'done' && task.progress.suitable === 0 && (
+          <p className="hint-inline">已经代聊满 {task.progress.chats} 场，这次没有遇到合适的。可以换个条件再交办一次。</p>
+        )}
         {error && <ErrorText text={error} />}
         <div className="hist-actions">
           {task.active_conversation_id && (
@@ -174,6 +194,12 @@ function TaskDetail({ id }: { id: string }) {
       <AgentLogPanel taskId={id} />
     </div>
   )
+}
+
+const POLL_MS = 10_000
+
+function ratio(done: number, total: number): number {
+  return Math.min(1, done / Math.max(1, total))
 }
 
 function ErrorText({ text }: { text: string }) {
