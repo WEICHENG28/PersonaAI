@@ -217,7 +217,7 @@
   position: fixed;
   right: var(--space-md);
   /* 手机：在底栏和聊天输入列上方，不盖住输入框（UX #9） */
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 84px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 124px);
   z-index: 500;
   display: grid;
   gap: var(--space-sm);
