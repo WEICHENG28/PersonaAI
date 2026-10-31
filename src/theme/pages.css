@@ -112,24 +112,55 @@
 .field em { font-style: normal; font-weight: 500; color: var(--color-muted); font-size: var(--text-xs); }
 .field textarea.input { padding: var(--space-sm) var(--space-md); min-height: 64px; resize: vertical; }
 
-/* ── 朋友页布局：不可整页滚动；聊天区内部独立滚动；手机只显示聊天 ── */
+/* ── 朋友页布局：不可整页滚动；聊天区内部独立滚动 ──
+ * 手机：chromabot fixed 铺满上半屏背景，聊天从中段开始叠在上面；
+ * 桌机：左 chromabot 栏 / 右聊天栏 */
+
+/* 手机 tabbar 高度 token（约 84px，用于安全 padding） */
+:root { --tabbar-h: 84px; }
+
 .friend-page {
   display: flex;
   flex-direction: column;
   height: calc(100svh - var(--bar-h));
   padding: 0;
-  overflow: hidden; /* 整页不能滚动 */
+  overflow: hidden;
 }
+
+/* 手机：chromabot fixed 铺满全屏背景，z-index 低于 tabbar（300） */
 .friend-avatar-col {
-  display: none; /* 手机隐藏 */
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none; /* 不拦截触摸事件 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fibre), var(--color-paper-2);
 }
+/* 手机 bot 同样 scale 1.5× */
+.friend-avatar-rive { display: block; width: 100%; height: 100%; transform: scale(1.5); transform-origin: center center; }
+
 .friend-chat-col {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* 相对于 fixed 背景浮在上面 */
+  position: relative;
+  z-index: 2;
+  /* 上半屏留给 chromabot 露出；聊天从 45svh 处开始叠在 bot 上 */
+  margin-top: 45svh;
+  /* 聊天区域背景：覆盖下半屏，隐藏 bot 下半部分 */
+  background: var(--color-paper);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 20px color-mix(in oklab, var(--color-ink) 6%, transparent);
+  /* 内容底部让出 tabbar + safe-area 高度，输入栏不被底栏遮挡 */
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
 }
+
 .friend-chat-head {
   display: flex;
   align-items: center;
@@ -152,7 +183,7 @@
   min-height: 0;
 }
 
-/* 输入栏：flex-shrink:0 贴底，不随聊天气泡滚动 */
+/* 输入栏：贴底，内边距正常（chat-col 已留出 tabbar 高度） */
 .friend-input-bar {
   display: flex;
   gap: var(--space-sm);
@@ -168,40 +199,45 @@
   .friend-page {
     flex-direction: row;
     padding: 0;
-    /* overflow: visible 让 ::before 伪元素能溢出到导航栏区域 */
-    overflow: visible;
+    overflow: visible; /* 让 ::before 能伸到 navbar 上方 */
   }
   .friend-chat-col {
-    /* chat col 独立管理自己的 overflow */
+    /* 桌机：取消手机的 margin-top 和 z-index */
+    margin-top: 0;
+    position: static;
+    z-index: auto;
     overflow: hidden;
   }
   .friend-avatar-col {
+    /* 桌机：脱离 fixed，回到正常 flex 左栏 */
+    position: relative;
+    inset: auto;
+    pointer-events: auto;
     display: flex;
     align-items: center;
     justify-content: center;
     align-self: stretch;
-    /* relative 供 ::before 定位 */
-    position: relative;
-    overflow: hidden; /* 裁切 scale(1.5) 溢出 */
+    overflow: hidden;
     width: clamp(360px, 34vw, 640px);
     flex-shrink: 0;
-    /* 不设 background：由 ::before 承担，以便向上延伸 */
+    background: none; /* 由 ::before 承担，向上延伸 */
     border-right: var(--rule-hair) solid var(--color-rule);
   }
-  /* ::before 延伸背景到导航栏之上（包含 safe area） */
+  /* 桌机左栏背景延伸到导航栏之上 */
   .friend-avatar-col::before {
     content: '';
     position: absolute;
     top: calc(-1 * var(--bar-h) - env(safe-area-inset-top, 0px));
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 0; right: 0; bottom: 0;
     background: var(--fibre), var(--color-paper-2);
     z-index: 0;
     pointer-events: none;
   }
-  /* bot 在 ::before 之上 */
   .friend-avatar-rive { position: relative; z-index: 1; display: block; width: 100%; height: 100%; transform: scale(1.5); transform-origin: center center; }
+  /* 桌机：输入栏底部 padding 恢复正常（无 tabbar） */
+  .friend-input-bar {
+    padding-bottom: var(--space-sm);
+  }
 }
 
 /* Profile 页桌机双栏：档案+风格（左）／记忆（右） */
