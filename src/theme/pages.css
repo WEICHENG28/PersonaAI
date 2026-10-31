@@ -494,6 +494,12 @@
 
 /* 卡片之間、和上方篩選卡之間都留寬一點的距離（原本貼在一起） */
 .lobby-grid { display: grid; gap: var(--space-lg); margin-top: var(--space-lg); }
+/* 篩選／搜索卡吸附在頂欄（--bar-h，sticky top:0）正下方，捲動列表時隨時能改條件 */
+.lobby-filter {
+  position: sticky;
+  top: var(--bar-h);
+  z-index: 200; /* 高於卡片、低於頂欄（300）與彈窗（400） */
+}
 @media (min-width: 48rem) {
   .lobby-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -532,6 +538,9 @@
 @media (min-width: 40rem) {
   .gear-opts { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 }
+/* 三颗短按钮（主动联系频率：关闭/低/普通）固定同一行，手机也不折行 */
+.gear-opts--row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gear-opts--row .gear-opt { justify-items: center; text-align: center; }
 .gear-opt {
   --edge: 4px;
   display: grid;
