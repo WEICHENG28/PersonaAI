@@ -17,6 +17,7 @@ import {
   unreadCount,
 } from './notificationView'
 import { useNotifications, type NotificationsState } from './useNotifications'
+import { BellIcon } from '@components/ui/Icons'
 import './notificationBell.css'
 
 export function NotificationBell() {
@@ -62,8 +63,9 @@ function LiveNotificationBell() {
         aria-haspopup="dialog"
         aria-expanded={open}
         title={NOTIFY_TEXT.bell}
+        aria-label={NOTIFY_TEXT.bell}
       >
-        <span className="knob__meta">{NOTIFY_TEXT.bell}</span>
+        <BellIcon size={18} />
         {unread > 0 && <span className="notif-count">{unread}</span>}
       </button>
       {open && <NotificationPanel state={state} anchorRef={buttonRef} panelRef={panelRef} onClose={() => setOpen(false)} />}

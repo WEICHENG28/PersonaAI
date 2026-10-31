@@ -171,6 +171,13 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-31｜设置／通知按钮改 SVG 图标｜Vincent（AI 協助）｜分支 a/icon-buttons
+- **做了什麼**：新增 `src/components/ui/Icons.tsx`（`GearIcon`／`BellIcon`，內聯 SVG、`stroke=currentColor` 隨文字色、無新依賴）；NavBar 設置鈕的 ⚙ emoji 換成 `GearIcon`；通知鈴的文字標籤「通知」換成 `BellIcon`＋`aria-label`（徽章不變）。
+- **為什麼不用 @icon-park/react**：該 repo 已於 2025-12 封存（read-only）；且只為兩顆按鈕加一個依賴不划算，AGENTS.md 規定新套件由 A 統一決定。Feather 風 path（MIT 同源）夠用。
+- **跨線註記**：`NotificationBell.tsx` 是 C 的檔案，只改了按鈕內容那兩行（label→icon），行為不變；已在 PR 註明請 Jerry 過目。
+- **驗證**：tsc 0 errors；vitest 532/532；`npm run build` 過。
+- **坑**：無。
+
 ### 2026-10-31｜全線檢查後的 A 線修正｜Vincent（AI 協助）｜分支 a/audit-fixes
 - **做了什麼**（對應檢查報告的 A①–A⑥）：
   - **① 任務確認卡**：FriendPage http 模式 `callFriendChat` 回 `taskId` 時改顯示 B 的 `<TaskConfirmCard taskId=…>`（真任務 pending_confirm → 確認 running），`onStarted` 導向 `/tasks/<id>`；mock 模式保留原 demo `TaskConfirmModal`。
