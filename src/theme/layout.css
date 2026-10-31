@@ -45,16 +45,30 @@
   .knobs { display: flex; gap: var(--space-sm); align-items: center; }
 }
 
-/* ── 顶栏（全站统一，每页都有）：sticky + 撕纸下缘 ── */
+/* ── 顶栏（全站统一，每页都有）：sticky + 撕纸下缘 ──
+ * 阴影技巧：filter 放父元素（.topbar）、clip-path 放子元素（.topbar__inner）。
+ * 之前 filter + clip-path 同挂一个元素，部分浏览器会直接丢弃 filter（computed 变 none），
+ * 阴影整个消失；父 filter / 子 clip 是標準做法，陰影會沿撕紙邊緣走。 */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 300;
-  background: var(--grain), var(--fibre), var(--color-card);
-  /* 阴影挂在元素自身（clip-path 会裁 box-shadow，故用 drop-shadow filter） */
+  /* drop-shadow 在父層：跟著子層撕紙形狀走 */
   filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--color-ink) 12%, transparent))
-    drop-shadow(0 6px 14px -6px color-mix(in oklab, var(--color-ink) 18%, transparent));
-  /* 撕纸下缘 */
+    drop-shadow(0 8px 16px color-mix(in oklab, var(--color-ink) 16%, transparent));
+}
+
+.topbar__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  height: var(--bar-h); /* 固定高（非 min-height）保證內容永遠垂直置中 */
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  box-sizing: border-box;
+  background: var(--grain), var(--fibre), var(--color-card);
+  /* 撕紙下緣（陰影在父層，這裡裁形狀） */
   clip-path: polygon(
     0 0, 100% 0,
     100% calc(100% - 8px), 97% calc(100% - 7px), 94% calc(100% - 8px),
@@ -74,17 +88,7 @@
 /* 滚动后加强阴影（JS 在 .app-shell 加 .is-scrolled） */
 .app-shell.is-scrolled .topbar {
   filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--color-ink) 14%, transparent))
-    drop-shadow(0 10px 20px -8px color-mix(in oklab, var(--color-ink) 26%, transparent));
-}
-
-.topbar__inner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-lg);
-  min-height: var(--bar-h);
-  max-width: var(--container);
-  margin-inline: auto;
-  padding-inline: var(--gutter);
+    drop-shadow(0 12px 24px color-mix(in oklab, var(--color-ink) 24%, transparent));
 }
 
 /* 顶栏右端钮群 */
