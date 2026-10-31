@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { AgentLogPanel } from '@components/AgentLogPanel'
 import { Button, Chip } from '@components/ui/Button'
 import { Card, CardHead } from '@components/ui/Card'
+import { LoadingDots } from '@components/ui/LoadingDots'
 import { t } from '@i18n/t'
 import {
   ApiError,
@@ -56,7 +57,7 @@ function TaskList() {
   }, [])
 
   if (error) return <ErrorText text={error} />
-  if (!tasks) return <p className="empty">…</p>
+  if (!tasks) return <LoadingDots label="加载任务中" />
   if (tasks.length === 0) return <p className="empty">还没有任务。跟阿澈说一句「帮我找 3 个喜欢登山的人聊聊」就会开始。</p>
 
   return (
@@ -110,7 +111,7 @@ function TaskDetail({ id }: { id: string }) {
     }
   }
 
-  if (!task) return error ? <ErrorText text={error} /> : <p className="empty">…</p>
+  if (!task) return error ? <ErrorText text={error} /> : <LoadingDots label="加载任务详情中" />
 
   const target = task.done_condition.suitable_count ?? task.target_count
   const active = task.status === 'running' || task.status === 'paused' || task.status === 'pending_confirm'

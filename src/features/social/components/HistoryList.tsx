@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button, Chip } from '@components/ui/Button'
 import { Card, CardHead } from '@components/ui/Card'
+import { LoadingDots } from '@components/ui/LoadingDots'
 import { t } from '@i18n/t'
 import { ApiError, getHistory, reopenHistory, type HistoryEntry } from '@lib/api/social'
 import { PersonKindChip } from '@components/PersonKindChip'
@@ -49,7 +50,7 @@ export function HistoryList() {
   }
 
   if (error) return <p className="chip chip--coral" role="alert">{error}</p>
-  if (!data) return <p className="empty">…</p>
+  if (!data) return <LoadingDots label="加载历史中" />
   if (data.items.length === 0) return <p className="empty">{t('history.empty')}</p>
 
   return (

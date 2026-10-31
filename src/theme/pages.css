@@ -643,7 +643,16 @@
 }
 .lobby-ai-popup__input .input { flex: 1; min-width: 0; }
 
-/* ── 三点脉冲（thinking 用） ── */
+/* ── 三点脉冲：loading 占位（页面级）和 thinking 气泡共用 ── */
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--space-3xl) 0;
+  /* 让它在 .page 里水平居中 */
+  display: flex;
+  justify-content: center;
+}
 .dot-pulse {
   width: 6px;
   height: 6px;
