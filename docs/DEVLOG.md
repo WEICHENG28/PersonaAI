@@ -26,6 +26,16 @@
 
 ## 共用與決策
 
+### 2026-10-31｜後端部署到 Vercel（/api 改成 Vercel Function）｜Peter（AI 協助）
+- **問題**：Peter 把專案接上 Vercel 後，多數功能顯示「出了点问题」。原因是 Vercel 只部署了前端靜態頁，`/api/*` 沒有後端在回應，`vercel.json` 還把 `/api` 也導回首頁；登入能用只是因為它直接連 Supabase。
+- **做法**：新增 `api/index.ts`，用 `hono/vercel` 把 `server/app.ts`（同一份後端）包成 Vercel Function；`vercel.json` 把 `/api/*` 轉給它（其他路徑仍回 `index.html`），函式最長執行 60 秒。本機開發照舊 `npm run server`。`tsconfig.server.json` 加入 `api`。
+- **限制**：社交 Agent 的背景迴圈（`npm run worker`）是一直跑的程式，Vercel 不能放；任務要往前推進時，要有一台電腦開 worker（Demo 時用 Peter 的電腦即可，它直接連雲端 Supabase，和網站在哪裡無關）。單次 API 超過 60 秒會被 Vercel 中斷（目前最慢的是阿澈聊天帶任務解析，約 10～20 秒）。
+- **Vercel 要設的環境變數**（Project Settings → Environment Variables，設完要 Redeploy）：前端 `VITE_API_MODE=http`、`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`；後端 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`LLM_BASE_URL`、`LLM_API_KEY`、`MODEL_CHAT`、`MODEL_REASON`、`MODEL_FAST`、`MODEL_EMBED`、`EMBEDDING_DIM`。名稱要和 `.env.example` 完全一樣（Supabase 整合自動加的 `NEXT_PUBLIC_*` 我們用不到）。
+- **給 A**：部署是 A 的任務（A-deploy），這次因為 Peter 已接好 Vercel、由 B 的 AI 先補上後端部署；之後部署相關改動請以這份為準。
+- **驗證**：`tsc -b`；用 Web Request 直接呼叫 `api/index.ts` 的 handler：`/api/health` 200、`/api/tasks` 未登入 401、不存在路徑 404；esbuild 打包成功；vitest 全過；`npm run build`。實際在 Vercel 上的效果要 Peter 部署後確認。
+
+---
+
 ### 2026-10-31｜全線檢查結果（Peter 請 AI 檢查 A／B／C）｜Peter（AI 協助）
 - **檢查方式**：`tsc -b`、vitest 388 項、`npm run build` 全過；比對前端呼叫的 `/api` 與後端路由（全部對得上）；後端所有需要登入的 API 未登入都回 401；**只用公開金鑰讀 14 張表都讀到 0 筆**（資料表權限正確）；讀 Peter 實跑主線的 3 場分身對話原文。
 - **B（已修，本 PR）**：規劃器沒拿到用戶自己的興趣，開場話題用了對方單方面的興趣（「露营时手冲咖啡」），用戶的分身因此編造「咖啡是我露营不会漏掉的东西」→ 規劃器輸入加上用戶對外檔案、Prompt 4 規定話題要雙方都有、程式再檢查一次（`chooseOpeningTopic`）。另：任務結束時回報寫入失敗不再算成任務失敗；`POST /api/tasks`、`/history/:id/reopen` 改成先驗登入。
