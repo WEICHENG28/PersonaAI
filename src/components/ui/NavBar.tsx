@@ -3,7 +3,7 @@ import { RiveAvatar } from './RiveAvatar'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { NotificationBell } from '@features/twin/components/NotificationBell'
-import { GearIcon } from './Icons'
+import { GearIcon, ArrowLeftIcon } from './Icons'
 import { isHttpMode } from '@lib/api/friend'
 
 const TABS = [
@@ -43,7 +43,12 @@ export function NavBar() {
                   to={tab.to}
                   className={`knob ${isActive(tab) ? 'is-on' : ''}`}
                 >
-                  {t(tab.key)}
+                  {tab.to === '/friend' ? (
+                    <>
+                      <RiveAvatar name="chromabot" size={22} />
+                      <span>AI 朋友</span>
+                    </>
+                  ) : t(tab.key)}
                 </NavLink>
               ))}
             </div>
@@ -52,7 +57,6 @@ export function NavBar() {
           {user ? (
             <div className="topbar__right">
               <NotificationBell />
-              <FriendKnob unread={unread} />
               <ProfileKnob />
               <SettingsKnob />
             </div>
@@ -125,29 +129,24 @@ function SettingsKnob() {
   )
 }
 
-/** 未登录：梨黄开始使用（顶栏 CTA） */
+/** 未登录：顶栏 CTA — 登录页上显示「返回」（回落地页），其他页显示「开始使用」（去登录页） */
 function StartNowKnob() {
   const navigate = useNavigate()
-  return (
+  const location = useLocation()
+  const isLoginPage = location.pathname === '/'
+  return isLoginPage ? (
+    <button
+      className="btn btn--secondary btn--small topbar__cta"
+      onClick={() => navigate('/landing')}
+      aria-label="返回落地页"
+    >
+      <ArrowLeftIcon size={15} />
+      返回
+    </button>
+  ) : (
     <button className="btn btn--primary btn--small topbar__cta" onClick={() => navigate('/')}>
       开始使用
     </button>
   )
 }
 
-/** 阿澈：通知铃 + 报回报 */
-function FriendKnob({ unread }: { unread: number }) {
-  const navigate = useNavigate()
-  const reportReady = useDemoStore((s) => s.reportReady)
-  return (
-    <button
-      className="knob knob--friend"
-      onClick={() => navigate('/friend')}
-      title={reportReady ? '阿澈有事想跟你说' : '阿澈'}
-    >
-      <RiveAvatar name="chromabot" size={26} />
-      <span className="knob__meta">{reportReady ? '有新回报' : '阿澈'}</span>
-      {unread > 0 && <span className="notif-count">{unread}</span>}
-    </button>
-  )
-}

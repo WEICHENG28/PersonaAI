@@ -87,7 +87,7 @@
 
 /* 顶栏右端钮群 */
 .topbar__right { display: flex; align-items: center; gap: var(--space-sm); margin-left: auto; }
-.topbar__cta { margin-left: auto; }
+.topbar__cta { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2xs); }
 
 /* Profile 钮（头像圆片 + 名字） */
 .knob--profile .knob__avatar {

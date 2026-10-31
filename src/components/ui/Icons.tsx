@@ -41,6 +41,14 @@ export function BellIcon({ size = 18 }: { size?: number }) {
 }
 
 /** 换一个（骰子／循环箭头）：登录页随机名字 */
+export function ArrowLeftIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M19 12H5M12 5l-7 7 7 7" />
+    </svg>
+  )
+}
+
 export function ShuffleIcon({ size = 18 }: { size?: number }) {
   return (
     <svg

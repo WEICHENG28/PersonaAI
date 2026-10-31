@@ -29,10 +29,7 @@ export function LandingPage() {
           </p>
           <div className="landing-actions">
             <Button onClick={() => navigate(user ? '/friend' : '/')}>
-              {user ? '回去找阿澈' : '免费开始（Demo）'}
-            </Button>
-            <Button variant="secondary" onClick={() => navigate('/lobby')}>
-              先逛逛大厅
+              开始使用
             </Button>
           </div>
           <p className="landing-note">AI 永远标示 · 角色生活是虚构设定 · 你掌控对外行为</p>
