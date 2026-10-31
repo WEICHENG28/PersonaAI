@@ -6,6 +6,7 @@ import {
   createTwinReply,
   formatRecentMessages,
   TwinError,
+  TWIN_RECENT_LIMIT,
   type TwinConversation,
   type TwinDeps,
   type TwinMessageRow,
@@ -133,6 +134,7 @@ describe('formatRecentMessages', () => {
 
 describe('twinReply', () => {
   let h: Harness
+  let h2: Harness
 
   beforeEach(() => {
     h = harness()
@@ -148,16 +150,18 @@ describe('twinReply', () => {
     expect(call.system).toContain('温和、平静')
   })
 
-  it('只帶最近 12 則訊息，並標示哪些是自己說的', async () => {
-    const recent = Array.from({ length: 15 }, (_, i) => message(i + 1, i % 2 === 0 ? ZHE : AN))
+  it('長對話（16 輪、32 則）時，第一則訊息仍在 Prompt 裡；超過整場的才捨去', async () => {
+    const recent = Array.from({ length: 34 }, (_, i) => message(i + 1, i % 2 === 0 ? ZHE : AN))
     h = harness({ recent })
     await createTwinReply(h.deps)('conv-1', AN)
-    expect(h.getRecent).toHaveBeenCalledWith('conv-1', 12)
+    expect(TWIN_RECENT_LIMIT).toBe(32)
+    expect(h.getRecent).toHaveBeenCalledWith('conv-1', 32)
     const system = (h.llm.mock.calls[0]![0] as { system: string }).system
-    expect(system).not.toContain('第3则')
+    expect(system).not.toContain('第2则')
+    expect(system).toContain('对方：第3则')
     expect(system).toContain('我：第4则')
-    expect(system).toContain('我：第14则')
-    expect(system).toContain('对方：第15则')
+    expect(system).toContain('对方：第33则')
+    expect(system).toContain('我：第34则')
   })
 
   it('訊息先過隱私守門，寫入的是守門後的版本，is_ai = true', async () => {
@@ -186,33 +190,29 @@ describe('twinReply', () => {
     expect(msg.content).toBe('我在读书')
   })
 
-  it('第一則訊息的日誌 reason 寫開場話題', async () => {
+  it('一般發言不寫日誌（開場由 C3「开始代聊」寫，守門改寫由 C2 寫），不洗版', async () => {
+    await createTwinReply(h.deps)('conv-1', AN)
+    h2 = harness({ recent: [message(1, ZHE)] })
+    await createTwinReply(h2.deps)('conv-1', AN)
+    const rewritten = harness({ guardOut: { ok: false, text: '我在读书', issues: ['学校'] } })
+    await createTwinReply(rewritten.deps)('conv-1', AN)
+    expect([...h.logs, ...h2.logs, ...rewritten.logs]).toEqual([])
+  })
+
+  it('ask_human = true 時只寫一筆「需要问本人」的日誌', async () => {
+    h = harness({ recent: [message(1, ZHE)], llmOut: { message: '这个我要问一下本人哦', ask_human: true } })
     await createTwinReply(h.deps)('conv-1', AN)
     expect(h.logs).toEqual([
       expect.objectContaining({
         user_id: AN,
         agent: 'twin',
-        action: '代聊发言',
-        reason: '开场话题：最近爬过的山',
+        action: '需要问本人',
+        reason: '对方问到个人信息或要约定时间地点，回复要问本人',
         conversation_id: 'conv-1',
         task_id: 'task-1',
+        detail: { message_id: 'msg-new' },
       }),
     ])
-  })
-
-  it('不是第一則時 reason 不寫開場話題', async () => {
-    h = harness({ recent: [message(1, ZHE)] })
-    await createTwinReply(h.deps)('conv-1', AN)
-    expect(h.logs).toHaveLength(1)
-    expect(h.logs[0]!.action).toBe('代聊发言')
-    expect(h.logs[0]!.reason).not.toContain('开场话题')
-  })
-
-  it('ask_human = true 時另外寫一筆「要問本人」的日誌', async () => {
-    h = harness({ recent: [message(1, ZHE)], llmOut: { message: '这个我要问一下本人哦', ask_human: true } })
-    await createTwinReply(h.deps)('conv-1', AN)
-    expect(h.logs.map((l) => l.action)).toEqual(['需要问本人', '代聊发言'])
-    expect(h.logs[0]!.reason).toBe('对方问到个人信息或要约定时间地点，回复要问本人')
   })
 
   it('有收尾指示時傳進 Prompt', async () => {
@@ -271,5 +271,100 @@ describe('twinReply', () => {
     h.llm.mockRejectedValueOnce(new Error('timeout'))
     await expect(createTwinReply(h.deps)('conv-1', AN)).rejects.toThrow('timeout')
     expect(h.inserted).toHaveLength(0)
+  })
+
+  describe('重複句防呆', () => {
+    const said = (content: string, i: number): TwinMessageRow => ({
+      sender_id: AN,
+      content,
+      created_at: `2026-10-30T10:00:${String(i).padStart(2, '0')}Z`,
+    })
+    const other = (content: string, i: number): TwinMessageRow => ({ ...said(content, i), sender_id: ZHE })
+
+    it('和自己最近 3 則幾乎一樣（只差標點）時重新產生一次，寫入第二次的版本', async () => {
+      h = harness({
+        recent: [said('咖啡确实是我露营时不会漏掉的东西！', 1), other('那你都怎么煮？', 2)],
+      })
+      h.llm
+        .mockResolvedValueOnce({ message: '咖啡确实是我露营时不会漏掉的东西～', ask_human: false })
+        .mockResolvedValueOnce({ message: '我没有特别固定的煮法，比较喜欢简单的挂耳。', ask_human: false })
+      const msg = await createTwinReply(h.deps)('conv-1', AN)
+      expect(h.llm).toHaveBeenCalledTimes(2)
+      const retry = h.llm.mock.calls[1]![0] as { messages: { content: string }[] }
+      expect(retry.messages[0]!.content).toContain('「咖啡确实是我露营时不会漏掉的东西！」几乎一样')
+      expect(h.guard).toHaveBeenCalledTimes(1)
+      expect(h.guard).toHaveBeenCalledWith('我没有特别固定的煮法，比较喜欢简单的挂耳。', AN)
+      expect(h.inserted).toHaveLength(1)
+      expect(msg.content).toBe('我没有特别固定的煮法，比较喜欢简单的挂耳。')
+    })
+
+    it('收尾時重生，收尾指示和「不要重複」都會帶上', async () => {
+      h = harness({ recent: [said('我真的完全不拍照的啦', 1), other('好吧', 2)] })
+      h.llm
+        .mockResolvedValueOnce({ message: '我真的完全不拍照的啦。', ask_human: false })
+        .mockResolvedValueOnce({ message: '今天聊得很开心，下次再聊～', ask_human: false })
+      await createTwinReply(h.deps)('conv-1', AN, { extraInstruction: '- 这是最后一则消息，请礼貌地结束对话。' })
+      const retry = (h.llm.mock.calls[1]![0] as { messages: { content: string }[] }).messages[0]!.content
+      expect(retry).toContain('这是最后一则消息')
+      expect(retry).toContain('不要重复')
+    })
+
+    it('對方說過的話不算重複；自己很多輪前說過的話仍然算', async () => {
+      h = harness({ recent: [other('我周末想去看日出', 1)] })
+      h.llm.mockResolvedValueOnce({ message: '我周末想去看日出', ask_human: false })
+      await createTwinReply(h.deps)('conv-1', AN)
+      expect(h.llm).toHaveBeenCalledTimes(1)
+
+      const long = Array.from({ length: 20 }, (_, i) => (i % 2 ? said(`第${i}则不一样的话题内容`, i) : other(`对方第${i}则`, i)))
+      h = harness({ recent: [said('我不常在外过夜，通常傍晚前就回去了。', 0), ...long] })
+      h.llm.mockResolvedValueOnce({ message: '我不常在外过夜，通常傍晚前就回家了！', ask_human: false })
+      await createTwinReply(h.deps)('conv-1', AN)
+      expect(h.llm).toHaveBeenCalledTimes(2)
+    })
+
+    it('長訊息裡有一句重複自己說過的句子（實跑：「我通常带一点简单的轻食」隔 6 輪又說）也重新產生', async () => {
+      h = harness({ recent: [said('我通常带一点简单的轻食。你平时去户外的话，会特别注意防晒吗？', 1), other('会呀', 2)] })
+      h.llm
+        .mockResolvedValueOnce({ message: '我通常带一点简单的轻食。远处的风景和近处的花草，你比较常拍哪一种？', ask_human: false })
+        .mockResolvedValueOnce({ message: '我比较喜欢拍近处的花草，光影很细。', ask_human: false })
+      const msg = await createTwinReply(h.deps)('conv-1', AN)
+      expect(h.llm).toHaveBeenCalledTimes(2)
+      expect((h.llm.mock.calls[1]![0] as { messages: { content: string }[] }).messages[0]!.content).toContain('「我通常带一点简单的轻食。」')
+      expect(msg.content).toBe('我比较喜欢拍近处的花草，光影很细。')
+    })
+
+    it('Prompt 列出自己問過的問題，提醒不要再問同類的', async () => {
+      h = harness({ recent: [said('我挺喜欢看展的。你看展的话，比较喜欢美术馆还是博物馆？', 1), other('我不常看展耶', 2)] })
+      await createTwinReply(h.deps)('conv-1', AN)
+      const system = (h.llm.mock.calls[0]![0] as { system: string }).system
+      expect(system).toContain('你已经问过的问题')
+      expect(system).toContain('- 你看展的话，比较喜欢美术馆还是博物馆？')
+      expect(system).not.toContain('- 我不常看展耶')
+    })
+
+    it('一直重複同一個口頭禪（最近 3 則有 2 則說過）時也重新產生', async () => {
+      h = harness({ recent: [said('想到高海拔就完全停不下来！', 1), said('上山就完全停不下来～', 2), other('哈哈', 3)] })
+      h.llm
+        .mockResolvedValueOnce({ message: '越野跑让我完全停不下来！', ask_human: false })
+        .mockResolvedValueOnce({ message: '你平时拍照喜欢拍什么？', ask_human: false })
+      const msg = await createTwinReply(h.deps)('conv-1', AN)
+      expect((h.llm.mock.calls[1]![0] as { messages: { content: string }[] }).messages[0]!.content).toContain('「完全停不下来」')
+      expect(msg.content).toBe('你平时拍照喜欢拍什么？')
+    })
+
+    it('第二次還重複其中一句時拿掉那一句；整則都是重複就照用，不無限重試', async () => {
+      h = harness({ recent: [said('你平时拍照通常都用什么设备？', 1), other('手机', 2)] })
+      h.llm
+        .mockResolvedValueOnce({ message: '你平时拍照通常都用什么设备？', ask_human: false })
+        .mockResolvedValueOnce({ message: '早晨空气比较好，光线也适合拍照。你平时拍照通常都用什么设备？', ask_human: false })
+      const msg = await createTwinReply(h.deps)('conv-1', AN)
+      expect(h.llm).toHaveBeenCalledTimes(2)
+      expect(msg.content).toBe('早晨空气比较好，光线也适合拍照。')
+
+      h = harness({ recent: [said('我也喜欢爬山。', 1)] })
+      const same = await createTwinReply(h.deps)('conv-1', AN)
+      expect(h.llm).toHaveBeenCalledTimes(2)
+      expect(same.content).toBe('我也喜欢爬山。')
+    })
   })
 })

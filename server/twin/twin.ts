@@ -14,11 +14,16 @@ import { getShareableProfile, getStyleProfile } from '../contracts/friend'
 import { guardText } from './guard'
 import { llmJson, type LlmJsonOptions } from '../lib/llm'
 import { writeLog } from '../lib/log'
-import { renderTwinSystem, twinReplySchema } from '../prompts/05_twin'
+import { CONFIG } from '../lib/config'
+import { renderTwinSystem, twinReplySchema, type TwinReply } from '../prompts/05_twin'
 import { supabaseTwinStore } from './store'
+import { askedQuestions, dropRepeatedSentences, repeatProblem } from './repeat'
 
-/** 帶入 Prompt 的最近訊息數（07C C1 第 2 點）。 */
-export const TWIN_RECENT_LIMIT = 12
+/**
+ * 帶入 Prompt 的最近訊息數：涵蓋整場代聊（每輪雙方各一則），分身才記得前面說過什麼、問過什麼。
+ * 07C C1 原本寫 12 則（6 輪），實跑時第 7 輪後開始重複前面的句子。
+ */
+export const TWIN_RECENT_LIMIT = CONFIG.MAX_ROUNDS * 2
 const TWIN_TEMPERATURE = 0.8
 /** 對話沒設定開場話題時給分身的提示。 */
 const OPENING_FALLBACK = '从你的兴趣聊起'
@@ -117,20 +122,44 @@ async function loadConversation(store: TwinStore, conversationId: string, speake
   return conv
 }
 
-async function writeReplyLogs(
+/**
+ * 一般發言不寫日誌（每句一筆會把工作日誌洗版）。只有「要問本人」寫在這裡；
+ * 其他有意義的事已經由別處寫：開場＝C3「开始代聊」、守門改寫＝C2「改写分身消息」、
+ * 失敗＝C3「开场失败」／C4「分身没有回上」／B9「跳过：代聊失败」。
+ */
+async function writeAskHumanLog(deps: TwinDeps, conv: TwinConversation, speakerUserId: string, messageId: string): Promise<void> {
+  await deps.writeLog({
+    user_id: speakerUserId,
+    agent: 'twin',
+    conversation_id: conv.id,
+    task_id: conv.task_id ?? undefined,
+    action: '需要问本人',
+    reason: '对方问到个人信息或要约定时间地点，回复要问本人',
+    detail: { message_id: messageId },
+  })
+}
+
+/** 產生一則；整則或其中一句和自己說過的幾乎一樣、或一直重複同一個口頭禪，就帶著「換個新內容」再產生一次；第二次還重複的句子拿掉。 */
+async function generateReply(
   deps: TwinDeps,
-  log: { conv: TwinConversation; speakerUserId: string; askHuman: boolean; reason: string; detail: Record<string, unknown> },
-): Promise<void> {
-  const base = {
-    user_id: log.speakerUserId,
-    agent: 'twin' as const,
-    conversation_id: log.conv.id,
-    task_id: log.conv.task_id ?? undefined,
-  }
-  if (log.askHuman) {
-    await deps.writeLog({ ...base, action: '需要问本人', reason: '对方问到个人信息或要约定时间地点，回复要问本人' })
-  }
-  await deps.writeLog({ ...base, action: '代聊发言', reason: log.reason, detail: log.detail })
+  system: string,
+  ownSaid: readonly string[],
+  extraInstruction?: string,
+): Promise<TwinReply> {
+  const ask = (extra?: string) =>
+    deps.llmJson({
+      role: 'chat',
+      system,
+      messages: [{ role: 'user', content: turnMessage(extra) }],
+      temperature: TWIN_TEMPERATURE,
+      schema: twinReplySchema,
+    })
+  const first = await ask(extraInstruction)
+  const problem = repeatProblem(first.message, ownSaid)
+  if (!problem) return first
+  const second = await ask([extraInstruction?.trim().replace(/^-\s*/, ''), problem].filter(Boolean).join('；'))
+  // 第二次還重複某一句（實測：同一個問題問兩次）：拿掉那一句；整則都是重複就照用，不再呼叫模型
+  return { ...second, message: dropRepeatedSentences(second.message, ownSaid) }
 }
 
 export function createTwinReply(deps: TwinDeps): TwinReplyFn {
@@ -146,23 +175,19 @@ export function createTwinReply(deps: TwinDeps): TwinReplyFn {
     ])
     if (!shareable) throw new TwinError('这位用户还没有确认对外档案，分身暂时不能代聊')
 
-    // 2～3. 開場話題＋最近 12 則 → Prompt 5
+    // 2～3. 開場話題＋整場的訊息 → Prompt 5
     const openingTopic = conv.opening_topic?.trim() || OPENING_FALLBACK
+    const ownSaid = recent.filter((m) => m.sender_id === speakerUserId).map((m) => m.content)
     const system = renderTwinSystem({
       name,
       shareable,
       style: style ?? DEFAULT_STYLE,
       openingTopic,
       recentMessages: formatRecentMessages(recent, speakerUserId),
+      askedQuestions: askedQuestions(ownSaid),
       extraInstruction: options.extraInstruction,
     })
-    const reply = await deps.llmJson({
-      role: 'chat',
-      system,
-      messages: [{ role: 'user', content: turnMessage(options.extraInstruction) }],
-      temperature: TWIN_TEMPERATURE,
-      schema: twinReplySchema,
-    })
+    const reply = await generateReply(deps, system, ownSaid, options.extraInstruction)
 
     // 4. 隱私守門 → 寫入 messages
     const guarded = await deps.guardText(reply.message, speakerUserId)
@@ -174,14 +199,8 @@ export function createTwinReply(deps: TwinDeps): TwinReplyFn {
       content: guarded.text,
     })
 
-    // 5～6. 工作日誌
-    await writeReplyLogs(deps, {
-      conv,
-      speakerUserId,
-      askHuman: reply.ask_human,
-      reason: recent.length === 0 ? `开场话题：${openingTopic}` : '接住对方上一则消息',
-      detail: { message_id: saved.id, guard_rewritten: !guarded.ok },
-    })
+    // 5～6. 工作日誌：只有要問本人時寫
+    if (reply.ask_human) await writeAskHumanLog(deps, conv, speakerUserId, saved.id)
 
     const { id, conversation_id, sender_id, is_ai, content, created_at } = saved
     return { id, conversation_id, sender_id, is_ai, content, created_at }
