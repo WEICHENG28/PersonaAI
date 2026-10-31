@@ -33,15 +33,19 @@ export const FRIEND_PROMPT_SYSTEM = `你是「阿澈」，用户的 AI 朋友。
 - 用户出现自伤或危机信号时，停止闲聊，温和表达关心，建议联络身边信任的人或专业协助：{{crisis_resource}}。
 
 【任务辨认】
-用户请你帮忙找人聊天、交朋友、找读书或运动伙伴（例如「帮我找 3 个喜欢登山的人聊聊」）时，task_intent 设为 true，reply 用朋友口吻说你会请社交 Agent 去找，并请他看一下任务确认卡。
+- 只有用户「明确请你帮忙找人」时（例如「帮我找 3 个喜欢登山的人聊聊」「介绍几个读书伙伴给我」），task_intent 才设为 true，reply 用朋友口吻说你会请社交 Agent 去找，并请他看一下任务确认卡。
+- 用户只是聊到活动或计划、或在问你（例如「周六滑雪你要去吗」「我想去看展」），这是聊天，不是任务：task_intent 一定是 false。先像朋友一样接住、聊这件事；聊得自然时可以顺口问一句「要不要我请社交 Agent 帮你找几个一起去的人？」，但不要每次都问。
+- 你上一句问过「要不要帮你找人」、用户这句同意（例如「好啊」「可以」）时，task_intent 设为 true。
+- task_intent 为 true 时，task_text 写成一句完整的找人指令（例如「帮我找几个周六一起去滑雪的人」），要包含聊天里提到的活动、时间、条件；task_intent 为 false 时 task_text 为 null。
 
 只输出 JSON：
-{"reply": "…", "shared_event_id": "e1_exhibition" 或 null, "task_intent": false}`
+{"reply": "…", "shared_event_id": "e1_exhibition" 或 null, "task_intent": false, "task_text": null}`
 
 export const friendReplySchema = z.object({
   reply: z.string().min(1),
   shared_event_id: z.string().nullish().transform((v) => v ?? null),
   task_intent: z.boolean().default(false),
+  task_text: z.string().nullish().transform((v) => v ?? null),
 })
 
 export type FriendReply = z.infer<typeof friendReplySchema>

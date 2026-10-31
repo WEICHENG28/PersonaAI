@@ -184,6 +184,12 @@ function toZh(message: string): string {
   return '出了点问题，再试一次？'
 }
 
+/** POST /api/friend/reports/deliver：把未讀的任務回報由阿澈說出來，回傳說了幾筆。 */
+export async function deliverReports(): Promise<number> {
+  const data = await apiCall<{ delivered: number }>('/api/friend/reports/deliver', { method: 'POST' })
+  return data.delivered
+}
+
 /** POST /api/friend/next-meet：模拟时间经过，阿澈分享新近况并回报任务结果。
  *  mock 模式不打 /api（caller 自己接 demo store）。
  */
