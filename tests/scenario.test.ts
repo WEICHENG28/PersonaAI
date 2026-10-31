@@ -16,7 +16,7 @@ const REQUIRED_KEYS = [
   'login.submitRegister', 'login.loading', 'login.errorMissingFields',
   'login.errorWeakPassword', 'login.footer',
   // friend
-  'friend.title', 'friend.subtitle', 'friend.empty', 'friend.inputPlaceholder',
+  'friend.title', 'friend.subtitle', 'friend.loading', 'friend.inputPlaceholder',
   'friend.send', 'friend.typing', 'friend.nextMeet', 'friend.nextMeetHint',
   'friend.taskCard', 'friend.hasNews', 'friend.memoriesTitle', 'friend.memoriesHint',
   'friend.demoTag', 'friend.openReport',

@@ -36,7 +36,7 @@
   "friend": {
     "title": "阿澈",
     "subtitle": "AI 朋友 · 生活是虚构的角色设定",
-    "empty": "和阿澈打个招呼吧",
+    "loading": "阿澈准备中",
     "inputPlaceholder": "跟阿澈说点什么…",
     "send": "发送",
     "sendDisabled": "阿澈还在准备中…",
