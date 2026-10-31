@@ -13,6 +13,7 @@ export const CONFIG = {
   FRIEND_HISTORY_LIMIT: 20,        // AI 朋友聊天帶入幾則歷史訊息
   MEMORY_LIMIT: 50,               // 「它記得的事」最多列幾筆（A3）
   PROFILE_EXTRACT_EVERY: 6,        // 用戶每說幾則話更新一次檔案
+  LOBBY_INVITE_MIN_MESSAGES: 8,    // 和阿澈說滿幾句、對外檔案也夠完整，才邀請真人進大廳
   ANOMALY_MIN_MESSAGES: 15,
   ANOMALY_CHECK_EVERY: 5,
   SEED_AUTO_RESPONSE: 'later',     // 種子用戶被請求真人時的自動回覆

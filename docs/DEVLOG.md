@@ -313,6 +313,17 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜真人一鍵進大廳（和種子用戶混在一起配對）｜Peter（AI 協助）
+- **做了什麼**：和阿澈說滿 8 句（`CONFIG.LOBBY_INVITE_MIN_MESSAGES`）、對外檔案有一句話介紹且至少 2 個興趣時，AI 朋友頁跳出「你可以进大厅了」，顯示自己的對外檔案與加入後會發生什麼；按「加入大厅」＝確認對外檔案（含算向量）＋開啟社交 Agent，之後 `searchLobby` 與大廳就會把他和種子用戶一起配對、他也會被別人找到。「先不要」這個瀏覽器不再問；「先改改档案」去檔案頁。
+- **為什麼**：現場 Demo 要讓大家互相配對；原本真人要自己去檔案頁確認、再去設定開社交 Agent，幾乎沒人會做。仍要本人按加入（對外資料要本人同意，02 F4）。
+- **API**：`GET /api/lobby-invite`（`in_lobby`／`not_yet`＋原因／`invite`＋對外檔案）、`POST /api/lobby-invite/accept`。說夠了但還沒有檔案時會補撷取一次（背景撷取在 Vercel 可能被中斷）。
+- **跨線**：撷取與確認直接用 A 的 `extractProfile`、`updateShareable`、`updateSettings`（同一套規則）；`FriendPage` 加 2 行掛元件。混合配對不用改：B 的 `searchLobby` 與 C 的大廳本來就是「開了社交 Agent＋檔案已確認」的人都算，種子和真人一樣。
+- **注意**：真人被配對後，雙方分身代聊要靠 worker 推進，Demo 時 Peter 電腦要開 `npm run worker`。
+- **改了哪些檔案**：`server/social/{lobbyInvite,lobbyInviteDeps}.ts`、`server/routes/social.ts`、`server/lib/config.ts`、`src/lib/api/social.ts`、`src/features/social/components/LobbyInvite.tsx`、`src/features/friend/FriendPage.tsx`、`tests/social/lobby-invite.test.ts`。
+- **驗證**：`tsc -b`；vitest 648/648（聊不夠、邀請、補撷取、檔案不完整、已在大廳、加入、不符合不加入）；build。
+
+---
+
 ### 2026-10-31｜任務確認卡關掉後的通知｜Peter（AI 協助）
 - **做了什麼**（http 模式的 AI 朋友頁）：
   - 按「再想想」或點旁邊關掉：任務**保留**在「我的任务」等確認（原本「再想想」會取消任務），右下角通知「任务先帮你留着…点这里去看看」。
