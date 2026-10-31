@@ -39,6 +39,16 @@
 - **踩到的坑**：（1）`FriendMessage.role` 是 `'user' | 'friend'`，不是 `'assistant'`，nudge 條件要用 `'friend'`。（2）`TaskStatus` 沒有 `'stopped'`，過濾要用 `'cancelled'`。（3）`extractProfile` 回傳 `{ shareable, confirmed, exists }`，不是 `{ shareable_profile }` 。
 - **還沒做完／待辦**：記憶提取背景觸發沒有 Realtime 推送，每次聊天後手動 refetch 有約 1 秒延遲，後續可接 Supabase Realtime 解決。
 
+---
+
+### 2026-10-31｜修正：「我的档案」外層「保存并确认对外使用」按了沒反應｜Peter（AI 協助）
+- **問題**：非編輯狀態的「保存并确认对外使用」按鈕接到 `extract`（重新撷取），按了只會重產草稿、`confirmed` 一直是 false，畫面也沒有任何提示。Peter 實測卡住，社交 Agent 開不了、任務無法開始。
+- **修正**：`ProfilePage.tsx` 新增 `confirmCurrent`，該按鈕改呼叫 `saveShareable(view.shareable)`（PUT /api/profile/shareable）；失敗會顯示錯誤。編輯表單裡的保存本來就是對的，未改。
+- **給 A（Vincent）**：這是你的頁面，因為卡住全隊測試由 B 的 AI 先修；給你的 prompt 第 1 點的按鈕部分已完成，「即将上线」標籤顏色與文字仍請你處理。
+- **驗證**：`tsc -b`、vitest 597/597、`npm run build`。
+
+---
+
 ### 2026-10-31｜修正：Vercel 上 /api 全部 FUNCTION_INVOCATION_FAILED｜Peter（AI 協助）
 - **問題**：#89 部署後，Vercel 上連 `/api/health` 都回 500（`FUNCTION_INVOCATION_FAILED`）。Vercel 把每個 TS 檔各自編成 Node ESM，ESM 的相對 import 必須寫副檔名，`import { app } from '../server/app'` 會找不到模組（本機用 tsc 照 Vercel 方式編譯後實際重現：`ERR_MODULE_NOT_FOUND ... server\app`）。本機的 tsx／vitest／Vite 會自動補，所以一直沒發現。
 - **修正**：`server/`、`shared/`、`api/` 所有相對 import／export 補上 `.js`（例如 `'./routes/friend'` → `'./routes/friend.js'`、資料夾 → `'/index.js'`），共 64 個檔案、259 處，**只改 import 路徑、沒改任何邏輯**。TypeScript、tsx、vitest、Vite 都認得 `.js` 對到 `.ts`。新增測試 `tests/social/esm-imports.test.ts`：之後有人寫了沒副檔名的相對 import，`npm test` 會失敗並列出位置。
@@ -290,6 +300,13 @@
 ---
 
 ## B：社交 Agent 線（Peter）
+
+### 2026-10-31｜任務確認卡：未確認檔案時給入口｜Peter（AI 協助）
+- **做了什麼**：`TaskConfirmCard` 按「确认」被擋（對外檔案未確認或社交 Agent 沒開）時，除了錯誤訊息，多兩顆按鈕「去确认对外档案」「去设置开启社交 Agent」，並提示完成後到「我的任务」確認，任務會保留（`/tasks/:id` 本來就有確認按鈕）。
+- **為什麼**：Peter 實測時卡在這一步，只看到紅字不知道下一步。
+- **驗證**：`tsc -b`、vitest 全過、`npm run build`。
+
+---
 
 ### 2026-10-31｜B11 找人目的：評審依目的加權｜Peter（AI 協助）｜Closes #19
 - **做了什麼**：`CONFIG.JUDGE_WEIGHTS`（交友等權重；讀書伙伴 `condition_fit ×2`、`humor ×0.5`；運動伙伴 `condition_fit ×2`、`engagement ×1.2`；興趣同好 `topic_fit`、`condition_fit ×1.5`）；`directionScore` 改成依任務目的的加權平均；評審 Prompt 的輸入加上「這個目的要多看什麼」（照 02 F13 的表）。
