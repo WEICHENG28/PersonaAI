@@ -5,8 +5,8 @@ import { z } from 'zod'
 import type { AgentTask, Purpose, ShareableProfile, StartConversationInput } from '../../shared/types'
 import type { LlmJsonOptions } from '../lib/llm'
 import {
-  CARD_HEADLINE_MAX,
-  CARD_STYLE_MAX,
+  CARD_HEADLINE_CAP,
+  CARD_STYLE_CAP,
   CARD_TAGS_MAX,
   CARD_TEMPERATURE,
   CARD_PROMPT_SYSTEM,
@@ -135,9 +135,9 @@ export function matchesFilter(row: LobbyRow, filter: LobbyFilter): boolean {
 /** LLM 失敗時的備用卡片：直接用對外檔案（不快取，下次再試）。 */
 export function fallbackCard(profile: ShareableProfile): LobbyCard {
   return {
-    headline: profile.intro.slice(0, CARD_HEADLINE_MAX),
+    headline: profile.intro.slice(0, CARD_HEADLINE_CAP),
     tags: profile.interests.slice(0, CARD_TAGS_MAX),
-    chat_style: profile.chat_style.slice(0, CARD_STYLE_MAX),
+    chat_style: profile.chat_style.slice(0, CARD_STYLE_CAP),
     mbti: null,
   }
 }

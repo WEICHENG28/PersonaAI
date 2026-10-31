@@ -7,6 +7,10 @@ export const CARD_TEMPERATURE = 0.3
 export const CARD_HEADLINE_MAX = 20
 export const CARD_TAGS_MAX = 5
 export const CARD_STYLE_MAX = 15
+// Prompt 要求 20／15 字內；模型偶爾超過幾個字，程式只在明顯過長時才截斷，避免把一句話切在中間
+// （實測「慢热，熟了会分享很多照片和小发现」被切成「…和小发」）
+export const CARD_HEADLINE_CAP = 30
+export const CARD_STYLE_CAP = 24
 
 export const CARD_PROMPT_SYSTEM = `根据对外档案产生大厅卡片。只能使用档案里的信息，不加任何推测。
 
@@ -24,13 +28,13 @@ export const CARD_PROMPT_SYSTEM = `根据对外档案产生大厅卡片。只能
 
 const MBTI = /^[EI][NS][TF][JP]$/
 
-// 太長就截斷而不是拒絕：schema 不符會讓 llmJson 判失敗，卡片就只能用備用內容
+// 過長就截斷而不是拒絕：schema 不符會讓 llmJson 判失敗，卡片就只能用備用內容
 export const lobbyCardSchema = z.object({
   headline: z
     .string()
     .trim()
     .min(1)
-    .transform((s) => s.slice(0, CARD_HEADLINE_MAX)),
+    .transform((s) => s.slice(0, CARD_HEADLINE_CAP)),
   tags: z
     .array(z.string().trim())
     .catch([])
@@ -39,7 +43,7 @@ export const lobbyCardSchema = z.object({
     .string()
     .trim()
     .catch('')
-    .transform((s) => s.slice(0, CARD_STYLE_MAX)),
+    .transform((s) => s.slice(0, CARD_STYLE_CAP)),
   mbti: z
     .string()
     .nullable()

@@ -420,6 +420,28 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-10-31｜C9 大廳（卡片、篩選、我自己聊、讓分身去聊）｜Jerry（AI 協助）｜分支 c/C9-lobby｜Closes #29
+- **做了什麼**：
+  - 後端（`server/twin/lobby.ts`、`lobbyStore.ts`，Prompt 10 在 `server/prompts/10_card.ts`）：`GET /api/lobby?purpose=&q=` 列出已開社交 Agent、已確認對外檔案的用戶（不含自己）。卡片讀 `user_profiles.card`，為 null 或格式不對就用 Prompt 10（`fast`、temperature 0.3）產生並快取；A 改對外檔案時會把 `card` 清成 null，下次打開大廳就重產。
+  - AI 預估：用**我和對方的 embedding** 算相似度，分成「很可能合得来」（≥ 0.65）／「可以聊聊看」（≥ 0.55）／「差异较大」，API 只回等級（`likely`／`maybe`／`different`），不回數字；我還沒有向量時回 null（畫面寫「确认档案后才能预估」）。卡片依相似度排序。
+  - 篩選：找人目的要在對方的 `purposes` 裡；興趣關鍵字和興趣雙向比對（「登山」對上「爱登山」），也看一句話介紹。
+  - `POST /api/conversations { targetUserId }`（我自己聊）：`startConversation({ aController: 'human', origin: 'manual' })`；已經有還沒結束的同一對手動對話就回那一段，不重開。
+  - `POST /api/lobby/twin-chat { targetUserId }`（讓分身去聊）：先確認我開了社交 Agent、檔案已確認（否則 403），再呼叫 B 的 `createSingleTargetTask`（經 `server/contracts/social`），回 `taskId`。
+  - 前端：http 模式的候選人改成真資料（`LiveLobby`），加上目的按鈕、關鍵字搜尋、兩個按鈕（我自己聊 → `/chat/<id>`；讓分身去聊 → `/tasks/<id>`）。mock 模式照舊用 demo 資料，但 AI 預估從數字改成同樣的三級文字。大廳 AI 助手沒動（C10）。
+- **為什麼這樣做**：
+  - **相似度不用 `searchLobby`**：`searchLobby` 是拿「查詢文字」的向量去比，每次都要多呼叫一次 embedding，還會寫一筆「搜索大厅」日誌（每開一次大廳就一筆，正是全線檢查說的洗日誌問題）；而且它不回卡片和 MBTI。大廳要的是「我和對方合不合」，直接比雙方已存的向量就好。cosine 自己寫一份（跨線只能經 contracts，B 的 `cosineSimilarity` 不在 contracts 裡）。
+  - **門檻依實測**：2026-10-31 只讀查詢雲端 29 位有向量的用戶，配對相似度 0.44～0.92、中位數 0.66；小安 ↔ 阿凯 0.44、阿哲 ↔ 子晴 0.66。
+  - **「讓分身去聊」需要 HTTP 端點**：B 的 `createSingleTargetTask` 只有函式沒有 API，所以加在 C 的路由（07C 第 4 節 API 表沒列，這是新增的 `/api/lobby/twin-chat`）。社交 Agent／檔案檢查自己先做，不依賴 B 的 `TaskError`（那是 B 的內部類別）。
+  - **卡片的 MBTI 以 `fun_labels.user_mbti` 為準**，不用快取裡的（用戶改了 MBTI 不會清卡片）。標籤只留對外檔案裡真的有的興趣，LLM 一個都沒對上就用檔案的興趣。
+  - **長度**：Prompt 照 07C 要求 20／15 字內，但實測模型偶爾超過幾個字，硬切 15 字會變成「…很多照片和小发」；程式改成 30／24 字才截斷。
+  - LLM 失敗時卡片直接用對外檔案（不快取），大廳照樣打得開；快取存不進去也照樣顯示。
+- **改了哪些檔案**：`server/twin/lobby.ts`、`server/twin/lobbyStore.ts`、`server/prompts/10_card.ts`、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/LobbyPage.tsx`、`src/features/twin/components/{LiveLobby.tsx,useLobby.ts,lobbyView.ts}`、`tests/twin/{lobby,lobby-routes,lobby-view}.test.ts`、`tests/twin/chat-room-routes.test.ts`（路由 deps 多一個 `lobby`）。沒動共用檔。
+- **踩到的坑／注意事項**：
+  - 第一次打開大廳要替每位產生卡片（實測 13 張約 7.5 秒），之後讀快取。
+  - 「交友」篩選是照 `purposes` 字面比對（B 的 `searchLobby` 把 friend 當成所有人），所以選「交友」只會出現目的有勾交友的人。
+  - 只讀實測（真 Supabase＋真 LLM，但不存快取、不建對話或任務）：13 張卡片、回應裡沒有數字或分數欄位；「运动＋登山」→ 小安、子晴、阿哲。
+- **還沒做完／待辦**：mock 模式的卡片沒有兩個按鈕（demo 沒有對應的真對話）；大廳 AI 助手（C10）http 模式仍是 mock 回答。
+
 ### 2026-10-31｜C8 言行異常提醒｜Jerry（AI 協助）｜PR #83｜Closes #28
 - **做了什麼**：
   - 後端（`server/twin/anomaly.ts`、`anomalyStore.ts`，Prompt 9 在 `server/prompts/09_anomaly.ts`）：C4 的本人發言存好後，背景呼叫 `checkAfterHumanMessage`（不等它、失敗也不影響發言）。這位用戶在這段對話的本人訊息數 ≥ `ANOMALY_MIN_MESSAGES`（15）且是 `ANOMALY_CHECK_EVERY`（5）的倍數 → Prompt 9（`reason`、temperature 0，只放對外檔案、說話風格和他本人最近 30 則話）。

@@ -155,11 +155,14 @@ describe('listLobby', () => {
 })
 
 describe('卡片格式', () => {
-  it('太長截斷、標籤最多 5 個、亂填的 MBTI 變 null', () => {
-    const card = lobbyCardSchema.parse({ headline: '一'.repeat(30), tags: ['a', 'b', 'c', 'd', 'e', 'f'], chat_style: '二'.repeat(20), mbti: '猜的' })
-    expect(card.headline).toHaveLength(20)
+  it('稍微超過不切（避免切在句子中間）、明顯過長才截斷；標籤最多 5 個、亂填的 MBTI 變 null', () => {
+    const slight = lobbyCardSchema.parse({ headline: '一'.repeat(22), tags: [], chat_style: '慢热，熟了会分享很多照片和小发现', mbti: null })
+    expect(slight.chat_style).toBe('慢热，熟了会分享很多照片和小发现')
+    expect(slight.headline).toHaveLength(22)
+    const card = lobbyCardSchema.parse({ headline: '一'.repeat(50), tags: ['a', 'b', 'c', 'd', 'e', 'f'], chat_style: '二'.repeat(40), mbti: '猜的' })
+    expect(card.headline).toHaveLength(30)
     expect(card.tags).toHaveLength(5)
-    expect(card.chat_style).toHaveLength(15)
+    expect(card.chat_style).toHaveLength(24)
     expect(card.mbti).toBeNull()
   })
 
