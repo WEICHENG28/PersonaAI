@@ -3,7 +3,7 @@ import { Button, Chip } from '@components/ui/Button'
 import { Card } from '@components/ui/Card'
 import { t } from '@i18n/t'
 import type { LobbyCardView } from '@lib/api/twin'
-import { LOBBY_TEXT, fitText } from './lobbyView'
+import { LOBBY_TEXT, fitText, hasFit } from './lobbyView'
 import type { LobbyAction, StartChatState } from './useLobby'
 import { PersonKindChip } from '@components/PersonKindChip'
 
@@ -33,9 +33,10 @@ export function LobbyCard({ card, chat, onStart, showFit = true }: LobbyCardProp
         ))}
       </div>
       <p className="cand-style">{card.chatStyle}</p>
-      {/* 文字预估比原本的数字长，和 MBTI 放同一行在手机上会挤成两行，所以各占一行 */}
-      {showFit && (
-        <p className="cand-fit">
+      {/* 文字预估比原本的数字长，和 MBTI 放同一行在手机上会挤成两行，所以各占一行。
+          没有预估（档案还没确认）时整行不显示；data-fit 给 CSS 上色（差异较大＝深橘）。 */}
+      {showFit && hasFit(card.fit) && (
+        <p className="cand-fit" data-fit={card.fit}>
           {t('lobby.fitPredict')} <b>{fitText(card.fit)}</b>
         </p>
       )}

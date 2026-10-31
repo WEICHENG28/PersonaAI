@@ -95,11 +95,8 @@ export function SettingsPage() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{t('settings.title')}</h1>
-        {saving && <span className="hint-inline">保存中…</span>}
-        {saveError && <span className="hint-inline" style={{ color: 'var(--c-err)' }}>{saveError}</span>}
-      </div>
+      {saving && <span className="hint-inline">保存中…</span>}
+      {saveError && <span className="hint-inline" style={{ color: 'var(--c-err)' }}>{saveError}</span>}
 
       {/* 六張卡片：桌機左三右三、一樣大小對齊（手機一欄）；登出放最下面一整條 */}
       <div className="settings-grid">

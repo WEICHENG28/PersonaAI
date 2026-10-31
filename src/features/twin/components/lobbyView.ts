@@ -11,7 +11,6 @@ export const LOBBY_TEXT = {
   search: '搜索',
   clear: '清除',
   fit: { likely: '很可能合得来', maybe: '可以聊聊看', different: '差异较大' } satisfies Record<FitLevel, string>,
-  fitUnknown: '确认档案后才能预估',
   chatMyself: '我自己聊',
   sendTwin: '让分身去聊',
   starting: '处理中…',
@@ -31,8 +30,13 @@ export const PURPOSE_OPTIONS: readonly LobbyPurpose[] = ['friend', 'study', 'spo
 /** 关键字和后端一致：去掉前后空白、最多 30 字。 */
 export const LOBBY_QUERY_MAX = 30
 
-export function fitText(fit: FitLevel | null): string {
-  return fit ? LOBBY_TEXT.fit[fit] : LOBBY_TEXT.fitUnknown
+export function fitText(fit: FitLevel): string {
+  return LOBBY_TEXT.fit[fit]
+}
+
+/** 画面要不要显示 AI 预估：没有预估（档案还没确认）时整行都不显示。 */
+export function hasFit(fit: FitLevel | null): fit is FitLevel {
+  return fit !== null
 }
 
 /** mock 模式的假资料是 0–100 的数字；画面不显示数字，换成同样的三级文字。 */

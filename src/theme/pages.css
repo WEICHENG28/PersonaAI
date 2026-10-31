@@ -1,28 +1,35 @@
 /* ── 各画面专属样式 ── */
 
-/* ── 登录页
- * 桌机：[左] chromabot（scale 1.5×）  [右] 登录卡
- * 手机：chromabot 铺满全屏背景，登录卡 fixed 贴底（类似 bottom sheet） */
+/* ── 登录页（不可滚动）
+ * 桌机：左栏 chromabot（scale 1.25×，溢出裁切），右栏登录卡，整页不滚动
+ * 手机：chromabot fixed 铺满全屏背景，登录卡 fixed 贴底浮在上面，无额外容器 */
 .login-page {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  /* 右栏固定宽度，左栏占剩余：保证 bot 不被压缩 */
+  grid-template-columns: 1fr min(420px, 40vw);
   align-items: center;
   gap: var(--space-2xl);
-  width: min(1280px, 100%);
-  margin-inline: auto;
+  /* 占满 page-center 高度 */
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* 防止 bot scale 溢出导致滚动 */
 }
 
-/* 头像容器：占满整栏高度，canvas 在其中 scale(1.5) 溢出裁切 */
+/* 头像容器：左栏全高，overflow hidden 裁掉 scale 溢出 */
 .login-avatar-area {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100svh;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
-/* chromabot 放大 1.5× */
+/* chromabot 尺寸：手机维持 1.5×（全屏背景），桌机 1.25×（略缩，避免过大） */
 .login-bot { display: block; width: 100%; height: 100%; transform: scale(1.5); transform-origin: center center; }
 .login-bot canvas { display: block; }
+@media (min-width: calc(64rem + 1px)) {
+  .login-bot { transform: scale(1.25); }
+}
 
 .login-right {
   display: flex;
@@ -50,37 +57,37 @@
   text-align: left;
 }
 
-/* ── 手机：chromabot 铺满全屏，登录卡 fixed 贴底 ── */
+/* ── 手机：chromabot 铺满全屏背景，登录卡 fixed 贴底浮在上面 ── */
 @media (max-width: 64rem) {
+  /* 手机不用 grid，头像 fixed 全屏，右栏 fixed 贴底 */
   .login-page {
-    display: block; /* 脱离 grid，头像区自然铺满 */
-    width: 100%;
+    display: block;
+    height: 100svh;
+    overflow: hidden;
   }
   .login-avatar-area {
-    /* 铺满整个视口（含导航栏后的剩余高度） */
     position: fixed;
     inset: 0;
     height: 100svh;
     z-index: 0;
+    overflow: hidden;
   }
+  /* 登录卡：无包裹容器，直接 fixed 贴底浮在 bot 上 */
   .login-right {
-    /* 像底部 nav 一样 fixed 贴底，出现在头像前 */
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 10;
-    padding: var(--space-md) var(--space-md) calc(var(--space-md) + env(safe-area-inset-bottom, 0));
+    padding: var(--space-md) var(--space-md) calc(var(--space-lg) + env(safe-area-inset-bottom, 0));
     background: var(--color-paper);
-    border-top: var(--rule-hair) solid var(--color-rule);
-    box-shadow: 0 -8px 32px color-mix(in oklab, var(--color-ink) 8%, transparent);
     border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 32px color-mix(in oklab, var(--color-ink) 10%, transparent);
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
-    margin-top: 0;
+    margin: 0;
   }
-  /* 桌机的品牌区 / 副标题在手机不需要 */
   .login-brand { display: none; }
   .login-sub-mobile { display: none; }
 }
@@ -108,7 +115,13 @@
 .field em { font-style: normal; font-weight: 500; color: var(--color-muted); font-size: var(--text-xs); }
 .field textarea.input { padding: var(--space-sm) var(--space-md); min-height: 64px; resize: vertical; }
 
-/* ── 朋友页布局：桌机 左（avatar）右（聊天）分栏，手机只显示聊天 ── */
+/* ── 朋友页布局：不可整页滚动；聊天区内部独立滚动 ──
+ * 手机：chromabot fixed 铺满上半屏背景，聊天从中段开始叠在上面；
+ * 桌机：左 chromabot 栏 / 右聊天栏 */
+
+/* 手机 tabbar 高度 token（约 84px，用于安全 padding） */
+:root { --tabbar-h: 84px; }
+
 .friend-page {
   display: flex;
   flex-direction: column;
@@ -116,16 +129,42 @@
   padding: 0;
   overflow: hidden;
 }
+
+/* 手机：chromabot fixed 贴顶，高度只占上方 38svh，不铺满全屏 */
 .friend-avatar-col {
-  display: none; /* 手机隐藏 */
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 38svh;   /* 只占上方一段，留出足够空间显示脸部 */
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fibre), var(--color-paper-2);
 }
+/* 手机 bot 不放大（1×），往下移一点让位置更居中 */
+.friend-avatar-rive { display: block; width: 100%; height: 100%; transform: translateY(6svh); }
+
 .friend-chat-col {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* 相对于 fixed 背景浮在上面 */
+  position: relative;
+  z-index: 2;
+  /* chromabot 高度 38svh；聊天从 26svh 处开始叠在 bot 下半身上，保留脸部可见 */
+  margin-top: 26svh;
+  /* 聊天区域背景：覆盖下半屏，隐藏 bot 下半部分 */
+  background: var(--color-paper);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 20px color-mix(in oklab, var(--color-ink) 6%, transparent);
+  /* 内容底部让出 tabbar + safe-area 高度，输入栏不被底栏遮挡 */
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
 }
+
 .friend-chat-head {
   display: flex;
   align-items: center;
@@ -137,7 +176,7 @@
 .friend-chat-head:empty { display: none; }
 .typing-label { font-size: var(--text-xs); color: var(--color-muted); }
 
-/* 聊天气泡区：可滚动 */
+/* 聊天气泡区：只有这里可以滚动 */
 .friend-chat-col .chat {
   flex: 1;
   overflow-y: auto;
@@ -145,37 +184,75 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  min-height: 0;
 }
 
-/* 输入栏：有 card 底纹，贴在底部 */
+/* 输入栏：悬浮胶囊卡片（与大厅候选筛选栏同风格），左右留出与消息一致的间距 */
 .friend-input-bar {
   display: flex;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) var(--space-2xs) var(--space-2xs) var(--space-md);
+  margin: 0 var(--space-md) var(--space-sm);
   flex-shrink: 0;
-  border-radius: 0;
-  border-top: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  border: var(--rule-hair) solid var(--color-rule);
+  background: var(--fibre), var(--color-card);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--color-ink) 7%, transparent);
 }
-.friend-input-bar .input { flex: 1; min-width: 0; }
+/* 胶囊内的输入框：去边框、透明背景，融入胶囊 */
+.friend-input-bar .input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.friend-input-bar .input:focus { box-shadow: none; }
 
 @media (min-width: 64rem) {
   .friend-page {
     flex-direction: row;
     padding: 0;
+    overflow: visible; /* 让 ::before 能伸到 navbar 上方 */
+  }
+  .friend-chat-col {
+    /* 桌机：取消手机的 margin-top 和 z-index */
+    margin-top: 0;
+    position: static;
+    z-index: auto;
+    overflow: hidden;
   }
   .friend-avatar-col {
+    /* 桌机：脱离 fixed，回到正常 flex 左栏 */
+    position: relative;
+    inset: auto;
+    height: auto; /* 覆盖手机的 38svh */
+    pointer-events: auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    align-self: stretch; /* 占满 friend-page 全高 */
+    align-self: stretch;
     overflow: hidden;
     width: clamp(360px, 34vw, 640px);
     flex-shrink: 0;
-    background: var(--fibre), var(--color-paper-2);
+    background: none; /* 由 ::before 承担，向上延伸 */
     border-right: var(--rule-hair) solid var(--color-rule);
   }
-  /* 朋友页 bot 也放大 1.5× */
-  .friend-avatar-rive { display: block; width: 100%; height: 100%; transform: scale(1.5); transform-origin: center center; }
+  /* 桌机左栏背景延伸到导航栏之上 */
+  .friend-avatar-col::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--bar-h) - env(safe-area-inset-top, 0px));
+    left: 0; right: 0; bottom: 0;
+    background: var(--fibre), var(--color-paper-2);
+    z-index: 0;
+    pointer-events: none;
+  }
+  .friend-avatar-rive { position: relative; z-index: 1; display: block; width: 100%; height: 100%; transform: scale(1.5); transform-origin: center center; }
+  /* 桌机：输入栏同样为悬浮胶囊卡片，无 tabbar 让位问题 */
+  .friend-chat-col { padding-bottom: var(--space-md); }
 }
 
 /* Profile 页桌机双栏：档案+风格（左）／记忆（右） */
@@ -431,6 +508,8 @@
 .cand-style { font-size: var(--text-xs); color: var(--color-muted); }
 .cand-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); margin-top: auto; }
 .cand-fit b { color: var(--color-mint-deep); font-size: var(--text-lg); }
+/* AI 预估三级用色：差异较大＝深橘（警示），其余维持薄荷 */
+.cand-fit[data-fit='different'] b { color: var(--color-coral-deep); }
 .cand-mbti { min-height: 26px; font-size: 11px; }
 .mbti-note { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-sm); }
 
@@ -618,7 +697,16 @@
 }
 .lobby-ai-popup__input .input { flex: 1; min-width: 0; }
 
-/* ── 三点脉冲（thinking 用） ── */
+/* ── 三点脉冲：loading 占位（页面级）和 thinking 气泡共用 ── */
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--space-3xl) 0;
+  /* 让它在 .page 里水平居中 */
+  display: flex;
+  justify-content: center;
+}
 .dot-pulse {
   width: 6px;
   height: 6px;

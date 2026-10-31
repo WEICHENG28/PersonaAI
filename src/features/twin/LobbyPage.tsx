@@ -58,7 +58,8 @@ function DemoCandidates() {
                 ))}
               </div>
               <p className="cand-style">{c.chatStyle}</p>
-              <p className="cand-fit">
+              {/* mock 资料一定有 fitPredict；data-fit 给 CSS 上色（差异较大＝深橘） */}
+              <p className="cand-fit" data-fit={fitFromPercent(c.fitPredict)}>
                 {t('lobby.fitPredict')} <b>{fitText(fitFromPercent(c.fitPredict))}</b>
               </p>
               <footer className="cand-foot">

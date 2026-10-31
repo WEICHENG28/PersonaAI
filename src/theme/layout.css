@@ -18,15 +18,24 @@
   padding: var(--space-md) var(--gutter) var(--space-2xl);
 }
 
-/* 短页（登录）：内容不足一屏时垂直置中，永不滚动 */
+/* 短页（登录）：全高 grid 置中，子页 height:100% 才有确定高度，永不滚动 */
 .app-main.page-center {
   display: grid;
-  place-content: center;
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
   /* 固定视口高度（navbar 之下），超出内容裁切 → 登录页不可滚动 */
   height: calc(100svh - var(--bar-h));
   box-sizing: border-box;
   padding-top: var(--space-sm);
   padding-bottom: var(--space-sm);
+  overflow: hidden;
+}
+
+/* 朋友页：app-main 去掉所有内边距，friend-page 自己管理全高布局
+ * 必须比 .app-main.has-nav 的 padding-bottom 优先级高，用 !important 覆盖 */
+.app-main:has(.friend-page) {
+  padding: 0 !important;
+  max-width: 100%;
   overflow: hidden;
 }
 
@@ -53,7 +62,10 @@
   position: sticky;
   top: 0;
   z-index: 300;
-  /* drop-shadow 在父層：跟著子層撕紙形狀走 */
+  /* drop-shadow 在父層：跟著子層撕紙形狀走。
+     will-change: filter 讓此層維持獨立合成層——點按鈕觸發 re-render 時
+     不會重新柵格化 filter，修掉「點一下頂欄陰影閃一下」的問題 */
+  will-change: filter;
   filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--color-ink) 12%, transparent))
     drop-shadow(0 8px 16px color-mix(in oklab, var(--color-ink) 16%, transparent));
 }

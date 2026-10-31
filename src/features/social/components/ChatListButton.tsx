@@ -105,7 +105,10 @@ function ChatPanel({
   useLayoutEffect(() => {
     const place = () => {
       const rect = anchor?.getBoundingClientRect()
-      if (rect) setStyle(panelPlacement(rect, window.innerWidth))
+      if (!rect) return
+      // 面板不可蓋住頂欄：下限用頂欄（.topbar）的下緣
+      const barRect = anchor?.closest('.topbar')?.getBoundingClientRect()
+      setStyle(panelPlacement(rect, window.innerWidth, barRect?.bottom ?? 0))
     }
     place()
     window.addEventListener('resize', place)

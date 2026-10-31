@@ -76,12 +76,13 @@
 
   /* 版面 */
   --container: 640px;
-  --bar-h: 64px;
+  /* 頂欄高度：桌機按鈕垂直居中的加高版（88px）全站套用（手機也同高，點擊有空間） */
+  --bar-h: 88px;
   --gutter: 20px;
 }
 
 @media (min-width: 64rem) {
-  :root { --container: min(100vw - 80px, 1600px); --container-wide: min(100vw - 80px, 1760px); --bar-h: 88px; --gutter: 40px; }
+  :root { --container: min(100vw - 80px, 1600px); --container-wide: min(100vw - 80px, 1760px); --gutter: 40px; }
 }
 
 /* 訊息泡泡色票（02 的角色色：朋友梨黃、twin 藍、人類薄荷） */

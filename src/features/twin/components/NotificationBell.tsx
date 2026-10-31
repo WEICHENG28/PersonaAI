@@ -73,13 +73,16 @@ function LiveNotificationBell() {
   )
 }
 
-/** 面板贴在铃铛下方、右缘对齐，并且不超出视窗；视窗大小改变时重算。 */
+/** 面板貼在鈴鐺下方、右緣對齊，不超出視窗、不蓋住頂欄；視窗大小改變時重算。 */
 function usePanelStyle(anchorRef: RefObject<HTMLElement | null>): CSSProperties | null {
   const [style, setStyle] = useState<CSSProperties | null>(null)
   useLayoutEffect(() => {
     const place = () => {
       const rect = anchorRef.current?.getBoundingClientRect()
-      if (rect) setStyle(panelPlacement(rect, window.innerWidth))
+      if (!rect) return
+      // topbar 的撕紙下緣在 topbar__inner 上，量它的 bottom 才是頂欄真正的下緣
+      const barRect = anchorRef.current?.closest('.topbar')?.getBoundingClientRect()
+      setStyle(panelPlacement(rect, window.innerWidth, barRect?.bottom ?? 0))
     }
     place()
     window.addEventListener('resize', place)
