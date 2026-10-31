@@ -646,9 +646,10 @@
   font-weight: 500;
   box-shadow: 0 4px 16px color-mix(in oklab, var(--color-ink) 24%, transparent);
   pointer-events: none;
-  animation: toast-in 0.2s var(--ease-snap);
+  /* 注意：不能用 toast-in——layout.css 的通知面板也用这个名字，同名 keyframes 会互相覆盖 */
+  animation: app-toast-in 0.2s var(--ease-snap);
 }
-@keyframes toast-in {
+@keyframes app-toast-in {
   from { opacity: 0; translate: -50% -8px; }
   to   { opacity: 1; translate: -50% 0; }
 }
