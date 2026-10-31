@@ -9,6 +9,7 @@ import { usePrivacyCheck } from '@components/PrivacyWarning'
 import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
+import { LoadingDots } from '@components/ui/LoadingDots'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
 import { useLobbyInvite } from '@features/social/components/LobbyInvite'
 import {
@@ -190,7 +191,7 @@ export function FriendPage() {
           {isHttpMode ? (
             <>
               {httpMessages.length === 0 && !httpTyping && (
-                <p className="empty">{t('friend.empty')}</p>
+                <LoadingDots label={t('friend.loading')} />
               )}
               {httpMessages.map((m) => (
                 <ChatBubble key={m.id} speaker={m.role === 'user' ? 'human' : 'friend'}>
@@ -206,7 +207,9 @@ export function FriendPage() {
             </>
           ) : (
             <>
-              {s.friendMessages.length === 0 && <p className="empty">{t('friend.empty')}</p>}
+              {s.friendMessages.length === 0 && !s.friendTyping && (
+                <LoadingDots label={t('friend.loading')} />
+              )}
               {s.friendMessages.map((m) => (
                 <ChatBubble key={m.id} speaker={m.speaker}>
                   {m.text}

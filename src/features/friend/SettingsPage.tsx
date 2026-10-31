@@ -157,10 +157,10 @@ export function SettingsPage() {
           />
         </Card>
 
-        {/* 主动频率 */}
+        {/* 主动频率：三颗按钮固定同一行（手机也并排） */}
         <Card>
           <CardHead title={t('settings.proactive')} />
-          <div className="gear-opts">
+          <div className="gear-opts gear-opts--row">
             {(['off', 'low', 'normal'] as const).map((v) => (
               <button key={v} className={`gear-opt ${proactive === v ? 'is-on' : ''}`} onClick={() => setProactive(v)} disabled={saving}>
                 <strong>{v === 'off' ? t('settings.proactiveOff') : v === 'low' ? t('settings.proactiveLow') : t('settings.proactiveNormal')}</strong>
