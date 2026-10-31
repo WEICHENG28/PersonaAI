@@ -25,7 +25,7 @@ export interface ChatRoomView {
   conversationId: string
   status: ConversationStatus
   me: { userId: string; controller: Controller }
-  other: { userId: string; name: string; controller: Controller }
+  other: { userId: string; name: string; controller: Controller; isSeed?: boolean }
   messages: ChatMessageView[]
 }
 
@@ -61,6 +61,8 @@ export interface NewHumanMessage {
 export interface ChatRoomStore {
   getConversation(id: string): Promise<ConversationRow | null>
   getDisplayName(userId: string): Promise<string>
+  /** 對方是不是示範用戶（虛構角色）；沒實作就不標。 */
+  isSeedUser?(userId: string): Promise<boolean>
   /** 依時間由舊到新。 */
   listMessages(conversationId: string): Promise<ChatMessageView[]>
   insertHumanMessage(row: NewHumanMessage): Promise<ChatMessageView>
@@ -132,11 +134,12 @@ export function toVerdictValue(raw: string): VerdictValue {
 
 async function getChatRoom(deps: ChatRoomDeps, conversationId: string, userId: string): Promise<ChatRoomView> {
   const { conv, me, other } = await loadSides(deps.store, conversationId, userId)
-  const [name, messages] = await Promise.all([
+  const [name, messages, isSeed] = await Promise.all([
     deps.store.getDisplayName(other.userId),
     deps.store.listMessages(conversationId),
+    deps.store.isSeedUser?.(other.userId),
   ])
-  return { conversationId: conv.id, status: conv.status, me: { ...me }, other: { ...other, name }, messages }
+  return { conversationId: conv.id, status: conv.status, me: { ...me }, other: { ...other, name, ...(isSeed === undefined ? {} : { isSeed }) }, messages }
 }
 
 async function getChatStatus(deps: ChatRoomDeps, conversationId: string, userId: string): Promise<ChatStatusView> {

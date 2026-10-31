@@ -20,6 +20,7 @@ import {
   verdictText,
 } from './chatRoomView'
 import { usePrivacyCheck } from '@components/PrivacyWarning'
+import { PersonKindChip } from '@components/PersonKindChip'
 import { HandoffCard } from './HandoffCard'
 import { HANDOFF_TEXT, readHandoffState, takeoverBlockOf } from './handoffView'
 import { useChatRoom, type ChatRoomState } from './useChatRoom'
@@ -97,7 +98,10 @@ function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
     <div className="page">
       {privacy.dialog}
       <div className="page-head">
-        <h1>{t('proxyChat.withWho', { name: room.other.name })}</h1>
+        <h1>
+          {t('proxyChat.withWho', { name: room.other.name })} <PersonKindChip isSeed={room.other.isSeed} />
+        </h1>
+        {room.other.isSeed && <p className="hint-inline">对方是示范用户（虚构角色），由 AI 扮演；接手聊天也不会有真人回复。</p>}
         <p>
           {chip && <Chip tone="coral">{chip}</Chip>} {!chip && anyTwin && <Chip tone="ink">{t('common.aiChatting')}</Chip>}
         </p>

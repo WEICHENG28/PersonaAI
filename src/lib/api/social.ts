@@ -94,6 +94,8 @@ export interface HistoryEntry {
   id: string
   target_user_id: string
   target_name: string
+  /** 對方是示範用戶（虛構角色）。 */
+  target_is_seed?: boolean
   conversation_id: string
   origin: 'auto' | 'manual'
   result: AttemptResult
