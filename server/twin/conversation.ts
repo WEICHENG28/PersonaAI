@@ -22,9 +22,11 @@ const END_REASON_TEXT: Record<EndReason, string> = {
   unsuitable: '判断不太合适，礼貌结束',
   done: '任务完成，结束代聊',
   declined: '对方婉拒，礼貌结束',
+  anomaly: '收到言行异常提醒，选择结束对话',
 }
 
-export type EndReason = 'unsuitable' | 'done' | 'declined'
+/** 前三種是跨線契約（server/contracts/twin.ts）的；anomaly 只有 C8 內部用。 */
+export type EndReason = 'unsuitable' | 'done' | 'declined' | 'anomaly'
 
 export interface EndOptions {
   /** 指定由誰的分身收尾（例如 C7 拒絕時由拒絕的人）；不是分身時照輪到的順序。 */

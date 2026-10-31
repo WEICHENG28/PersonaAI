@@ -36,7 +36,14 @@ function score(perspective: string, round: number, direction: number, verdict: S
   return { perspective, round, direction_score: direction, verdict }
 }
 
-function harness(opts: { conv?: ConversationRow | null; scores?: (ScoreRow & { perspective: string })[]; reply?: TwinReplyFn } = {}) {
+function harness(
+  opts: {
+    conv?: ConversationRow | null
+    scores?: (ScoreRow & { perspective: string })[]
+    reply?: TwinReplyFn
+    afterHumanMessage?: (conversationId: string, userId: string) => void
+  } = {},
+) {
   const row = opts.conv === undefined ? conv() : opts.conv
   const messages: ChatMessageView[] = [
     { id: 'm1', conversation_id: 'conv-1', sender_id: ME, is_ai: true, guard_rewritten: false, content: '你好呀', created_at: '2026-10-30T10:00:01.000Z' },
@@ -68,7 +75,7 @@ function harness(opts: { conv?: ConversationRow | null; scores?: (ScoreRow & { p
         .slice(0, limit)
         .map(({ round, direction_score, verdict }) => ({ round, direction_score, verdict })),
   }
-  const api = createChatRoomApi({ store, twinReply, writeLog: async (e) => void logs.push(e) })
+  const api = createChatRoomApi({ store, twinReply, writeLog: async (e) => void logs.push(e), afterHumanMessage: opts.afterHumanMessage })
   return { api, messages, logs, twinReply }
 }
 
@@ -170,6 +177,31 @@ describe('sendHumanMessage', () => {
     expect(twinReply).toHaveBeenCalledWith('conv-1', AN)
     expect(result).toMatchObject({ replied: true, replyFailed: false })
     expect(messages.at(-1)).toMatchObject({ sender_id: AN, is_ai: true })
+  })
+
+  it('C8：本人訊息存好後通知言行異常檢查（對話、發言者）', async () => {
+    const after = vi.fn()
+    const { api, messages } = harness({ conv: conv({ side_a_controller: 'human' }), afterHumanMessage: after })
+    await api.sendHumanMessage('conv-1', ME, '你好')
+    expect(after).toHaveBeenCalledWith('conv-1', ME)
+    expect(messages.some((m) => m.content === '你好' && !m.is_ai)).toBe(true)
+  })
+
+  it('C8：檢查丟錯也不影響發言與分身回覆', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const after = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const { api } = harness({ conv: conv({ side_a_controller: 'human' }), afterHumanMessage: after })
+    await expect(api.sendHumanMessage('conv-1', ME, '你好')).resolves.toMatchObject({ replied: true })
+    spy.mockRestore()
+  })
+
+  it('C8：沒有寫入（我方還是分身）就不檢查', async () => {
+    const after = vi.fn()
+    const { api } = harness({ afterHumanMessage: after })
+    await expect(api.sendHumanMessage('conv-1', ME, '你好')).rejects.toMatchObject({ status: 409 })
+    expect(after).not.toHaveBeenCalled()
   })
 
   it('我方還是分身 → 409，不寫入', async () => {

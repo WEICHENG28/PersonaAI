@@ -16,6 +16,9 @@ import { llmJson } from '../lib/llm'
 import { supabaseNotificationStore } from '../twin/notificationStore'
 import { createNotificationApi, type NotificationApi } from '../twin/notifications'
 import { createRequestHumanApi, humanResponseSchema, type RequestHumanApi } from '../twin/requestHuman'
+import { anomalyChoiceSchema, createAnomalyApi, type AnomalyApi } from '../twin/anomaly'
+import { supabaseAnomalyStore } from '../twin/anomalyStore'
+import { getShareableProfile, getStyleProfile } from '../contracts/friend'
 import { createResultApi, type ResultApi } from '../twin/result'
 import { supabaseResultStore } from '../twin/resultStore'
 import { twinReply } from '../twin/twin'
@@ -31,12 +34,14 @@ export interface TwinRouteDeps {
   handoff(): HandoffApi
   requestHuman(): RequestHumanApi
   notifications(): NotificationApi
+  anomaly(): AnomalyApi
   resolveUserId: ResolveUserId
 }
 
 const idSchema = z.uuid()
 const NOTIFICATION_NOT_FOUND = '找不到这则通知'
-const respondBodySchema = z.object({ response: humanResponseSchema })
+// request_human：now／later／decline；anomaly（C8）：continue／end／report
+const respondBodySchema = z.object({ response: z.union([humanResponseSchema, anomalyChoiceSchema]) })
 
 /** Bearer JWT → auth 用戶 → users.id。 */
 async function resolveAppUserId(c: Context): Promise<string | Response> {
@@ -104,12 +109,15 @@ export function createTwinRoutes(deps: TwinRouteDeps): Hono {
     return c.json({ ok: true, data: await deps.notifications().list(userId) })
   })
 
-  // C7 回應請求真人：{ response: 'now' | 'later' | 'decline' }；先確認登入與 id，再看內容
+  // C7 回應請求真人 { response: 'now' | 'later' | 'decline' }；C8 回應言行異常提醒 { response: 'continue' | 'end' | 'report' }。
+  // 先確認登入與 id，再看內容；通知類型和回應不合時由各自的函式回 400
   routes.post('/notifications/:id/respond', (c) =>
     respond(c, deps, async (id, userId) => {
       const body = respondBodySchema.safeParse(await c.req.json().catch(() => null))
-      if (!body.success) throw new ChatRoomError('请选择现在聊、稍后聊或拒绝', 400)
-      return deps.requestHuman().respond(id, userId, body.data.response)
+      if (!body.success) throw new ChatRoomError('请选择一个选项', 400)
+      const choice = anomalyChoiceSchema.safeParse(body.data.response)
+      if (choice.success) return deps.anomaly().respond(id, userId, choice.data)
+      return deps.requestHuman().respond(id, userId, humanResponseSchema.parse(body.data.response))
     }, NOTIFICATION_NOT_FOUND),
   )
 
@@ -130,12 +138,35 @@ let handoffApi: HandoffApi | null = null
 let requestHumanApi: RequestHumanApi | null = null
 let notificationApi: NotificationApi | null = null
 let conversationApi: ConversationApi | null = null
+let anomalyApi: AnomalyApi | null = null
+
+const getConversationApi = (): ConversationApi => (conversationApi ??= createConversationApi(defaultConversationDeps()))
+
+const getAnomalyApi = (): AnomalyApi =>
+  (anomalyApi ??= createAnomalyApi({
+    store: supabaseAnomalyStore(),
+    getShareableProfile,
+    getStyleProfile,
+    llmJson,
+    writeLog,
+    endConversation: (id, closerUserId) => getConversationApi().endConversation(id, 'anomaly', { closerUserId }),
+    now: () => new Date(),
+    minMessages: CONFIG.ANOMALY_MIN_MESSAGES,
+    checkEvery: CONFIG.ANOMALY_CHECK_EVERY,
+  }))
 
 const getHandoffApi = (): HandoffApi =>
   (handoffApi ??= createHandoffApi({ store: supabaseHandoffStore(), llmJson, writeLog }))
 
 export const twinRoutes = createTwinRoutes({
-  chatRoom: () => (chatRoomApi ??= createChatRoomApi({ store: supabaseChatRoomStore(), twinReply, writeLog })),
+  chatRoom: () =>
+    (chatRoomApi ??= createChatRoomApi({
+      store: supabaseChatRoomStore(),
+      twinReply,
+      writeLog,
+      // C8：每則本人訊息後背景檢查言行異常，不擋發言
+      afterHumanMessage: (id, userId) => void getAnomalyApi().checkAfterHumanMessage(id, userId),
+    })),
   result: () =>
     (resultApi ??= createResultApi({
       store: supabaseResultStore(),
@@ -158,13 +189,13 @@ export const twinRoutes = createTwinRoutes({
           content,
         })
       },
-      endConversation: (id, reason, closerUserId) =>
-        (conversationApi ??= createConversationApi(defaultConversationDeps())).endConversation(id, reason, { closerUserId }),
+      endConversation: (id, reason, closerUserId) => getConversationApi().endConversation(id, reason, { closerUserId }),
       writeLog,
       schedule: (ms, run) => void setTimeout(run, ms),
       now: () => new Date(),
       seedAutoResponse: CONFIG.SEED_AUTO_RESPONSE,
     })),
+  anomaly: getAnomalyApi,
   notifications: () => (notificationApi ??= createNotificationApi({ store: supabaseNotificationStore(), now: () => new Date() })),
   resolveUserId: resolveAppUserId,
 })
