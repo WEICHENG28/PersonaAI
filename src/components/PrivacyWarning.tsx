@@ -53,9 +53,15 @@ interface DialogProps {
 
 function PrivacyWarningDialog({ hits, audience, onCancel, onConfirm }: DialogProps) {
   useEffect(() => {
+    // 等這次按鍵事件跑完才把焦點移到「返回修改」：在輸入框按 Enter 跳出視窗時，
+    // 同一次 Enter 若落在已聚焦的按鈕上會直接觸發它，視窗一閃就關掉（看起來像 Enter 沒反應）
+    const focusTimer = window.setTimeout(() => document.getElementById('privacy-warning-back')?.focus(), 0)
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.clearTimeout(focusTimer)
+      window.removeEventListener('keydown', onKey)
+    }
   }, [onCancel])
 
   return (
@@ -85,7 +91,7 @@ function PrivacyWarningDialog({ hits, audience, onCancel, onConfirm }: DialogPro
           </ul>
         </div>
         <footer className="modal__foot">
-          <Button autoFocus onClick={onCancel}>
+          <Button id="privacy-warning-back" onClick={onCancel}>
             返回修改
           </Button>
           <Button variant="secondary" onClick={onConfirm}>

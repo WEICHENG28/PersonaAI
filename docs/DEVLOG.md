@@ -313,6 +313,14 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜修正：隱私警告按 Enter 一閃就關｜Peter（AI 協助）
+- **問題**：在輸入框按 Enter，警告視窗跳出後立刻被同一次 Enter 觸發「返回修改」關掉，看起來像 Enter 沒反應（按送出按鈕正常）。
+- **修正**：「返回修改」改成等這次按鍵事件跑完（setTimeout 0）才取得焦點，不用 autoFocus。三個聊天輸入框都靠這個元件，一起修好。
+- **改了哪些檔案**：`src/components/PrivacyWarning.tsx`。
+- **驗證**：`tsc -b`、vitest、build；畫面請 Peter 在瀏覽器確認（這台無頭 Chrome 無法截圖）。
+
+---
+
 ### 2026-10-31｜送出前隱私警告｜Peter（AI 協助）
 - **做了什麼**：和真人聊天（http 的 `LiveChatRoom`、mock 接手後的 `ProxyChatPage`）和阿澈聊天（`FriendPage`）按送出前先檢查；有微信號／QQ 等帳號、手機號、座機、身份證號、地址、email、網址、銀行卡號、密碼／驗證碼、「加我微信」時，跳出紅色警告視窗（偵測到什麼、誰會看到、防詐提醒），選「返回修改」或「我确定，仍要发送」。只提醒不擋。
 - **怎麼做**：C2 隱私守門的規則（`maskByRules`）原封不動搬到 `src/lib/privacy/rules.ts`，前後端共用一套；`server/twin/guard.ts` 改成從那裡 import 並 re-export（行為不變，C 的 59 則測試照過）。警告另外多認銀行卡號、密碼／驗證碼、「加我微信」，只用在警告、不影響 C2 遮蔽。元件 `src/components/PrivacyWarning.tsx`（`usePrivacyCheck('human'|'friend')`）。
