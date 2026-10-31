@@ -18,10 +18,13 @@
   padding: var(--space-md) var(--gutter) var(--space-2xl);
 }
 
-/* 短页（登录）：内容不足一屏时垂直置中，永不滚动 */
+/* 短页（登录）：内容不足一屏时垂直置中，永不滚动
+ * 用 grid 单行 1fr 轨道置中（不能 place-content）：轨道高 = 可视区全高，
+ * 子页 .login-page 的 height:100% 才有确定高度可解，chromabot 头像栏才能占满整屏 */
 .app-main.page-center {
   display: grid;
-  place-content: center;
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
   /* 固定视口高度（navbar 之下），超出内容裁切 → 登录页不可滚动 */
   height: calc(100svh - var(--bar-h));
   box-sizing: border-box;
