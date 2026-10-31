@@ -99,11 +99,8 @@ export function SettingsPage() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{t('settings.title')}</h1>
-        {saving && <span className="hint-inline">保存中…</span>}
-        {saveError && <span className="hint-inline" style={{ color: 'var(--c-err)' }}>{saveError}</span>}
-      </div>
+      {saving && <span className="hint-inline">保存中…</span>}
+      {saveError && <span className="hint-inline" style={{ color: 'var(--c-err)' }}>{saveError}</span>}
 
       <div className="stack">
         {/* 桌机双栏：左＝社交 Agent/档位/频率，右＝dev/时间/登出 */}

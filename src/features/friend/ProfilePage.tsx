@@ -110,11 +110,6 @@ function HttpProfileSection({ memoriesSection }: { memoriesSection: React.ReactN
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{t('profile.title')}</h1>
-        <p>{t('profile.shareableNote')}</p>
-      </div>
-
       <div className="profile-layout">
         <div className="stack">
           {/* 对外档案 */}
@@ -317,9 +312,6 @@ function MockProfileSection() {
   if (!s.profileDraftReady && !s.memories.length && !s.profile.interests.length) {
     return (
       <div className="page">
-        <div className="page-head">
-          <h1>{t('profile.title')}</h1>
-        </div>
         <p className="empty">{t('profile.comingSoon')}</p>
       </div>
     )
@@ -338,11 +330,6 @@ function MockProfileSection() {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{t('profile.title')}</h1>
-        <p>{t('profile.shareableNote')}</p>
-      </div>
-
       {/* 桌机双栏：档案+说话风格（左）／它记得的事（右） */}
       <div className="profile-layout">
         <div className="stack">
