@@ -1,10 +1,8 @@
 /* ── 各画面专属样式 ── */
 
 /* ── 登录页
- * 无滚动：.page-center 已做 100svh 置中，.login-page 不设固定高度
- * chromabot 占满整栏高度（左（桌机）／上（手机））
- * 桌机：[左] chromabot  [右] PersonaAI 标题 + 副标题 + 登录卡
- * 手机：chromabot 上方占满剩余空间 → 登录卡 → 副标题 */
+ * 桌机：[左] chromabot（scale 1.5×）  [右] 登录卡
+ * 手机：chromabot 铺满全屏背景，登录卡 fixed 贴底（类似 bottom sheet） */
 .login-page {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
@@ -14,15 +12,16 @@
   margin-inline: auto;
 }
 
-/* 头像容器：150svh 高（bot 超出屏幕裁切），两端一致 */
+/* 头像容器：占满整栏高度，canvas 在其中 scale(1.5) 溢出裁切 */
 .login-avatar-area {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 150svh;
+  height: 100svh;
   overflow: hidden;
 }
-.login-bot { display: block; width: 100%; height: 100%; }
+/* chromabot 放大 1.5× */
+.login-bot { display: block; width: 100%; height: 100%; transform: scale(1.5); transform-origin: center center; }
 .login-bot canvas { display: block; }
 
 .login-right {
@@ -51,34 +50,39 @@
   text-align: left;
 }
 
-/* ── 手机：单栏，无滚动设计 ── */
+/* ── 手机：chromabot 铺满全屏，登录卡 fixed 贴底 ── */
 @media (max-width: 64rem) {
   .login-page {
-    grid-template-columns: 1fr;
-    width: min(400px, 100%);
-    gap: 0;
-    align-items: start;
+    display: block; /* 脱离 grid，头像区自然铺满 */
+    width: 100%;
   }
   .login-avatar-area {
-    /* 手机同样 150svh，登录卡覆盖底部 */
-    height: 150svh;
+    /* 铺满整个视口（含导航栏后的剩余高度） */
+    position: fixed;
+    inset: 0;
+    height: 100svh;
+    z-index: 0;
   }
   .login-right {
-    /* 覆盖头像底部约 2rem，制造层叠感 */
-    margin-top: -2rem;
-    position: relative;
-    z-index: 1;
+    /* 像底部 nav 一样 fixed 贴底，出现在头像前 */
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    padding: var(--space-md) var(--space-md) calc(var(--space-md) + env(safe-area-inset-bottom, 0));
+    background: var(--color-paper);
+    border-top: var(--rule-hair) solid var(--color-rule);
+    box-shadow: 0 -8px 32px color-mix(in oklab, var(--color-ink) 8%, transparent);
+    border-radius: 16px 16px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-top: 0;
   }
-  /* 桌机的品牌区在手机隐藏 */
+  /* 桌机的品牌区 / 副标题在手机不需要 */
   .login-brand { display: none; }
-  /* 手机副标题显示在卡片下方 */
-  .login-sub-mobile {
-    display: block;
-    text-align: center;
-    color: var(--color-muted);
-    font-size: var(--text-sm);
-    padding: var(--space-xs) var(--space-sm);
-  }
+  .login-sub-mobile { display: none; }
 }
 
 .login-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
@@ -163,14 +167,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    /* 150svh：bot 超出列高裁切，与登录页一致 */
-    height: 150svh;
+    align-self: stretch; /* 占满 friend-page 全高 */
+    overflow: hidden;
     width: clamp(360px, 34vw, 640px);
     flex-shrink: 0;
     background: var(--fibre), var(--color-paper-2);
     border-right: var(--rule-hair) solid var(--color-rule);
   }
-  .friend-avatar-rive { display: block; width: 100%; height: 100%; }
+  /* 朋友页 bot 也放大 1.5× */
+  .friend-avatar-rive { display: block; width: 100%; height: 100%; transform: scale(1.5); transform-origin: center center; }
 }
 
 /* Profile 页桌机双栏：档案+风格（左）／记忆（右） */
