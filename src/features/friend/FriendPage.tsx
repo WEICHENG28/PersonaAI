@@ -10,6 +10,7 @@ import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
+import { useLobbyInvite } from '@features/social/components/LobbyInvite'
 import {
   isHttpMode,
   callFriendIntro,
@@ -41,6 +42,8 @@ export function FriendPage() {
 
   // 消息数量用于自动滚动（mock 或 http 模式均适用）
   const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
+  // 聊夠了、對外檔案也夠完整 → 邀請一鍵加入大廳（B 的元件）
+  const lobbyInvite = useLobbyInvite(httpMessages.filter((m) => m.role === 'user').length)
   const chatRef = useAutoScrollBottom<HTMLDivElement>(msgCount)
 
   // http 模式：挂载时拉消息 + 首次见面
@@ -160,6 +163,7 @@ export function FriendPage() {
   return (
     <div className="page friend-page">
       {privacy.dialog}
+      {lobbyInvite}
       {/* 桌机左栏：chromabot 大头像（手机隐藏；占屏幕高度 60%） */}
       <aside className="friend-avatar-col" aria-hidden>
         <RiveAvatar name="chromabot" fill className="friend-avatar-rive" />
