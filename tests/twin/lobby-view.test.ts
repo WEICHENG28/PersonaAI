@@ -1,13 +1,19 @@
 // C9 大廳畫面的純函數：AI 預估一律顯示文字，不顯示數字。
 import { describe, expect, it } from 'vitest'
-import { LOBBY_TEXT, fitFromPercent, fitText } from '../../src/features/twin/components/lobbyView'
+import { LOBBY_TEXT, fitFromPercent, fitText, hasFit } from '../../src/features/twin/components/lobbyView'
 
 describe('大廳 AI 預估文字', () => {
-  it('三級文字；沒有預估時提示先確認檔案', () => {
+  it('三級文字', () => {
     expect(fitText('likely')).toBe('很可能合得来')
     expect(fitText('maybe')).toBe('可以聊聊看')
     expect(fitText('different')).toBe('差异较大')
-    expect(fitText(null)).toBe(LOBBY_TEXT.fitUnknown)
+  })
+
+  it('沒有預估（檔案還沒確認）時畫面整行不顯示，不是改顯示提示文字', () => {
+    expect(hasFit(null)).toBe(false)
+    expect(hasFit('likely')).toBe(true)
+    expect(hasFit('maybe')).toBe(true)
+    expect(hasFit('different')).toBe(true)
   })
 
   it('mock 的 0–100 數字換成同樣的三級，畫面不出現數字', () => {
