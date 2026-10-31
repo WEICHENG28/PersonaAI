@@ -224,6 +224,13 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-31｜AI 朋友頁空狀態改 loading 動畫｜Vincent（AI 協助）｜分支 a/friend-empty-loading
+- **做了什麼**：朋友頁聊天區沒有訊息時，不再顯示「和阿澈打个招呼吧」提示文字，改為三點脈衝 loading 動畫（`<LoadingDots>`，與「我的任務」/「歷史」頁同款）；`friend.empty` 換成 `friend.loading`（aria-label 用）。http 與 mock 兩種模式都改。
+- **為什麼這樣做**：與全站 loading 樣式統一（任務/歷史頁已用同款），避免每頁發明自己的空狀態；動畫也讓「阿澈準備中」的感覺比靜態提示更自然。
+- **改了哪些檔案**：`src/features/friend/FriendPage.tsx`、`messages/strings.json`、`tests/scenario.test.ts`。
+- **踩到的坑／注意事項**：typing 中（`httpTyping`/`s.friendTyping`）會另有 typing-dot 動畫，所以空狀態的 loading 有加 `!typing` 條件，避免同時出現兩組動畫。`LoadingDots` 的 CSS（`.loading-dots`）在 `.page` 內會水平置中，放在 `.chat` 裡也正常。
+- **還沒做完／待辦**：無。
+
 ### 2026-10-31｜手機 AI 朋友頁佈局＋大廳契合度顯示修正｜Vincent（AI 協助）｜分支 a/friend-quality
 - **做了什麼**：
   1. **手機 AI 朋友頁重排**：chromabot 改大圖背景（38svh→下移 6svh），聊天浮層從 26svh 延伸顯示更多訊息；輸入欄改懸浮膠囊卡片（與大廳篩選欄同風格），桌機/手機通用，不再與底欄重疊。
