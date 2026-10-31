@@ -1,25 +1,28 @@
 /* ── 各画面专属样式 ── */
 
 /* ── 登录页
- * 桌机：[左] chromabot 大头像  [右] PersonaAI 标题 + 副标题 + 登录卡
- * 手机：chromabot 上半屏 → 登录卡（稍微遮住头像底部）→ 副标题
- * 不需要滚动：移除冗余 padding，手机限制头像高度 */
+ * 无滚动：.page-center 已做 100svh 置中，.login-page 不设固定高度
+ * chromabot 占屏幕高度 60%（左（桌机）／上（手机））
+ * 桌机：[左] chromabot  [右] PersonaAI 标题 + 副标题 + 登录卡
+ * 手机：chromabot 上方 60svh → 登录卡 → 副标题 */
 .login-page {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   align-items: center;
   gap: var(--space-2xl);
-  width: min(920px, 100%);
+  width: min(980px, 100%);
   margin-inline: auto;
-  padding: var(--space-lg) var(--space-md);
 }
 
+/* 头像容器：高度由屏幕决定（60svh），宽度自适应 */
 .login-avatar-area {
   display: flex;
   justify-content: center;
   align-items: center;
+  height: 60svh;
+  overflow: hidden;
 }
-.login-bot { display: block; }
+.login-bot { display: block; width: 100%; height: 100%; }
 .login-bot canvas { display: block; }
 
 .login-right {
@@ -53,18 +56,12 @@
   .login-page {
     grid-template-columns: 1fr;
     width: min(400px, 100%);
-    padding: 0 var(--space-md) var(--space-lg);
     gap: 0;
     align-items: start;
   }
   .login-avatar-area {
-    /* 限制高度不超过屏幕 45%，底部裁切留给卡片覆盖 */
-    height: min(260px, 45svh);
-    overflow: hidden;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding-top: var(--space-sm);
+    /* chromabot 占屏幕高度 60%；底部裁切留给卡片覆盖 */
+    height: 60svh;
   }
   .login-right {
     /* 覆盖头像底部约 2rem，制造层叠感 */
@@ -166,12 +163,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 280px;
+    /* chromabot 占屏幕高度 60%：栏高固定，canvas 填满 */
+    height: 60svh;
+    width: 320px;
     flex-shrink: 0;
+    margin-block: auto;
     background: var(--fibre), var(--color-paper-2);
     border-right: var(--rule-hair) solid var(--color-rule);
   }
-  .friend-avatar-rive { display: block; }
+  .friend-avatar-rive { display: block; width: 100%; height: 100%; }
 }
 
 /* Profile 页桌机双栏：档案+风格（左）／记忆（右） */

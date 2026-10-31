@@ -139,9 +139,9 @@ export function FriendPage() {
 
   return (
     <div className="page friend-page">
-      {/* 桌机左栏：chromabot 大头像（手机隐藏） */}
+      {/* 桌机左栏：chromabot 大头像（手机隐藏；占屏幕高度 60%） */}
       <aside className="friend-avatar-col" aria-hidden>
-        <RiveAvatar name="chromabot" size={260} className="friend-avatar-rive" />
+        <RiveAvatar name="chromabot" fill className="friend-avatar-rive" />
       </aside>
 
       {/* 聊天栏（无容器，直接融入页面；输入框固定底部） */}
