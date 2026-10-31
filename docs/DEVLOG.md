@@ -26,6 +26,14 @@
 
 ## 共用與決策
 
+### 2026-10-31｜修正：「我的档案」外層「保存并确认对外使用」按了沒反應｜Peter（AI 協助）
+- **問題**：非編輯狀態的「保存并确认对外使用」按鈕接到 `extract`（重新撷取），按了只會重產草稿、`confirmed` 一直是 false，畫面也沒有任何提示。Peter 實測卡住，社交 Agent 開不了、任務無法開始。
+- **修正**：`ProfilePage.tsx` 新增 `confirmCurrent`，該按鈕改呼叫 `saveShareable(view.shareable)`（PUT /api/profile/shareable）；失敗會顯示錯誤。編輯表單裡的保存本來就是對的，未改。
+- **給 A（Vincent）**：這是你的頁面，因為卡住全隊測試由 B 的 AI 先修；給你的 prompt 第 1 點的按鈕部分已完成，「即将上线」標籤顏色與文字仍請你處理。
+- **驗證**：`tsc -b`、vitest 597/597、`npm run build`。
+
+---
+
 ### 2026-10-31｜修正：Vercel 上 /api 全部 FUNCTION_INVOCATION_FAILED｜Peter（AI 協助）
 - **問題**：#89 部署後，Vercel 上連 `/api/health` 都回 500（`FUNCTION_INVOCATION_FAILED`）。Vercel 把每個 TS 檔各自編成 Node ESM，ESM 的相對 import 必須寫副檔名，`import { app } from '../server/app'` 會找不到模組（本機用 tsc 照 Vercel 方式編譯後實際重現：`ERR_MODULE_NOT_FOUND ... server\app`）。本機的 tsx／vitest／Vite 會自動補，所以一直沒發現。
 - **修正**：`server/`、`shared/`、`api/` 所有相對 import／export 補上 `.js`（例如 `'./routes/friend'` → `'./routes/friend.js'`、資料夾 → `'/index.js'`），共 64 個檔案、259 處，**只改 import 路徑、沒改任何邏輯**。TypeScript、tsx、vitest、Vite 都認得 `.js` 對到 `.ts`。新增測試 `tests/social/esm-imports.test.ts`：之後有人寫了沒副檔名的相對 import，`npm test` 會失敗並列出位置。

@@ -79,6 +79,20 @@ function HttpProfileSection({ memoriesSection }: { memoriesSection: React.ReactN
     }
   }
 
+  /** 確認目前的草稿可以對外使用（PUT /api/profile/shareable，設 shareable_confirmed = true）。 */
+  const confirmCurrent = async () => {
+    if (!view?.shareable) return
+    setBusy(true)
+    setError(null)
+    try {
+      setView(await saveShareable(view.shareable))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '确认失败，再试一次？')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const extract = async () => {
     setBusy(true)
     setError(null)
@@ -189,7 +203,8 @@ function HttpProfileSection({ memoriesSection }: { memoriesSection: React.ReactN
                     {busy ? t('login.loading') : '重新撷取'}
                   </Button>
                   {!view?.confirmed && (
-                    <Button small onClick={busy ? undefined : extract} disabled={busy}>
+                    // 之前誤接到 extract（重新撷取），按了只會重產草稿、永遠確認不了
+                    <Button small onClick={busy ? undefined : confirmCurrent} disabled={busy}>
                       {t('profile.saveConfirm')}
                     </Button>
                   )}
