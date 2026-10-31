@@ -224,6 +224,16 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-31｜手機 AI 朋友頁佈局＋大廳契合度顯示修正｜Vincent（AI 協助）｜分支 a/friend-quality
+- **做了什麼**：
+  1. **手機 AI 朋友頁重排**：chromabot 改大圖背景（38svh→下移 6svh），聊天浮層從 26svh 延伸顯示更多訊息；輸入欄改懸浮膠囊卡片（與大廳篩選欄同風格），桌機/手機通用，不再與底欄重疊。
+  2. **大廳契合度預估顯示修正**：檔案還沒確認（`fit` 為 null）時**整行不顯示**（原本顯示「确认档案后才能预估」提示文字）；有預估時加 `data-fit` 屬性給 CSS 上色（「差异较大」可做深橘）。`fitText` 簽名收窄成只接受 `FitLevel`，新增 `hasFit()` 型別守衛。
+  3. 頂欄 88px 全站套用、歷史/任務頁三點脈衝載入動畫、登入/朋友頁禁滾動等 UI 修正（見上方各 commit）。
+- **為什麼這樣做**：契合度預估是 AI 加值資訊，沒有預估時顯示教學提示反而讓卡片變吵；隱藏後卡片更乾淨，預估出現時才有「AI 看完雙方檔案給的判斷」的感覺。用 `data-fit` 而不是 className 拼接，讓 CSS 端用屬性選擇器統一上色。
+- **改了哪些檔案**：`src/features/twin/LobbyPage.tsx`、`src/features/twin/components/LobbyCard.tsx`、`src/features/twin/components/lobbyView.ts`、`tests/twin/lobby-view.test.ts`（本筆）；`src/theme/pages.css`（手機佈局各 commit）。
+- **踩到的坑／注意事項**：mock 模式的 `fitPredict` 是 0–100 數字，轉三級文字後同樣走 `data-fit`；`hasFit` 是 type guard，`fitText(null)` 編譯期就會報錯，不用再防 null。
+- **還沒做完／待辦**：`data-fit="different"` 的深橘色樣式尚未加到 `pages.css`（目前只有屬性，CSS 端可後續接）。
+
 ### 2026-10-31｜02 概念調整（分身→AI 人設）＋落地頁組件化重構｜Vincent（AI 協助）｜分支 a/friend-quality
 - **做了什麼**：
   1. **`docs/02` 概念轉向**：對外角色從「分身」（AI 從你的聊天推斷你）改為「**AI 人設**」（用戶自己編寫、想怎麼被認識就怎麼寫）。改了 §1 原則、§2 角色表（含新增「人設不是被解讀的你」與誠實底線：可美化表達、不編造事實）、§3 流程圖與對話組合、§4 Agent 分工（分身 Agent→人設 Agent）、F3 整節重寫（人設編寫＋起草輔助）、F4/F5/F7/F8、§7 隱私分層（`shareable_profile`＋人設）、§8 待討論（加人設編輯器欄位一條）。
