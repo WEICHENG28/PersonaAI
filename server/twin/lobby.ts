@@ -3,8 +3,8 @@
 // 卡片內容來自 user_profiles.card；為 null（或格式不對）時用 Prompt 10 產生並快取。
 // AI 預估只回文字等級（很可能合得來／可以聊聊看／差異較大），不回相似度數字、向量或對外檔案以外的資料。
 import { z } from 'zod'
-import type { AgentTask, LobbyCandidate, LobbyQuery, Purpose, ShareableProfile, StartConversationInput } from '../../shared/types'
-import type { LlmJsonOptions } from '../lib/llm'
+import type { AgentTask, LobbyCandidate, LobbyQuery, Purpose, ShareableProfile, StartConversationInput } from '../../shared/types.js'
+import type { LlmJsonOptions } from '../lib/llm/index.js'
 import {
   CARD_HEADLINE_CAP,
   CARD_STYLE_CAP,
@@ -14,9 +14,9 @@ import {
   cardUserMessage,
   lobbyCardSchema,
   type LobbyCard,
-} from '../prompts/10_card'
-import { ChatRoomError } from './chatRoom'
-import { askAssistant, type AssistantView } from './lobbyAssistant'
+} from '../prompts/10_card.js'
+import { ChatRoomError } from './chatRoom.js'
+import { askAssistant, type AssistantView } from './lobbyAssistant.js'
 
 export type FitLevel = 'likely' | 'maybe' | 'different'
 

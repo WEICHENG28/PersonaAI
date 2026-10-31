@@ -1,8 +1,8 @@
 // B6｜歷史嘗試＋重啟對話（docs/07B 的 B6、02 F8）。擁有者：B。不回傳任何分數。
-import type { ReasonType, StartConversationInput } from '../../shared/types'
-import type { AgentStore, HistoryItem } from './agentStore'
-import { writeLog } from '../lib/log'
-import { TaskError } from './task'
+import type { ReasonType, StartConversationInput } from '../../shared/types.js'
+import type { AgentStore, HistoryItem } from './agentStore.js'
+import { writeLog } from '../lib/log.js'
+import { TaskError } from './task.js'
 
 const HISTORY_LIMIT = 50
 const INSIGHT_MIN = 3

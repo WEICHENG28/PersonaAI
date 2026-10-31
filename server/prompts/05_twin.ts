@@ -1,8 +1,8 @@
 // Prompt 5｜分身（docs/07C 第 3 節，MODEL_CHAT，temperature 0.8）。擁有者：C。
 // 本文照 07C 逐條翻成簡體，並加上「用简体中文回复」。只用對外檔案與說話風格，不放 agent_profile。
 import { z } from 'zod'
-import type { ShareableProfile, StyleProfile } from '../../shared/types'
-import { shareableToText } from '../twin/seed'
+import type { ShareableProfile, StyleProfile } from '../../shared/types.js'
+import { shareableToText } from '../twin/seed.js'
 
 export const TWIN_PROMPT_SYSTEM = `你是「{{name}}」的分身，代替 TA 和别人聊天。你是 AI，对方知道这是 AI 代聊。全程只用简体中文，不要用繁体字。
 

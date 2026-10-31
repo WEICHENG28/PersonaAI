@@ -7,18 +7,18 @@
  * API：GET /api/profile（只回 shareable 与确认状态）、PUT /api/profile/shareable、POST /api/profile/extract。
  */
 import { z } from 'zod'
-import { getServiceClient } from '../lib/supabase'
-import { llmJson, embed } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { CONFIG } from '../lib/config'
+import { getServiceClient } from '../lib/supabase.js'
+import { llmJson, embed } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { CONFIG } from '../lib/config.js'
 import {
   renderProfileSystem,
   profileExtractSchema,
   PROFILE_USER_LINES_LIMIT,
   type ProfileExtract,
-} from '../prompts/03_profile'
-import type { ShareableProfile, AgentProfile } from '../../shared/types'
-import { shareableToSimplified } from '../lib/zh'
+} from '../prompts/03_profile.js'
+import type { ShareableProfile, AgentProfile } from '../../shared/types.js'
+import { shareableToSimplified } from '../lib/zh.js'
 
 export class ProfileError extends Error {
   constructor(message = '档案更新失败，稍后再试') {

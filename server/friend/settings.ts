@@ -3,7 +3,7 @@
  * 讀 / 更新 users 表中的設定欄位（dev_mode、proactive_frequency、social_agent_enabled 等）。
  */
 import { z } from 'zod'
-import { getServiceClient } from '../lib/supabase'
+import { getServiceClient } from '../lib/supabase.js'
 
 // ──────────── Zod schema（PUT /api/settings 的 body）────────────
 

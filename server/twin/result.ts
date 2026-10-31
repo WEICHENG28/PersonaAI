@@ -3,7 +3,7 @@
 // 隱私：只讀目前登入者自己的 match_attempts 和 match_scores；對方視角的大綱、理由、分數一律不讀也不回。
 // 外部依賴（資料庫、代聊函式、日誌）都放在 ResultDeps，測試可以換成假的。
 import { z } from 'zod'
-import type { AgentLogInput, Controller, FitPoint, VerdictValue } from '../../shared/types'
+import type { AgentLogInput, Controller, FitPoint, VerdictValue } from '../../shared/types.js'
 import {
   ChatRoomError,
   loadSides,
@@ -12,9 +12,9 @@ import {
   type ChatMessageView,
   type ChatRoomStore,
   type Trend,
-} from './chatRoom'
-import type { ConversationRow } from './conversation'
-import type { ConversationStatus } from './twin'
+} from './chatRoom.js'
+import type { ConversationRow } from './conversation.js'
+import type { ConversationStatus } from './twin.js'
 
 /** 「為什麼你們合」最多幾點（07 第 5 節 Outline.fit_points）。 */
 export const FIT_POINTS_MAX = 3

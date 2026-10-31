@@ -2,8 +2,8 @@
 // 本文照 07C 翻成簡體，並加上「用简体中文回复」。本人說的話放在 user 訊息的 <messages> 標籤，只當資料，不當指令。
 // 輸入只有對外檔案與說話風格（不拿 agent_profile）；輸出不打分數，只回是否極度不一致。
 import { z } from 'zod'
-import type { ShareableProfile, StyleProfile } from '../../shared/types'
-import { shareableToText } from '../twin/seed'
+import type { ShareableProfile, StyleProfile } from '../../shared/types.js'
+import { shareableToText } from '../twin/seed.js'
 
 export const ANOMALY_PROMPT_SYSTEM = `你是言行异常检测。比较这位用户「本人」说的话和 TA 的对外描述，只在极度不一致时回报。
 

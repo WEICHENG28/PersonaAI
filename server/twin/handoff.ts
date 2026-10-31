@@ -2,15 +2,15 @@
 // POST /api/conversations/:id/takeover：確認是對話一方且我方還是分身 → 我方 controller 改成本人、對話改回 active
 // → Prompt 7 產生接手摘要（只放我方視角的判定）→ 寫入 handoffs → 寫日誌。接手後不再交回分身。
 // 外部依賴（資料庫、LLM、日誌）都放在 HandoffDeps，測試可以換成假的。
-import type { AgentLogInput, VerdictValue } from '../../shared/types'
-import type { LlmJsonOptions } from '../lib/llm'
+import type { AgentLogInput, VerdictValue } from '../../shared/types.js'
+import type { LlmJsonOptions } from '../lib/llm/index.js'
 import {
   EMPTY_HANDOFF_SUMMARY,
   handoffSummarySchema,
   handoffUserMessage,
   renderHandoffSystem,
   type HandoffSummary,
-} from '../prompts/07_handoff'
+} from '../prompts/07_handoff.js'
 import {
   ChatRoomError,
   loadSides,
@@ -19,8 +19,8 @@ import {
   type ChatMessageView,
   type ChatRoomStore,
   type Trend,
-} from './chatRoom'
-import type { ConversationRow } from './conversation'
+} from './chatRoom.js'
+import type { ConversationRow } from './conversation.js'
 
 /** 帶入 Prompt 7 的最近訊息數（MAX_ROUNDS 輪全部放得下）。 */
 export const HANDOFF_TRANSCRIPT_LIMIT = 40

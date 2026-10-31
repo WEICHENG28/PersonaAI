@@ -1,5 +1,5 @@
 // B 線 stub 假資料（server/contracts/social.ts 用）。
-import type { AgentTask, LobbyCandidate } from '../../shared/types'
+import type { AgentTask, LobbyCandidate } from '../../shared/types.js'
 
 export function fakeTask(userId: string, overrides: Partial<AgentTask> = {}): AgentTask {
   return {

@@ -1,8 +1,8 @@
 // C9 大廳的 Supabase 實作（lobby.ts 的 LobbyStore）。擁有者：C。
 // 候選人與排序來自 B 的 searchLobby；這裡只讀卡片快取、自填 MBTI、目的與開關。agent_profile（Big Five）一律不讀。
-import type { Purpose } from '../../shared/types'
-import { getServiceClient } from '../lib/supabase'
-import type { CardRow, LobbyStore } from './lobby'
+import type { Purpose } from '../../shared/types.js'
+import { getServiceClient } from '../lib/supabase.js'
+import type { CardRow, LobbyStore } from './lobby.js'
 
 type Join<T> = T | T[] | null
 

@@ -1,8 +1,8 @@
 // Prompt 13｜隱私守門（docs/07C 第 3 節，MODEL_FAST，temperature 0）。擁有者：C。
 // 本文照 07C 翻成簡體，並加上「用简体中文回复」；另外說明「（已隐藏）」是規則已經遮掉的內容。
 import { z } from 'zod'
-import type { ShareableProfile } from '../../shared/types'
-import { shareableToText } from '../twin/seed'
+import type { ShareableProfile } from '../../shared/types.js'
+import { shareableToText } from '../twin/seed.js'
 
 export const GUARD_PROMPT_SYSTEM = `你是隐私守门 Agent。检查分身准备发出的消息有没有泄露隐私。
 

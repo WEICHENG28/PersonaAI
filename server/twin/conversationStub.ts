@@ -1,9 +1,9 @@
 // C3 代聊函式的記憶體版（原 C0 stub，07C C0 第 2 點）。擁有者：C。
 // 沒設定 Supabase 時（B 的記憶體模式、測試）server/contracts/twin.ts 改用這份：
 // 回傳 server/fixtures 假資料，對話狀態只存在記憶體（server 重啟就清空）。
-import type { ChatMessage, StartConversationInput } from '../../shared/types'
-import { FAKE_MESSAGE_GAP_MS, FAKE_START_TIME, fakeRoundLines, fakeTranscript } from '../fixtures/twin'
-import type { ConversationApi } from './conversation'
+import type { ChatMessage, StartConversationInput } from '../../shared/types.js'
+import { FAKE_MESSAGE_GAP_MS, FAKE_START_TIME, fakeRoundLines, fakeTranscript } from '../fixtures/twin.js'
+import type { ConversationApi } from './conversation.js'
 
 interface StubConversation {
   aUserId: string

@@ -2,13 +2,13 @@
  * A5：模擬下次見面。擁有者：A。
  * 規格：docs/07A_AI朋友線.md「A5」一節。
  */
-import { getServiceClient } from '../lib/supabase'
-import { llmJson } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { getLifeUpdate } from './persona'
-import { listMemories } from './memory'
-import { renderReportSystem, reportReplySchema } from '../prompts/08_report'
-import type { TaskReport } from '../../shared/types'
+import { getServiceClient } from '../lib/supabase.js'
+import { llmJson } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { getLifeUpdate } from './persona.js'
+import { listMemories } from './memory.js'
+import { renderReportSystem, reportReplySchema } from '../prompts/08_report.js'
+import type { TaskReport } from '../../shared/types.js'
 
 export class NextMeetError extends Error {
   constructor(message = '模拟下次见面失败') {

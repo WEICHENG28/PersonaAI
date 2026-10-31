@@ -2,8 +2,8 @@
 // 用 A 的 requireAuth 驗證 Bearer JWT，再用 users.auth_id 對回 users.id。
 // 完全沒接資料庫（記憶體模式）時，用固定的 dev 用戶，方便本機開發與測試。
 import type { Context } from 'hono'
-import { isAuthFailure, requireAuth } from '../lib/auth'
-import { getAdminDb } from './db'
+import { isAuthFailure, requireAuth } from '../lib/auth.js'
+import { getAdminDb } from './db.js'
 
 export const DEV_USER_ID = 'dev-user'
 

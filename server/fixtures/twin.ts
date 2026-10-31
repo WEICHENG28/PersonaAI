@@ -1,6 +1,6 @@
 // C 線假資料：沒設定 Supabase 時代聊函式的記憶體版（server/twin/conversationStub.ts）用。
 // sender_id 用 server/fixtures/seed-users.ts 的 key（seed-an＝小安、seed-zhe＝阿哲）。
-import type { ChatMessage } from '../../shared/types'
+import type { ChatMessage } from '../../shared/types.js'
 
 /** 沒有用 startConversation 建過的對話 ID，getTranscript 回這份。 */
 export const fakeTranscript: ChatMessage[] = [

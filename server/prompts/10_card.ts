@@ -1,7 +1,7 @@
 // Prompt 10｜大廳卡片（docs/07C 第 3 節，MODEL_FAST，temperature 0.3）。擁有者：C。
 // 本文照 07C 翻成簡體，並加上「用简体中文回复」；對外檔案放在 user 訊息的標籤裡，只當資料。
 import { z } from 'zod'
-import type { ShareableProfile } from '../../shared/types'
+import type { ShareableProfile } from '../../shared/types.js'
 
 export const CARD_TEMPERATURE = 0.3
 export const CARD_HEADLINE_MAX = 20

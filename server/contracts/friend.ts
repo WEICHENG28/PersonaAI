@@ -2,9 +2,9 @@
 // A4 起改為真實作：讀 user_profiles（service role）。
 // 沒有 DB 設定（本機測試／mock 模式）時回退 fixtures，
 // 行為與 B 的 searchLobby 記憶體模式一致（server/social/db.ts 的做法）。
-import type { AgentProfile, ShareableProfile, StyleProfile, TaskReport } from '../../shared/types'
-import { getServiceClient } from '../lib/supabase'
-import { fakeAgentProfile, fakeShareable } from '../fixtures/friend'
+import type { AgentProfile, ShareableProfile, StyleProfile, TaskReport } from '../../shared/types.js'
+import { getServiceClient } from '../lib/supabase.js'
+import { fakeAgentProfile, fakeShareable } from '../fixtures/friend.js'
 
 type ProfileCol = 'shareable_profile' | 'agent_profile'
 

@@ -1,12 +1,12 @@
 // B5｜評審：雙方視角各判 JUDGE_RUNS 次取多數（docs/07B 的 B5、02 第 6.2 節）。擁有者：B。
 // 每個視角各自保存大綱與「為什麼你們合」（fit_points），只給該視角的用戶看。
-import type { AgentTask, ChatMessage, Purpose, Evaluation, GuardResult, Outline, ReasonType, ShareableProfile, Verdict, VerdictValue } from '../../shared/types'
-import { CONFIG } from '../lib/config'
-import { LlmError, llmJson } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { judgeSchema, judgeSystem, judgeUser, type JudgeRun } from '../prompts/06_judge'
-import type { AgentStore } from './agentStore'
-import { PURPOSE_LABEL } from './task'
+import type { AgentTask, ChatMessage, Purpose, Evaluation, GuardResult, Outline, ReasonType, ShareableProfile, Verdict, VerdictValue } from '../../shared/types.js'
+import { CONFIG } from '../lib/config.js'
+import { LlmError, llmJson } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { judgeSchema, judgeSystem, judgeUser, type JudgeRun } from '../prompts/06_judge.js'
+import type { AgentStore } from './agentStore.js'
+import { PURPOSE_LABEL } from './task.js'
 
 export interface JudgeContext {
   store: AgentStore

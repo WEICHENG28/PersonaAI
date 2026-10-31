@@ -2,20 +2,20 @@
 // 回應格式：成功 { ok: true, data }，失敗 { ok: false, error: '给用户看的简体中文讯息' }。
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { isAuthFailure, requireAuth } from '../lib/auth'
-import { initUserProfile } from '../lib/profile'
-import { friendChat, friendIntro, getFriendMessages, FriendChatError } from '../friend/chat'
-import { nextMeet, NextMeetError } from '../friend/nextMeet'
-import { deleteMemory, editMemory, listMemories, markNotLikeMe, memoryIdSchema, memoryContentSchema, MemoryError } from '../friend/memory'
-import { getSettings, updateSettings, settingsUpdateSchema, SettingsError } from '../friend/settings'
-import { generateFunLabels, getFunLabels, setUserMbti, userMbtiSchema, FunLabelsError } from '../friend/funLabels'
+import { isAuthFailure, requireAuth } from '../lib/auth.js'
+import { initUserProfile } from '../lib/profile.js'
+import { friendChat, friendIntro, getFriendMessages, FriendChatError } from '../friend/chat.js'
+import { nextMeet, NextMeetError } from '../friend/nextMeet.js'
+import { deleteMemory, editMemory, listMemories, markNotLikeMe, memoryIdSchema, memoryContentSchema, MemoryError } from '../friend/memory.js'
+import { getSettings, updateSettings, settingsUpdateSchema, SettingsError } from '../friend/settings.js'
+import { generateFunLabels, getFunLabels, setUserMbti, userMbtiSchema, FunLabelsError } from '../friend/funLabels.js'
 import {
   extractProfile,
   getShareableView,
   updateShareable,
   shareableUpdateSchema,
   ProfileError,
-} from '../friend/profile'
+} from '../friend/profile.js'
 
 export const friendRoutes = new Hono()
 
@@ -365,7 +365,7 @@ friendRoutes.put('/profile/fun/mbti', async (c) => {
 
 /** auth.users id → public.users id（profile/init 已保证有行）。 */
 async function appUserId(authed: { authId: string }): Promise<string> {
-  const { getServiceClient } = await import('../lib/supabase')
+  const { getServiceClient } = await import('../lib/supabase.js')
   const db = getServiceClient()
   const { data, error } = await db
     .from('users')

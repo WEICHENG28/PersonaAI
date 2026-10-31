@@ -2,8 +2,8 @@
 // 這裡只放流程；連 Supabase 的部分在 scripts/seed.ts，測試時換成假的 SeedDb。
 // 重跑時依 display_name 更新現有種子用戶、不刪除：conversations、messages 指向 users 且沒有 on delete cascade，
 // 而且 B 記錄的已嘗試名單、指定對象用的是 users.id，ID 要保持不變。
-import type { AgentProfile, Preferences, Purpose, ShareableProfile } from '../../shared/types'
-import { SEED_USERS, type SeedUser } from '../fixtures/seed-users'
+import type { AgentProfile, Preferences, Purpose, ShareableProfile } from '../../shared/types.js'
+import { SEED_USERS, type SeedUser } from '../fixtures/seed-users.js'
 
 export interface SeedUserRow {
   display_name: string
