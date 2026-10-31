@@ -14,7 +14,7 @@
 
 /* 每个 section 的主标与副标 */
 .landing h2 {
-  font-size: var(--text-title);
+  font-size: var(--text-2xl);
   margin-bottom: var(--space-xs);
 }
 
@@ -36,7 +36,8 @@
 @media (min-width: 64rem) {
   .landing-hero {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    padding-block: var(--space-3xl);
+    /* 桌機 hero 收緊一點：3xl(96px)→2xl(64px)，其餘區塊間距不變 */
+    padding-block: var(--space-2xl);
   }
 }
 
