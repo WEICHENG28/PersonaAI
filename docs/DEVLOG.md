@@ -328,7 +328,8 @@
 ### 2026-10-31｜回報通知一定會清掉＋任務進度條｜Peter（AI 協助）
 - **通知「阿澈有事想跟你说」點了不消失**：#109 之後打開 AI 朋友頁會讓阿澈說回報並設已讀，但 Prompt 8 失敗時會還原成未讀。改成 AI 失敗就用固定句子回報（`fallbackReportText`：代聊幾場、合適的人名含真人／示范用户），只有寫入訊息失敗才還原。Peter 截圖時 #109 可能還沒部署完，部署後請重新整理再試。
 - **進度條不動**：原本只有「合適人數」一條，合適數為 0 時整個任務都看起來沒動；而且只靠 Realtime，沒開或斷線就不更新。改成兩條（代聊 x / 最多場數、合適 y / 目標），進行中每 10 秒備援重抓；已完成但 0 位合適時說明「已经代聊满 N 场，这次没有遇到合适的」。
-- **改了哪些檔案**：`server/friend/nextMeet.ts`（A，Peter 同意）、`src/features/social/TaskPage.tsx`、`tests/social/report-fallback.test.ts`。
+- **結果頁**：我方契合度改大字，依分數區間上色（`scoreColor`：80+ 深綠、65–79 綠、50–64 琥珀橘、50 以下紅，都用 tokens.css 的顏色）；標題「和 XX 的对话」放大到 `--text-2xl`。
+- **改了哪些檔案**：`server/friend/nextMeet.ts`（A，Peter 同意）、`src/features/social/TaskPage.tsx`、`src/features/twin/components/{LiveResult.tsx,resultView.ts}`（C，Peter 同意）、`tests/social/report-fallback.test.ts`。
 - **驗證**：`tsc -b`、vitest 662/662、build。
 
 ---

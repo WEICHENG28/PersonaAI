@@ -15,3 +15,14 @@ describe('fallbackReportText', () => {
     expect(fallbackReportText({ chats: 6, saved_minutes: 0, suitable: [] })).toContain('换个条件')
   })
 })
+
+import { scoreColor } from '../../src/features/twin/components/resultView'
+
+describe('scoreColor', () => {
+  it('依區間給顏色：80+ 深綠、65–79 綠、50–64 琥珀橘、50 以下紅', () => {
+    expect(scoreColor(92)).toBe('var(--color-success)')
+    expect(scoreColor(70)).toBe('var(--color-leaf)')
+    expect(scoreColor(51)).toBe('var(--color-accent-deep)')
+    expect(scoreColor(30)).toBe('var(--color-error)')
+  })
+})
