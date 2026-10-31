@@ -215,3 +215,14 @@ describe('讓分身去聊', () => {
     await expect(createLobbyApi(d).startTwinChat(ME, ZHE)).rejects.toMatchObject({ name: 'ChatRoomError', status: 404, message: '找不到这个人' })
   })
 })
+
+import { matchesName } from '../../server/twin/lobby'
+
+describe('matchesName：用名字（ID）找人', () => {
+  it('包含就算、不分大小寫；沒填就全部', () => {
+    expect(matchesName('爱喝咖啡的橘猫', '橘猫')).toBe(true)
+    expect(matchesName('C-Test4', 'test')).toBe(true)
+    expect(matchesName('夏夏', '小林')).toBe(false)
+    expect(matchesName('夏夏', undefined)).toBe(true)
+  })
+})

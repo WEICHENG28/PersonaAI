@@ -26,20 +26,20 @@ export function useLobbyCards(filter: LobbyFilterInput): LobbyCardsState {
   const [loadError, setLoadError] = useState<string | null>(null)
   // 筛选换得快时只采用最后一次的结果
   const requestId = useRef(0)
-  const { purpose, q } = filter
+  const { purpose, q, name } = filter
 
   const reload = useCallback(() => {
     const id = ++requestId.current
     setCards(null)
     setLoadError(null)
-    getLobby({ purpose, q })
+    getLobby({ purpose, q, name })
       .then((data) => {
         if (id === requestId.current) setCards(data)
       })
       .catch((err: unknown) => {
         if (id === requestId.current) setLoadError(messageOf(err))
       })
-  }, [purpose, q])
+  }, [purpose, q, name])
 
   useEffect(() => {
     reload()

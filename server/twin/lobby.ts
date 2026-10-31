@@ -43,6 +43,13 @@ export const lobbyQuerySchema = z.object({
     .max(LOBBY_QUERY_MAX)
     .optional()
     .transform((q) => q || undefined),
+  /** 用名字（帳號 ID）找人：名字包含這段字就算（不分大小寫）。 */
+  name: z
+    .string()
+    .trim()
+    .max(LOBBY_QUERY_MAX)
+    .optional()
+    .transform((n) => n || undefined),
 })
 
 export type LobbyFilter = z.infer<typeof lobbyQuerySchema>
@@ -125,6 +132,11 @@ export function matchesQuery(profile: ShareableProfile, q: string): boolean {
     return v.includes(key) || (v.length > 0 && key.includes(v))
   }
   return profile.interests.some(hit) || profile.intro.toLowerCase().includes(key)
+}
+
+/** 名字（帳號 ID）包含搜尋字就算，不分大小寫。 */
+export function matchesName(displayName: string, name: string | undefined): boolean {
+  return !name || displayName.toLowerCase().includes(name.toLowerCase())
 }
 
 /** 目的照字面比對（選「交友」只出現目的有交友的人）；關鍵字要對得上。 */
@@ -219,7 +231,7 @@ export function createLobbyApi(deps: LobbyDeps): LobbyApi {
       // 我還沒有確認的檔案時，相似度不是「跟我合不合」，就不給預估
       const found = await deps.searchLobby(userId, { text: me ? myQueryText(me) : undefined, limit: LOBBY_POOL_LIMIT })
       const rows = await deps.store.getCardRows(found.map((c) => c.user_id))
-      const kept = found.filter((c) => matchesFilter(rows.get(c.user_id)?.purposes, c.shareable, filter))
+      const kept = found.filter((c) => matchesName(c.display_name, filter.name) && matchesFilter(rows.get(c.user_id)?.purposes, c.shareable, filter))
       return toCards(kept, me !== null, rows)
     },
 
