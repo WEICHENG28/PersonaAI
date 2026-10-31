@@ -8,6 +8,7 @@ import type { HandoffApi, TakeoverView } from '../../server/twin/handoff'
 import type { RequestHumanApi } from '../../server/twin/requestHuman'
 import type { NotificationApi } from '../../server/twin/notifications'
 import type { AnomalyApi } from '../../server/twin/anomaly'
+import type { LobbyApi } from '../../server/twin/lobby'
 
 const CONV_ID = '6f1c2a5e-7d1b-4c3a-9e2f-1a2b3c4d5e6f'
 const NOTE_ID = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d'
@@ -61,6 +62,7 @@ function app(opts: AppOpts = {}) {
   }
   const routes = createTwinRoutes({
     anomaly: () => anomaly,
+    lobby: () => ({}) as LobbyApi,
     chatRoom: () => api,
     result: () => result,
     handoff: () => handoff,

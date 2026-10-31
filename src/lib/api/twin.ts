@@ -127,6 +127,28 @@ export interface RespondView {
   handoff: TakeoverView | null
 }
 
+export type LobbyPurpose = 'friend' | 'study' | 'sport' | 'hobby'
+export type FitLevel = 'likely' | 'maybe' | 'different'
+
+/** C9 大厅卡片：只有卡片内容与文字的 AI 预估，没有任何分数。 */
+export interface LobbyCardView {
+  userId: string
+  name: string
+  headline: string
+  tags: string[]
+  chatStyle: string
+  /** 自填才有，画面要标「仅供娱乐」。 */
+  mbti: string | null
+  purposes: LobbyPurpose[]
+  /** 我的档案还没确认（没有向量）时是 null。 */
+  fit: FitLevel | null
+}
+
+export interface LobbyFilterInput {
+  purpose?: LobbyPurpose
+  q?: string
+}
+
 /** 失败时丢出的错误，message 是可以直接给用户看的简体中文；status 是 HTTP 状态码（连不上时为 0）。 */
 export class TwinApiError extends Error {
   constructor(
@@ -190,6 +212,25 @@ export function respondAnomaly(notificationId: string, choice: AnomalyChoice): P
 /** C7「找到合适的人」点开后设为已读。 */
 export function markNotificationRead(notificationId: string): Promise<{ id: string }> {
   return request('POST', `/api/notifications/${encodeURIComponent(notificationId)}/read`)
+}
+
+/** C9 大厅卡片（可依找人目的、兴趣关键字筛选）；第一次产生卡片要等几秒。 */
+export function getLobby(filter: LobbyFilterInput = {}): Promise<LobbyCardView[]> {
+  const params = new URLSearchParams()
+  if (filter.purpose) params.set('purpose', filter.purpose)
+  if (filter.q?.trim()) params.set('q', filter.q.trim())
+  const query = params.toString()
+  return request('GET', query ? `/api/lobby?${query}` : '/api/lobby')
+}
+
+/** C9「我自己聊」：我本人 ↔ 对方分身；已经有还没结束的就接着聊。 */
+export function startHumanChat(targetUserId: string): Promise<{ conversationId: string }> {
+  return request('POST', '/api/conversations', { targetUserId })
+}
+
+/** C9「让分身去聊」：建立单人任务（B），回传任务 id。 */
+export function startTwinChat(targetUserId: string): Promise<{ taskId: string }> {
+  return request('POST', '/api/lobby/twin-chat', { targetUserId })
 }
 
 /**

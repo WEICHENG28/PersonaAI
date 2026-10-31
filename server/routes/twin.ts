@@ -7,7 +7,7 @@ import { isAuthFailure, requireAuth } from '../lib/auth'
 import { writeLog } from '../lib/log'
 import { CONFIG } from '../lib/config'
 import { getServiceClient } from '../lib/supabase'
-import { runTwinRounds } from '../contracts/twin'
+import { runTwinRounds, startConversation } from '../contracts/twin'
 import { ChatRoomError, createChatRoomApi, MESSAGE_MAX, messageBodySchema, type ChatRoomApi } from '../twin/chatRoom'
 import { supabaseChatRoomStore } from '../twin/chatRoomStore'
 import { createHandoffApi, type HandoffApi } from '../twin/handoff'
@@ -24,6 +24,9 @@ import { supabaseResultStore } from '../twin/resultStore'
 import { twinReply } from '../twin/twin'
 import { createConversationApi, defaultConversationDeps, type ConversationApi } from '../twin/conversation'
 import { supabaseTwinStore } from '../twin/store'
+import { createLobbyApi, lobbyQuerySchema, targetBodySchema, type LobbyApi } from '../twin/lobby'
+import { supabaseLobbyStore } from '../twin/lobbyStore'
+import { createSingleTargetTask } from '../contracts/social'
 
 /** 回 users.id；失敗回已寫好的 401／403 Response。 */
 export type ResolveUserId = (c: Context) => Promise<string | Response>
@@ -35,6 +38,7 @@ export interface TwinRouteDeps {
   requestHuman(): RequestHumanApi
   notifications(): NotificationApi
   anomaly(): AnomalyApi
+  lobby(): LobbyApi
   resolveUserId: ResolveUserId
 }
 
@@ -70,6 +74,25 @@ async function respond<T>(
     if (err instanceof ChatRoomError) return c.json({ ok: false, error: err.message }, err.status)
     throw err
   }
+}
+
+/** 不需要對話 id 的路由（大廳）：先確認登入，ChatRoomError 原樣回給用戶。 */
+async function respondAsUser<T>(c: Context, deps: TwinRouteDeps, run: (userId: string) => Promise<T>) {
+  const userId = await deps.resolveUserId(c)
+  if (userId instanceof Response) return userId
+  try {
+    return c.json({ ok: true, data: await run(userId) })
+  } catch (err) {
+    if (err instanceof ChatRoomError) return c.json({ ok: false, error: err.message }, err.status)
+    throw err
+  }
+}
+
+/** 大廳兩個按鈕的 body：{ targetUserId }。 */
+async function readTarget(c: Context): Promise<string> {
+  const body = targetBodySchema.safeParse(await c.req.json().catch(() => null))
+  if (!body.success) throw new ChatRoomError('请选择要聊天的用户', 400)
+  return body.data.targetUserId
 }
 
 export function createTwinRoutes(deps: TwinRouteDeps): Hono {
@@ -129,9 +152,29 @@ export function createTwinRoutes(deps: TwinRouteDeps): Hono {
     }, NOTIFICATION_NOT_FOUND),
   )
 
+  // C9 大廳卡片：?purpose=&q=；只回卡片內容與文字的 AI 預估，沒有數字
+  routes.get('/lobby', (c) =>
+    respondAsUser(c, deps, async (userId) => {
+      const query = lobbyQuerySchema.safeParse(c.req.query())
+      if (!query.success) throw new ChatRoomError('筛选条件不正确，关键字最多 30 字', 400)
+      return deps.lobby().listLobby(userId, query.data)
+    }),
+  )
+
+  // C9「我自己聊」：我本人 ↔ 對方分身，回 conversationId（前端導向聊天室）
+  routes.post('/conversations', (c) =>
+    respondAsUser(c, deps, async (userId) => deps.lobby().startHumanChat(userId, await readTarget(c))),
+  )
+
+  // C9「讓分身去聊」：B 的 createSingleTargetTask，回 taskId（前端導向任務頁）
+  routes.post('/lobby/twin-chat', (c) =>
+    respondAsUser(c, deps, async (userId) => deps.lobby().startTwinChat(userId, await readTarget(c))),
+  )
+
   return routes
 }
 
+let lobbyApi: LobbyApi | null = null
 let chatRoomApi: ChatRoomApi | null = null
 let resultApi: ResultApi | null = null
 let handoffApi: HandoffApi | null = null
@@ -196,6 +239,8 @@ export const twinRoutes = createTwinRoutes({
       seedAutoResponse: CONFIG.SEED_AUTO_RESPONSE,
     })),
   anomaly: getAnomalyApi,
+  lobby: () =>
+    (lobbyApi ??= createLobbyApi({ store: supabaseLobbyStore(), llmJson, startConversation, createSingleTargetTask })),
   notifications: () => (notificationApi ??= createNotificationApi({ store: supabaseNotificationStore(), now: () => new Date() })),
   resolveUserId: resolveAppUserId,
 })
