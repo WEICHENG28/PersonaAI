@@ -104,7 +104,7 @@ describe('未讀與等待回應', () => {
     const list = [a]
     expect(withChoice(list, 'n-1', 'end')[0]).toMatchObject({ choice: 'end', read: true })
     expect(list[0]).toMatchObject({ choice: null, read: false })
-    expect(NOTIFY_TEXT.chosen.report).toBe('已记录检举')
+    expect(NOTIFY_TEXT.chosen.report).toBe('已记录举报')
   })
 
   it('回應後的文字', () => {

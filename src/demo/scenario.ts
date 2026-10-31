@@ -187,15 +187,15 @@ export const DEMO_SCREENED = 5
 /** 第 0 笔和最后一笔的文字由 store 依任务内容替换（人数、完成条件） */
 export const taskLogBeats: LogBeat[] = [
   { role: 'social', text: '收到任务', reason: '用户一句话交办', anchor: { kind: 'start' } },
-  { role: 'social', text: `搜寻大厅：喜欢户外、个性偏安静 → 找到 ${DEMO_SCREENED} 位`, reason: '你偏好慢热的人', anchor: { kind: 'start' } },
+  { role: 'social', text: `搜索大厅：喜欢户外、个性偏安静 → 找到 ${DEMO_SCREENED} 位`, reason: '你偏好慢热的人', anchor: { kind: 'start' } },
   { role: 'judge', text: '和陈岭的代聊结束：判定不合适', reason: '对方节奏偏快，与你的慢热偏好冲突', anchor: { kind: 'start' } },
   { role: 'social', text: '选择林小山', reason: '价值观相近，对方也偏好慢热的人', anchor: { kind: 'start' } },
   { role: 'twin', text: '开始代聊，开场话题：最近的登山行程', reason: '双方共同兴趣', anchor: { kind: 'start' } },
   { role: 'judge', text: '第 2 轮判定：你的视角 68 分、对方视角 66 分', reason: '双方仍在试探，话题有交集', anchor: { kind: 'verdict', round: 2 } },
-  { role: 'privacy', text: '第 3 轮讯息含可能识别你的信息 → 改写后送出', reason: '不泄露可定位的信息', anchor: { kind: 'msg', step: 4 } },
+  { role: 'privacy', text: '第 3 轮消息含可能识别你的信息 → 改写后送出', reason: '不泄露可定位的信息', anchor: { kind: 'msg', step: 4 } },
   { role: 'judge', text: '第 4 轮判定：你的视角 76 分、对方视角 74 分（走势上升）', reason: '对方主动揭露偏好，符合我方条件', anchor: { kind: 'verdict', round: 4 } },
   { role: 'social', text: '继续聊，暂不通知本人', reason: '还没聊完，先不打扰你', anchor: { kind: 'verdict', round: 4 } },
-  { role: 'privacy', text: '第 6 轮讯息含可能识别你的信息 → 改写后送出', reason: '不泄露可定位的信息', anchor: { kind: 'msg', step: 10 } },
+  { role: 'privacy', text: '第 6 轮消息含可能识别你的信息 → 改写后送出', reason: '不泄露可定位的信息', anchor: { kind: 'msg', step: 10 } },
   { role: 'judge', text: '第 7 轮判定：你的视角 84 分、对方视角 80 分（3 次判定一致）', reason: '话题自然延续、幽默有共鸣', anchor: { kind: 'verdict', round: 7 } },
   { role: 'social', text: '双向合适 → 通知本人', reason: '两个方向分数都 ≥ 70', anchor: { kind: 'done' } },
 ]

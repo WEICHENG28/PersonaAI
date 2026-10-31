@@ -18,7 +18,7 @@ export const failedMatch = {
     highlights: [],
   },
   reasonType: 'friction' as const,
-  reasonText: '在要不要安排紧凑行程的话题上意见分歧，对方节奏比你想像的快很多。',
+  reasonText: '在要不要安排紧凑行程的话题上意见分歧，对方节奏比你想象的快很多。',
   initiated: 'auto' as const,
   startedAt: 0,
 }

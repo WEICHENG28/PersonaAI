@@ -12,7 +12,7 @@ export const RESULT_TEXT = {
   outlineEmpty: '暂无',
   logEmpty: '还没有对话',
   continuing: '分身正在继续聊，大约需要一分钟…',
-  continued: '分身又聊了几轮，新的对话已经加进完整纪录',
+  continued: '分身又聊了几轮，新的对话已经加进完整记录',
   continuedEnded: '分身又聊了几轮，已经聊到上限',
   loadFailedTitle: '打不开这个结果',
   back: '回到上一页',

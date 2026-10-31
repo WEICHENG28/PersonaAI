@@ -24,11 +24,11 @@ export const NOTIFY_TEXT = {
   takingOver: '正在整理接手卡片，大约十几秒…',
   anomalyEvidence: '对方的具体行为',
   anomalyNote: '这只是提醒，只有你看得到，不会告诉对方。',
-  choose: { continue: '继续聊', end: '结束对话', report: '检举' } satisfies Record<AnomalyChoice, string>,
+  choose: { continue: '继续聊', end: '结束对话', report: '举报' } satisfies Record<AnomalyChoice, string>,
   chosen: {
     continue: '你选择了继续聊',
     end: '已结束对话',
-    report: '已记录检举',
+    report: '已记录举报',
   } satisfies Record<AnomalyChoice, string>,
   viewResult: '查看结果',
   goFriend: '去看看',

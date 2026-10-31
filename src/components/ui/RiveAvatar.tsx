@@ -20,7 +20,7 @@ export function RiveAvatar({ name, size = 120, className, options }: RiveAvatarP
   const { RiveComponent } = useRive({
     src: SOURCES[name],
     autoplay: true,
-    stateMachines: 'State Machine 1',
+    stateMachine: 'State Machine 1',
     ...options,
   })
   return (

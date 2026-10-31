@@ -5,7 +5,8 @@
     "history": "历史",
     "profile": "我的档案",
     "settings": "设置",
-    "tasks": "我的任务"
+    "tasks": "我的任务",
+    "me": "我的"
   },
   "login": {
     "title": "PersonaAI",
@@ -110,9 +111,9 @@
     "outlineFit": "契合点",
     "outlineFriction": "摩擦点",
     "outlineHighlight": "对方亮点",
-    "fullLog": "完整对话纪录",
-    "fullLogShow": "展开完整纪录",
-    "fullLogHide": "收起完整纪录",
+    "fullLog": "完整对话记录",
+    "fullLogShow": "展开完整记录",
+    "fullLogHide": "收起完整记录",
     "roundTag": "第 {{n}} 轮",
     "jumpToRound": "点击跳到该轮对话",
     "nextTitle": "下一步",
@@ -142,7 +143,7 @@
     "statUnit": "人",
     "statSession": "场",
     "calcNote": "代聊 {{sessions}} 场 × 人工平均 {{avg}} 分钟 = 帮你省下{{saved}}",
-    "calcNoteAdjust": "人工平均时间是系统预设值，可以在设置里调整",
+    "calcNoteAdjust": "人工平均时间是系统默认值，可以在设置里调整",
     "seeResult": "看看这个人",
     "dismiss": "知道了",
     "friendTone": "用朋友的口吻说的，数字都附计算依据"
@@ -239,7 +240,7 @@
     "gearMutualHint": "双方都合适才通知",
     "avgManualTime": "人工平均时间（分钟）",
     "avgManualTimeNote": "效率统计的计算依据",
-    "logout": "登出"
+    "logout": "退出登录"
   },
   "common": {
     "loading": "加载中…",
@@ -250,7 +251,7 @@
     "confirm": "确认",
     "save": "保存",
     "comingSoonBadge": "即将上线",
-    "logout": "登出",
+    "logout": "退出登录",
     "close": "关闭",
     "back": "返回",
     "demoBadge": "Demo",

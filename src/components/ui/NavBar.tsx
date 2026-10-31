@@ -5,26 +5,35 @@ import { t } from '@i18n/t'
 import { NotificationBell } from '@features/twin/components/NotificationBell'
 import { GearIcon } from './Icons'
 
-const TABS = [
-  { to: '/friend', key: 'nav.friend' as const, match: /^\/(friend|chat)/ },
-  { to: '/lobby', key: 'nav.lobby' as const, match: /^\/lobby/ },
-  { to: '/history', key: 'nav.history' as const, match: /^\/history/ },
-  { to: '/tasks', key: 'nav.tasks' as const, match: /^\/tasks/ },
-]
+interface Tab {
+  to: string
+  key: string
+  match: RegExp
+}
+
+const FRIEND: Tab = { to: '/friend', key: 'nav.friend', match: /^\/(friend|chat)/ }
+const LOBBY: Tab = { to: '/lobby', key: 'nav.lobby', match: /^\/lobby/ }
+const HISTORY: Tab = { to: '/history', key: 'nav.history', match: /^\/history/ }
+const TASKS: Tab = { to: '/tasks', key: 'nav.tasks', match: /^\/tasks/ }
+
+/** 桌机顶栏 nav（维持原样） */
+const TABS: Tab[] = [FRIEND, LOBBY, HISTORY, TASKS]
+/** 手机底栏 5 格：AI 朋友、大厅、我的任务、历史、我的（我的＝档案＋设置，UX #27） */
+const MOBILE_TABS: Tab[] = [FRIEND, LOBBY, TASKS, HISTORY, { to: '/profile', key: 'nav.me', match: /^\/(profile|settings)/ }]
 
 /**
  * 全站统一顶栏（每页都有，sticky + 撕纸下缘阴影）：
  * - wordmark → /landing
  * - 桌机：nav knobs（朋友/大厅/历史）
  * - 右端：已登录 → Profile 钮 + 阿澈（通知）；未登录 → 开始使用（梨黄按钮）
- * - 手机：nav 收进底拦（.knobs 隐藏），顶栏保留 wordmark + 右端钮
+ * - 手机：nav 收进底拦（.knobs 隐藏），顶栏只留 wordmark + 阿澈头像（含红点）+ 用户头像；齿轮移到「我的档案」页
  */
 export function NavBar() {
   const location = useLocation()
   const user = useDemoStore((s) => s.user)
   const unread = useDemoStore((s) => s.notifications.length)
 
-  const isActive = (tab: (typeof TABS)[number]) => tab.match.test(location.pathname)
+  const isActive = (tab: Tab) => tab.match.test(location.pathname)
 
   return (
     <>
@@ -63,31 +72,12 @@ export function NavBar() {
 
       {/* ── 手机底部 tab 拦 ── */}
       {user && (
-        <nav className="tabbar safe-bottom" aria-label="主导览">
-          {TABS.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              className={`tabbar__tab ${isActive(tab) ? 'is-on' : ''}`}
-            >
+        <nav className="tabbar safe-bottom" aria-label="主导航">
+          {MOBILE_TABS.map((tab) => (
+            <NavLink key={tab.to} to={tab.to} className={`tabbar__tab ${isActive(tab) ? 'is-on' : ''}`}>
               <span className="tabbar__label">{t(tab.key)}</span>
-              {tab.to === '/friend' && unread > 0 && <i className="tabbar__dot" />}
             </NavLink>
           ))}
-          {/* Profile 也进底拦（第 4 格） */}
-          <NavLink
-            to="/profile"
-            className={`tabbar__tab ${/^\/profile/.test(location.pathname) ? 'is-on' : ''}`}
-          >
-            <span className="tabbar__label">{t('nav.profile')}</span>
-          </NavLink>
-          {/* Settings 进底拦（第 5 格） */}
-          <NavLink
-            to="/settings"
-            className={`tabbar__tab ${/^\/settings/.test(location.pathname) ? 'is-on' : ''}`}
-          >
-            <span className="tabbar__label">设置</span>
-          </NavLink>
         </nav>
       )}
     </>

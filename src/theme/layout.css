@@ -145,6 +145,14 @@
 .knob--friend { margin-left: var(--space-md); }
 .knob__meta { font-size: var(--text-sm); }
 
+/* 手机顶栏只留头像：名字、齿轮收起（齿轮在「我的档案」页里，UX #27） */
+@media (max-width: 63.99rem) {
+  .topbar .knob__meta,
+  .topbar .knob--settings { display: none; }
+  .topbar .knob--friend { margin-left: 0; padding-inline: var(--space-sm); }
+  .topbar .knob--profile { padding-inline: var(--space-xs); }
+}
+
 /* ── 手机底部 tab 拦 ── */
 .tabbar {
   position: fixed;
