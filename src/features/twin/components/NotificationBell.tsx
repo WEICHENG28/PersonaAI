@@ -18,6 +18,7 @@ import {
 } from './notificationView'
 import { useNotifications, type NotificationsState } from './useNotifications'
 import { BellIcon } from '@components/ui/Icons'
+import { playNotifySound, shouldChime } from '@lib/notifySound'
 import './notificationBell.css'
 
 export function NotificationBell() {
@@ -31,6 +32,14 @@ function LiveNotificationBell() {
   const buttonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const unread = unreadCount(state.list)
+
+  // 有新的未讀通知就「叮咚」一聲（剛載入時不響）
+  const lastUnread = useRef<number | null>(null)
+  useEffect(() => {
+    if (state.loadError) return
+    if (shouldChime(lastUnread.current, unread)) playNotifySound()
+    lastUnread.current = unread
+  }, [unread, state.loadError])
 
   // 点铃铛和面板以外的地方、或按 Esc 关闭（面板在 portal 里，不在铃铛的 DOM 底下，要两个都排除）
   useEffect(() => {

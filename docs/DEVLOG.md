@@ -335,6 +335,15 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜通知音效＋「我的聊天」排版｜Peter（AI 協助）
+- **通知音效**：`src/lib/notifySound.ts` 用 Web Audio 產生一聲「叮咚」（不用音檔、不用新套件）。鈴鐺未讀數變多、「我的聊天」的「等你接手」變多時響；剛載入不響（`shouldChime`）。瀏覽器要求先點過頁面才能出聲，所以第一次點擊／按鍵時解鎖，之前安靜略過。
+- **我的聊天**：名字放大（`--text-lg`），真人／示范用户標籤放在名字旁邊同一行，狀態放右邊；「你们在聊」改成「聊天室」。
+- **跨線**（Peter 同意）：C 的 `NotificationBell.tsx` 加音效。
+- **改了哪些檔案**：`src/lib/notifySound.ts`、`src/features/twin/components/NotificationBell.tsx`、`src/features/social/components/ChatListButton.tsx`、`tests/social/notify-sound.test.ts`。
+- **驗證**：`tsc -b`、vitest 670/670、build；聲音請 Peter 在瀏覽器確認（先點一下頁面）。
+
+---
+
 ### 2026-10-31｜只提示缺的那一步＋設定頁改版｜Peter（AI 協助）
 - **提示只講缺的那一步**：原本不管缺什麼都說「先到「我的档案」确认对外档案，并在设置开启社交 Agent」。新增 `server/social/readiness.ts` 的 `notReadyMessage`：只缺社交 Agent →「先到「设置」开启社交 Agent」；只缺檔案 →「先到「我的档案」确认对外档案」；都缺才兩句。用在 B 的確認任務、單人任務，以及 C 大廳「让分身去聊」（`LobbyStore.readinessOf` 選填）。確認卡也只顯示缺的那一步的按鈕。
 - **設定頁**：拿掉「人工平均时间」（Peter：看不懂用途；效率統計照用預設 20 分鐘）。六張卡片桌機左三右三、同樣大小（社交 Agent、每日代聊上限、對外檔案入口 ｜ 檔位、主動頻率、開發者模式），手機一欄；登出改成最下面一整條紅色按鈕。新增 `.settings-grid`。

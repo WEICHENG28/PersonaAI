@@ -10,10 +10,11 @@ import { isLiveChat } from '@lib/api/twin'
 import { listChats, type ChatListItem, type ChatState } from '@lib/api/social'
 import { panelPlacement, timeLabel } from '@features/twin/components/notificationView'
 import '@features/twin/components/notificationBell.css'
+import { playNotifySound, shouldChime } from '@lib/notifySound'
 
 const STATE_LABEL: Record<ChatState, { text: string; tone: 'coral' | 'mint' | 'ink' }> = {
   waiting_you: { text: '等你接手', tone: 'coral' },
-  chatting: { text: '你们在聊', tone: 'mint' },
+  chatting: { text: '聊天室', tone: 'mint' },
   twin_chatting: { text: '分身代聊中', tone: 'ink' },
 }
 
@@ -31,6 +32,13 @@ function LiveChatListButton() {
   const buttonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const waiting = items.filter((i) => i.state === 'waiting_you').length
+
+  // 多了一個「等你接手」也叮咚一聲
+  const lastWaiting = useRef<number | null>(null)
+  useEffect(() => {
+    if (shouldChime(lastWaiting.current, waiting)) playNotifySound()
+    lastWaiting.current = waiting
+  }, [waiting])
 
   const load = async () => {
     try {
@@ -138,8 +146,14 @@ function ChatPanel({
                 navigate(`/chat/${item.conversationId}`)
               }}
             >
-              <strong>{item.otherName}</strong> <PersonKindChip isSeed={item.otherIsSeed} />{' '}
-              <Chip tone={STATE_LABEL[item.state].tone}>{STATE_LABEL[item.state].text}</Chip>
+              {/* 名字（大一點）和真人／示范用户同一行，狀態在右邊 */}
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', flexWrap: 'wrap' }}>
+                <strong style={{ fontSize: 'var(--text-lg)' }}>{item.otherName}</strong>
+                <PersonKindChip isSeed={item.otherIsSeed} />
+                <span style={{ marginLeft: 'auto' }}>
+                  <Chip tone={STATE_LABEL[item.state].tone}>{STATE_LABEL[item.state].text}</Chip>
+                </span>
+              </span>
               {item.lastMessage && <p className="hint-inline">{item.lastMessage}</p>}
               <p className="hint-inline">{timeLabel(item.lastAt)}</p>
             </button>
