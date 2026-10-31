@@ -81,7 +81,7 @@
 }
 
 @media (min-width: 64rem) {
-  :root { --container: min(100vw - 80px, 1600px); --container-wide: min(100vw - 80px, 1760px); --bar-h: 76px; --gutter: 40px; }
+  :root { --container: min(100vw - 80px, 1600px); --container-wide: min(100vw - 80px, 1760px); --bar-h: 88px; --gutter: 40px; }
 }
 
 /* 訊息泡泡色票（02 的角色色：朋友梨黃、twin 藍、人類薄荷） */

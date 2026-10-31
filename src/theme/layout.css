@@ -62,11 +62,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-lg);
-  height: var(--bar-h); /* 固定高（非 min-height）保證內容永遠垂直置中 */
-  max-width: var(--container);
-  margin-inline: auto;
-  padding-inline: var(--gutter);
+  /* 高度加大到 84px（桌机），让按钮垂直居中有足够空间 */
+  height: var(--bar-h);
+  /* 宽度占满整个窗口，safe space 用 padding 控制（不用 max-width 限制背景） */
+  width: 100%;
   box-sizing: border-box;
+  /* 内容两侧的安全间距：与 app-main 同款 gutter；内容最宽 var(--container) 居中 */
+  padding-inline: max(var(--gutter), calc((100% - var(--container)) / 2 + var(--gutter)));
   background: var(--grain), var(--fibre), var(--color-card);
   /* 撕紙下緣（陰影在父層，這裡裁形狀） */
   clip-path: polygon(
