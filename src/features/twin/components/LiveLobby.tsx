@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@components/ui/Button'
 import { Card } from '@components/ui/Card'
-import { t } from '@i18n/t'
+import { LoadingDots } from '@components/ui/LoadingDots'
 import type { LobbyPurpose } from '@lib/api/twin'
 import { LobbyAIFloating } from './LobbyAIFloating'
 import { LobbyCard } from './LobbyCard'
@@ -39,8 +39,8 @@ export function LiveLobby() {
 
   return (
     <div className="page">
-      <h2 className="section-title">{t('lobby.candidatesTitle')}</h2>
-      <Card className="stack">
+      {/* 筛选／搜索卡吸附在顶栏下方（.lobby-filter），卷卡片列表时随时能改条件 */}
+      <Card className="stack lobby-filter">
         <div className="chips" role="group" aria-label={LOBBY_TEXT.filterLabel}>
           <Button small variant={purpose ? 'secondary' : 'primary'} aria-pressed={!purpose} onClick={() => setPurpose(undefined)}>
             {LOBBY_TEXT.allPurposes}
@@ -107,7 +107,7 @@ function LobbyCards({ lobby, chat, onStart }: LobbyCardsProps) {
       </Card>
     )
   }
-  if (!lobby.cards) return <p className="empty">{LOBBY_TEXT.loading}</p>
+  if (!lobby.cards) return <LoadingDots label="正在整理大厅卡片" />
   if (lobby.cards.length === 0) return <p className="empty">{LOBBY_TEXT.empty}</p>
   return (
     <div className="lobby-grid">
