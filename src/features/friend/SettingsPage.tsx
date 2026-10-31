@@ -71,10 +71,13 @@ export function SettingsPage() {
   }
 
   const toggleSocialAgent = () => {
+    // 未确认对外档案：先提示，再跳去档案页（不静默跳页）
     if (!shareableConfirmed && !socialAgent) {
-      navigate('/profile')
+      setSaveError('请先到「我的档案」确认对外档案，才能开启社交 Agent')
+      window.setTimeout(() => navigate('/profile'), 1200)
       return
     }
+    setSaveError(null)
     if (isHttpMode) { void httpSave({ social_agent_enabled: !socialAgent }) }
     else { s.toggleSetting('socialAgent') }
   }
@@ -113,21 +116,49 @@ export function SettingsPage() {
                 sub={t('settings.socialAgentNote')}
                 right={<Chip tone={socialAgent ? 'mint' : 'well'}>{socialAgent ? '开' : '关'}</Chip>}
               />
-              {!shareableConfirmed && !socialAgent && (
-                <p className="hint-inline">请先在「档案」页确认对外档案，才能开启</p>
-              )}
-              {shareableConfirmed && socialAgent && (
-                <p className="hint-inline">分身和大厅会使用你的对外档案，可随时关闭</p>
-              )}
-              <Button
-                small
-                variant={socialAgent ? 'danger' : 'primary'}
-                onClick={toggleSocialAgent}
-                disabled={saving}
-              >
-                {socialAgent ? '关闭' : '开启'}
-              </Button>
+              <div className="stack" style={{ gap: '0.5rem' }}>
+                <p className="hint-inline">
+                  {socialAgent
+                    ? '已开启：分身和大厅会使用你的对外档案，可随时关闭'
+                    : shareableConfirmed
+                      ? '关闭中：开启后分身和大厅会使用你的对外档案'
+                      : '请先到「我的档案」确认对外档案，才能开启'}
+                </p>
+                <div>
+                  <Button
+                    small
+                    variant={socialAgent ? 'danger' : 'primary'}
+                    onClick={toggleSocialAgent}
+                    disabled={saving}
+                  >
+                    {socialAgent ? '点击关闭' : '点击开启'}
+                  </Button>
+                </div>
+              </div>
             </Card>
+
+            {/* 每日代聊上限（http 模式） */}
+            {isHttpMode && (
+              <Card>
+                <CardHead title="每日代聊上限" sub="社交 Agent 每天最多帮你代聊几场" />
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={httpSettings?.daily_chat_limit ?? 10}
+                  onChange={(e) => {
+                    const v = Math.max(1, Math.min(20, Number(e.target.value) || 10))
+                    setHttpSettings((prev) => (prev ? { ...prev, daily_chat_limit: v } : prev))
+                  }}
+                  onBlur={(e) => {
+                    const v = Math.max(1, Math.min(20, Number(e.target.value) || 10))
+                    if (v !== (httpSettings?.daily_chat_limit ?? 10)) void httpSave({ daily_chat_limit: v })
+                  }}
+                  style={{ maxWidth: 120 }}
+                />
+              </Card>
+            )}
 
             {/* 档位 */}
             <Card>

@@ -4,7 +4,8 @@
     "lobby": "大厅",
     "history": "历史",
     "profile": "我的档案",
-    "settings": "设置"
+    "settings": "设置",
+    "tasks": "我的任务"
   },
   "login": {
     "title": "PersonaAI",
