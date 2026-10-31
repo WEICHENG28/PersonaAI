@@ -39,6 +39,7 @@ vi.mock('../../server/social/task', () => ({
 vi.mock('../../server/lib/log', () => ({ writeLog: vi.fn(async () => {}) }))
 vi.mock('../../server/friend/memory', () => ({
   extractMemories: vi.fn(async () => 0),
+  listMemories: vi.fn(async () => []),
 }))
 
 import { llmJson } from '../../server/lib/llm'
@@ -150,6 +151,17 @@ describe('friendChat 主流程（mock）', () => {
     expect(out.taskId).toBe('task-1')
     expect(createTaskFromText).toHaveBeenCalledWith('u1', '帮我找 3 个喜欢登山的人聊聊')
     expect(tables['friend_messages']!.list.at(-1)).toMatchObject({ kind: 'task_card', meta: { taskId: 'task-1' } })
+  })
+
+  it('用户同意「要不要帮你找人」时，用模型整理好的 task_text 建任务（不是「好啊」）', async () => {
+    vi.mocked(llmJson).mockResolvedValueOnce({
+      reply: '好，我请社交 Agent 帮你找几个周六一起滑雪的人。',
+      shared_event_id: null,
+      task_intent: true,
+      task_text: '帮我找几个周六一起去滑雪的人',
+    } as never)
+    await friendChat('u1', '好啊')
+    expect(createTaskFromText).toHaveBeenCalledWith('u1', '帮我找几个周六一起去滑雪的人')
   })
 
   it('shared_event_id：记入 ai_friends.shared_event_ids', async () => {

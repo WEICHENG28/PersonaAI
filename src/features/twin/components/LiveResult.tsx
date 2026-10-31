@@ -9,7 +9,7 @@ import { t } from '@i18n/t'
 import type { FitPointView, OutlineView, ResultMessage, ResultView } from '@lib/api/twin'
 import { speakerOf, statusChip } from './chatRoomView'
 import { HANDOFF_TEXT, takeoverBlockOf, type HandoffRouteState } from './handoffView'
-import { groupByRound, RESULT_TEXT, verdictLine } from './resultView'
+import { groupByRound, RESULT_TEXT, scoreColor, verdictLine } from './resultView'
 import { useResult, type ResultState } from './useResult'
 
 /** 同一轮的气泡放在同一组；组本身是直向 flex，气泡的左右对齐（align-self）才有作用。 */
@@ -78,11 +78,11 @@ function ResultBody({ view, state, onSkip }: ResultBodyProps) {
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>{t('proxyChat.withWho', { name: view.other.name })}</h1>
-        <p>
-          {view.mutual ? t('result.mutualBadgeSub') : null} {chip && <Chip tone="coral">{chip}</Chip>}
-        </p>
+      {/* 標題和狀態標籤同一行、垂直置中 */}
+      <div className="page-head" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-sm)' }}>
+        <h1 style={{ fontSize: 'var(--text-2xl)' }}>{t('proxyChat.withWho', { name: view.other.name })}</h1>
+        {chip && <Chip tone="coral">{chip}</Chip>}
+        {view.mutual && <p style={{ margin: 0, flexBasis: '100%' }}>{t('result.mutualBadgeSub')}</p>}
       </div>
 
       {view.mutual && (
@@ -95,7 +95,21 @@ function ResultBody({ view, state, onSkip }: ResultBodyProps) {
 
       <div className="stack">
         <Card>
-          <CardHead title={t('result.verdictTitle')} />
+          <CardHead
+            title={t('result.verdictTitle')}
+            right={
+              typeof view.verdict?.score === 'number' ? (
+                <div style={{ textAlign: 'right', lineHeight: 1 }} aria-label={`我方契合度 ${view.verdict.score} 分`}>
+                  {/* 大字＋依分數區間上色（80+ 深綠、65–79 綠、50–64 琥珀橘、50 以下紅） */}
+                  <strong style={{ fontSize: 'calc(var(--text-2xl) * 1.6)', fontWeight: 800, color: scoreColor(view.verdict.score) }}>
+                    {view.verdict.score}
+                  </strong>
+                  <span style={{ fontSize: 'var(--text-md)', color: 'var(--color-muted)' }}> / 100</span>
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-muted)', marginTop: 'var(--space-2xs)' }}>我方契合度</p>
+                </div>
+              ) : undefined
+            }
+          />
           <div className="verdict-final">
             <p className="verdict-note">{verdictLine(view.verdict)}</p>
             <p className="verdict-hidden">{t('result.oppVerdictHidden')}</p>
@@ -131,7 +145,8 @@ function ResultBody({ view, state, onSkip }: ResultBodyProps) {
             </Button>
           </div>
           {(state.notice ?? view.continueBlock) && (
-            <p className="verdict-hidden" role="status">
+            // 按鈕底下有立體陰影，文字要留距離才不會黏在按鈕上
+            <p className="verdict-hidden" role="status" style={{ marginTop: 'var(--space-md)' }}>
               {state.notice ?? view.continueBlock}
             </p>
           )}

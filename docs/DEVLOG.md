@@ -335,6 +335,61 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜只提示缺的那一步＋設定頁改版｜Peter（AI 協助）
+- **提示只講缺的那一步**：原本不管缺什麼都說「先到「我的档案」确认对外档案，并在设置开启社交 Agent」。新增 `server/social/readiness.ts` 的 `notReadyMessage`：只缺社交 Agent →「先到「设置」开启社交 Agent」；只缺檔案 →「先到「我的档案」确认对外档案」；都缺才兩句。用在 B 的確認任務、單人任務，以及 C 大廳「让分身去聊」（`LobbyStore.readinessOf` 選填）。確認卡也只顯示缺的那一步的按鈕。
+- **設定頁**：拿掉「人工平均时间」（Peter：看不懂用途；效率統計照用預設 20 分鐘）。六張卡片桌機左三右三、同樣大小（社交 Agent、每日代聊上限、對外檔案入口 ｜ 檔位、主動頻率、開發者模式），手機一欄；登出改成最下面一整條紅色按鈕。新增 `.settings-grid`。
+- **合併**：先把 main 合進來解 DEVLOG 衝突（#113 合併後）。
+- **跨線**（Peter 同意）：A 的 `SettingsPage.tsx`、`pages.css`；C 的 `server/twin/{lobby,lobbyStore}.ts`。
+- **驗證**：`tsc -b`；vitest 669/669（新增 readiness 4 則、改 task 驗收 2 的訊息）；build。
+
+---
+
+### 2026-10-31｜進大廳進度條＋空聊天室提示｜Peter（AI 協助）
+- **進大廳進度**：Peter 新帳號聊了好幾句沒看到邀請，也不知道還差什麼。AI 朋友頁上方加一條「进大厅进度 N%：再和阿澈聊 X 句／阿澈还不太了解你的兴趣…」＋進度條；句數夠了但檔案不完整時給「去「我的档案」整理」按鈕。每多說一句就重問 `GET /api/lobby-invite`（原本要滿 8 句才問，沒達標時畫面上什麼都沒有）。`useLobbyInvite` 改回傳 `{ dialog, banner }`。
+- **空聊天室顯示「加载中…」**：自己去找對方分身聊、還沒人開口時，聊天室其實已載入完，卻寫「加载中…」。改成「还没有消息。先打个招呼吧，对方的分身会回你。」（`emptyChatHint`）。
+- **worker 一直「读取任务失败」**：錯誤是 `fetch failed … ECONNRESET`（TLS 連線被中斷），是當下這台電腦連 Supabase 的網路問題，不是程式；之後測試 Node 與 curl 都正常。worker 會自己重試，網路恢復就繼續。
+- **改了哪些檔案**：`src/features/social/{lobbyProgress.ts,components/LobbyInvite.tsx}`、`FriendPage.tsx`（A）、`src/features/twin/components/{chatRoomView.ts,LiveChatRoom.tsx}`（C），Peter 同意；`tests/social/lobby-invite.test.ts`。
+- **驗證**：`tsc -b`、vitest 664/664、build。
+
+---
+
+### 2026-10-31｜大廳：用名字（ID）找人＋卡片間距｜Peter（AI 協助）
+- **ID 搜尋**：大廳興趣關鍵字左邊加「用户 ID（名字）」欄位；`GET /api/lobby?name=`，名字包含就算、不分大小寫，和目的、興趣可以一起用（`matchesName`）。
+- **間距**：候選人卡片原本貼著上方篩選卡、彼此間距也小；`.lobby-grid` 間距與上邊距改 `--space-lg`，卡片內距改 `--space-lg`。
+- **分數沒變大／上色**：#111 的程式已在 main，但線上網站還是 #110 的版本——Vercel 沒有替 #111 合併後的 commit 部署（commit 上沒有 Vercel 狀態），請 Peter 到 Vercel 後台看原因（可能是免費方案每日部署次數用完），必要時手動 Redeploy。
+- **跨線**（Peter 同意）：C 的 `server/twin/lobby.ts`、`src/features/twin/components/{LiveLobby.tsx,useLobby.ts,lobbyView.ts}`、`src/lib/api/twin.ts`、`tests/twin/lobby.test.ts`；A 的 `src/theme/pages.css`（兩行）。
+- **驗證**：`tsc -b`、vitest、build。
+
+---
+
+### 2026-10-31｜回報通知一定會清掉＋任務進度條｜Peter（AI 協助）
+- **通知「阿澈有事想跟你说」點了不消失**：#109 之後打開 AI 朋友頁會讓阿澈說回報並設已讀，但 Prompt 8 失敗時會還原成未讀。改成 AI 失敗就用固定句子回報（`fallbackReportText`：代聊幾場、合適的人名含真人／示范用户），只有寫入訊息失敗才還原。Peter 截圖時 #109 可能還沒部署完，部署後請重新整理再試。
+- **進度條不動**：原本只有「合適人數」一條，合適數為 0 時整個任務都看起來沒動；而且只靠 Realtime，沒開或斷線就不更新。改成兩條（代聊 x / 最多場數、合適 y / 目標），進行中每 10 秒備援重抓；已完成但 0 位合適時說明「已经代聊满 N 场，这次没有遇到合适的」。
+- **結果頁**：我方契合度改大字，依分數區間上色（`scoreColor`：80+ 深綠、65–79 綠、50–64 琥珀橘、50 以下紅，都用 tokens.css 的顏色）；標題「和 XX 的对话」放大到 `--text-2xl`。
+- **改了哪些檔案**：`server/friend/nextMeet.ts`（A，Peter 同意）、`src/features/social/TaskPage.tsx`、`src/features/twin/components/{LiveResult.tsx,resultView.ts}`（C，Peter 同意）、`tests/social/report-fallback.test.ts`。
+- **驗證**：`tsc -b`、vitest 662/662、build。
+
+---
+
+### 2026-10-31｜代聊結果頁：排版修正＋顯示我方契合度｜Peter（AI 協助）
+- **排版**：「下一步」下方的說明（例如「这段对话已经结束了」）黏在按鈕的立體陰影上，加上間距；標題「和 XX 的对话」與「对话已结束」標籤放同一行、垂直置中。
+- **我方契合度**：判定卡右上角顯示大字分數「82 / 100 · 我方契合度」（`ResultView.verdict.score`，取我方最新一筆 `direction_score`）。Peter 要求顯示；**對方視角的分數仍然一律不回**（測試確認回應裡只有一個 score、而且是我方的）。這是對 02 §F7「前端不顯示分數」的調整，只限結果頁、只限我方。
+- **跨線**（Peter 同意）：C 的 `server/twin/result.ts`、`LiveResult.tsx`、`src/lib/api/twin.ts`、`tests/twin/result.test.ts`。
+- **驗證**：`tsc -b`、vitest、build；畫面請 Peter 確認。
+
+---
+
+### 2026-10-31｜修正 AI 朋友：新訊息消失、太快建任務、記憶沒用上、回報通知不消失｜Peter（AI 協助）
+- **新訊息消失**：`getFriendMessages` 與對話上下文都是 `ascending + limit`，拿到的是**最舊**的 40／20 則。聊超過 40 則後，新訊息一刷新就不見，阿澈也看不到最近的話。改成取最新的 N 則再轉回時間順序；畫面上限 100 則。
+- **太快建任務**：Prompt 1 改成只有「明確請你找人」才 `task_intent`；聊到活動（「周六滑雪你要去吗」）先當聊天，可以順口問「要不要我请社交 Agent 帮你找几个一起去的人？」，用戶同意才建任務。新增 `task_text`（模型整理的完整找人指令），用戶只回「好啊」時用它建任務。
+- **記憶沒用上**：`friendChat` 原本寫死「（还没有长期记忆）」，改成帶入最新 12 條「它记得的事」。
+- **回報通知不消失**：任務回報（friend_report）原本只有「模擬下次見面」才會說、才會設已讀，但新版 AI 朋友頁已經沒有那顆按鈕，所以鈴鐺一直亮、阿澈也沒回報。新增 `deliverPendingReports`（先搶到 read_at 才產生，失敗還原）與 `POST /api/friend/reports/deliver`，AI 朋友頁每次打開（含從鈴鐺點進來）都會呼叫。
+- **跨線**：全部是 A 的檔案（`server/friend/{chat,nextMeet}.ts`、`server/prompts/01_friend.ts`、`server/routes/friend.ts`、`src/lib/api/friend.ts`、`FriendPage.tsx`、`tests/friend/{chat,nudge}.test.ts` 的 mock），經 Peter 同意直接改。
+- **已知**：背景撷取檔案的觸發是用「最近 20 則裡的用戶訊息數 % 6」，聊久了不一定會觸發；進大廳邀請（#104）會補撷取，其他情況可在檔案頁手動生成。
+- **驗證**：`tsc -b`；vitest 660/660（新增：同意後用 task_text 建任務）；build。
+
+---
+
 ### 2026-10-31｜任務確認卡可編輯＋頂欄「我的聊天」｜Peter（AI 協助）
 - **確認卡可編輯**：待確認時目的（下拉）、條件（用「、」分開）、人數、找到幾位就停、最多代聊幾場都能改；數字有 −／＋ 也能直接輸入，離開欄位夾回範圍（人數 1–10、合適數 ≤ 人數、代聊場數 ≥ 合適數且 ≤ 30），上方複述即時更新。按確認或「再想想」時有改過就先存（`POST /api/tasks/:id/edit`，只限 `pending_confirm`，後端再夾一次範圍並重寫複述、寫日誌）。
 - **我的聊天**：鈴鐺左邊新增聊天按鈕，點開列出還沒結束、和我有關的對話（`GET /api/chats`）：對方名字＋真人／示范用户、狀態（等你接手／你们在聊／分身代聊中）、最後一句、時間；等你接手的排前面並顯示在角標；點一下到 `/chat/<id>`。每 30 秒更新。只在 http 模式顯示。

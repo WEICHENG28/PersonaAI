@@ -80,6 +80,15 @@ export function expectsTwinReply(room: ChatRoomView): boolean {
   return room.other.controller === 'twin' && room.status === 'active'
 }
 
+/** 還沒有任何訊息時的提示（資料已經載入完，只是還沒人開口；原本誤寫成「加载中…」）。 */
+export function emptyChatHint(room: ChatRoomView): string {
+  if (room.status === 'ended') return '这段对话没有留下消息'
+  if (room.me.controller === 'human') {
+    return room.other.controller === 'twin' ? '还没有消息。先打个招呼吧，对方的分身会回你。' : '还没有消息。先打个招呼吧。'
+  }
+  return '分身正在准备开场，稍等一下…'
+}
+
 export function placeholderOf(room: ChatRoomView): string {
   if (room.status === 'ended') return CHAT_TEXT.placeholderEnded
   return room.me.controller === 'human' ? CHAT_TEXT.placeholderHuman : CHAT_TEXT.placeholderTwin

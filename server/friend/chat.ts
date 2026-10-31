@@ -11,7 +11,7 @@ import { writeLog } from '../lib/log.js'
 import { createTaskFromText } from '../../server/social/task.js'
 import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend.js'
 import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona.js'
-import { extractMemories } from './memory.js'
+import { extractMemories, listMemories } from './memory.js'
 import { extractProfile, shouldExtractProfile } from './profile.js'
 
 export interface FriendRow {
@@ -143,12 +143,15 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     .from('friend_messages')
     .select('role, kind, content')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
-    .limit(CONFIG.FRIEND_HISTORY_LIMIT * 2) // 取宽一点再裁最近 N 则
-  const recent = (history ?? []).slice(-CONFIG.FRIEND_HISTORY_LIMIT) as MessageRow[]
+    // 取「最新」的 N 则再转回时间顺序（原本 ascending + limit 拿到的是最旧的 N 则，聊久了阿澈会看不到最近的话）
+    .order('created_at', { ascending: false })
+    .limit(CONFIG.FRIEND_HISTORY_LIMIT)
+  const recent = [...(history ?? [])].reverse() as MessageRow[]
   const recentText = recent.map((m) => `${m.role === 'user' ? '用户' : '阿澈'}：${m.content}`).join('\n')
-  // A3 未實作：記憶先空（鉤子註明）
-  const memoriesText = '（还没有长期记忆）'
+  // 它记得的事（A3）：最新 12 条带进对话，阿澈才会越聊越了解你；读不到就当没有
+  const memoriesText = await listMemories(userId)
+    .then((rows) => rows.slice(0, 12).map((m) => `- ${m.content}`).join('\n') || '（还没有长期记忆）')
+    .catch(() => '（还没有长期记忆）')
 
   // 3. 呼叫 Prompt 1
   const system = renderFriendSystem({
@@ -197,7 +200,8 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   let taskId: string | null = null
   if (reply.task_intent && !isNudge) {
     try {
-      const task = await createTaskFromText(userId, body.text)
+      // 用户同意「要不要我帮你找人」时，body.text 可能只是「好啊」，所以优先用模型整理好的完整说法
+      const task = await createTaskFromText(userId, reply.task_text?.trim() || body.text)
       taskId = task.id
       await db.from('friend_messages').insert({
         user_id: userId,
@@ -243,16 +247,17 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
 }
 
 /** 取聊天记录（前端拉一次用；Realtime 由前端订阅，A 线后续接）。 */
-export async function getFriendMessages(userId: string, limit = CONFIG.FRIEND_HISTORY_LIMIT * 2) {
+export async function getFriendMessages(userId: string, limit = 100) {
   const db = getServiceClient()
+  // 最新的 limit 则，再转回时间顺序（原本拿到最旧的 40 则：聊超过 40 则后新消息一刷新就不见）
   const { data, error } = await db
     .from('friend_messages')
     .select('id, role, kind, content, meta, created_at')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw new FriendChatError(`读取聊天记录失败：${error.message}`)
-  return data ?? []
+  return [...(data ?? [])].reverse()
 }
 
 /** 给 ensureFriendRow 用的 LIFE_UPDATES 引用（避免 tree-shake 问题，导出确认）。 */

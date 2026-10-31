@@ -15,6 +15,7 @@ import {
   lobbyCardSchema,
   type LobbyCard,
 } from '../prompts/10_card.js'
+import { notReadyMessage } from '../social/readiness.js'
 import { ChatRoomError } from './chatRoom.js'
 import { askAssistant, type AssistantView } from './lobbyAssistant.js'
 
@@ -43,6 +44,13 @@ export const lobbyQuerySchema = z.object({
     .max(LOBBY_QUERY_MAX)
     .optional()
     .transform((q) => q || undefined),
+  /** 用名字（帳號 ID）找人：名字包含這段字就算（不分大小寫）。 */
+  name: z
+    .string()
+    .trim()
+    .max(LOBBY_QUERY_MAX)
+    .optional()
+    .transform((n) => n || undefined),
 })
 
 export type LobbyFilter = z.infer<typeof lobbyQuerySchema>
@@ -62,6 +70,8 @@ export interface LobbyStore {
   saveCard(userId: string, card: LobbyCard): Promise<void>
   /** 我開了社交 Agent、對外檔案也確認了（分身才能替我去聊）。 */
   isReadyForTwin(userId: string): Promise<boolean>
+  /** 缺哪一步（給更準的提示）；沒實作就用通用說法。 */
+  readinessOf?(userId: string): Promise<{ socialAgentEnabled: boolean; shareableConfirmed: boolean }>
   /** 對方在大廳裡（開了社交 Agent、對外檔案已確認）。 */
   isInLobby(userId: string): Promise<boolean>
   /** 我本人和這位分身之間還沒結束的手動對話（重複按「我自己聊」時接著聊）。 */
@@ -125,6 +135,11 @@ export function matchesQuery(profile: ShareableProfile, q: string): boolean {
     return v.includes(key) || (v.length > 0 && key.includes(v))
   }
   return profile.interests.some(hit) || profile.intro.toLowerCase().includes(key)
+}
+
+/** 名字（帳號 ID）包含搜尋字就算，不分大小寫。 */
+export function matchesName(displayName: string, name: string | undefined): boolean {
+  return !name || displayName.toLowerCase().includes(name.toLowerCase())
 }
 
 /** 目的照字面比對（選「交友」只出現目的有交友的人）；關鍵字要對得上。 */
@@ -219,7 +234,7 @@ export function createLobbyApi(deps: LobbyDeps): LobbyApi {
       // 我還沒有確認的檔案時，相似度不是「跟我合不合」，就不給預估
       const found = await deps.searchLobby(userId, { text: me ? myQueryText(me) : undefined, limit: LOBBY_POOL_LIMIT })
       const rows = await deps.store.getCardRows(found.map((c) => c.user_id))
-      const kept = found.filter((c) => matchesFilter(rows.get(c.user_id)?.purposes, c.shareable, filter))
+      const kept = found.filter((c) => matchesName(c.display_name, filter.name) && matchesFilter(rows.get(c.user_id)?.purposes, c.shareable, filter))
       return toCards(kept, me !== null, rows)
     },
 
@@ -246,7 +261,11 @@ export function createLobbyApi(deps: LobbyDeps): LobbyApi {
 
     async startTwinChat(userId, targetUserId) {
       await requireTarget(userId, targetUserId)
-      if (!(await deps.store.isReadyForTwin(userId))) throw new ChatRoomError(NOT_READY_FOR_TWIN, 403)
+      if (!(await deps.store.isReadyForTwin(userId))) {
+        // 只講缺的那一步：沒開社交 Agent 就叫他去設定開，不要叫他去我的檔案
+        const r = await deps.store.readinessOf?.(userId)
+        throw new ChatRoomError((r && notReadyMessage(r, '，分身才能替你去聊')) || NOT_READY_FOR_TWIN, 403)
+      }
       const task = await withTaskErrors(() => deps.createSingleTargetTask(userId, targetUserId))
       return { taskId: task.id }
     },

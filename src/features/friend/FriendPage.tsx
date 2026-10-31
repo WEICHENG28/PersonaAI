@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
@@ -14,6 +14,7 @@ import { useLobbyInvite } from '@features/social/components/LobbyInvite'
 import {
   isHttpMode,
   callFriendIntro,
+  deliverReports,
   callFriendChat,
   getFriendMessages,
   fetchSettings,
@@ -30,6 +31,7 @@ export function FriendPage() {
   // 送出前檢查隱私（微信號、手機號等），有就先跳警告
   const privacy = usePrivacyCheck('friend')
   const navigate = useNavigate()
+  const location = useLocation()
   const [draft, setDraft] = useState('')
 
   // http 模式专用状态
@@ -47,11 +49,16 @@ export function FriendPage() {
   const chatRef = useAutoScrollBottom<HTMLDivElement>(msgCount)
 
   // http 模式：挂载时拉消息 + 首次见面
+  //（每次导到这页都重跑：从铃铛「阿澈有事想跟你说」点进来时，location.key 会变）
   useEffect(() => {
     if (!isHttpMode) return
     const init = async () => {
       try {
         await callFriendIntro()   // 幂等，intro_done 时直接 ok
+      } catch { /* 非致命 */ }
+      // 有任务回报就让阿澈先说（铃铛的通知也会变已读）；失败不影响聊天
+      try {
+        await deliverReports()
       } catch { /* 非致命 */ }
       try {
         const msgs = await getFriendMessages()
@@ -65,7 +72,7 @@ export function FriendPage() {
       } catch { /* 面板默认不显示 */ }
     }
     void init()
-  }, [])
+  }, [location.key])
 
   const send = useCallback(async () => {
     const text = draft.trim()
@@ -163,7 +170,7 @@ export function FriendPage() {
   return (
     <div className="page friend-page">
       {privacy.dialog}
-      {lobbyInvite}
+      {lobbyInvite.dialog}
       {/* 桌机左栏：chromabot 大头像（手机隐藏；占屏幕高度 60%） */}
       <aside className="friend-avatar-col" aria-hidden>
         <RiveAvatar name="chromabot" fill className="friend-avatar-rive" />
@@ -176,6 +183,7 @@ export function FriendPage() {
             <span className="typing-label">{t('friend.typing')}</span>
           )}
           {s.reportReady && <Chip tone="pear">{t('friend.hasNews')}</Chip>}
+          {lobbyInvite.banner}
         </div>
 
         <div className="chat" ref={chatRef}>

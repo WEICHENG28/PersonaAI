@@ -150,7 +150,7 @@ describe('getResult', () => {
     const { api } = harness()
     const view = await api.getResult('conv-1', ME)
     expect(view.mutual).toBe(true)
-    expect(view.verdict).toEqual({ value: 'suitable', trend: 'flat' })
+    expect(view.verdict).toEqual({ value: 'suitable', trend: 'flat', score: 82 })
     expect(view.outline).toEqual({ topics: ['登山', '摄影'], fits: ['都喜欢慢慢走'], frictions: ['作息不同'], highlights: ['会主动分享路线'] })
     expect(view.fitPoints).toEqual(MY_OUTLINE.fit_points)
     expect(view.other).toEqual({ userId: AN, name: '小安', controller: 'twin' })
@@ -172,14 +172,16 @@ describe('getResult', () => {
     expect(store.getMyLatestAttempt).not.toHaveBeenCalledWith('conv-1', AN)
   })
 
-  it('回應裡沒有對方視角的大綱、理由，也沒有任何分數', async () => {
+  // Peter 2026-10-31：結果頁顯示「我方」契合度（verdict.score）；對方視角的分數仍然一律不回
+  it('回應裡沒有對方視角的大綱、理由、分數；只有我方的契合度', async () => {
     const { api } = harness()
     const json = JSON.stringify(await api.getResult('conv-1', ME))
     expect(json).not.toContain('对方的秘密理由')
     expect(json).not.toContain('对方视角')
     expect(json).not.toContain('小安在意的点')
-    expect(json).not.toMatch(/score|direction|reason/i)
-    expect(json).not.toContain('82')
+    expect(json).not.toMatch(/direction|reason/i)
+    expect(json.match(/score/g)).toHaveLength(1)
+    expect(json).toContain('"score":82')
     expect(json).not.toContain('40')
   })
 

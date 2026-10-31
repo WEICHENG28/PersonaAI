@@ -57,7 +57,7 @@ vi.mock('../../server/social/task', () => ({
     return { id: 'task-1', restatement: text }
   }),
 }))
-vi.mock('../../server/friend/memory', () => ({ extractMemories: vi.fn(async () => 0) }))
+vi.mock('../../server/friend/memory', () => ({ extractMemories: vi.fn(async () => 0), listMemories: vi.fn(async () => []) }))
 vi.mock('../../server/friend/profile', () => ({
   extractProfile: vi.fn(async () => ({})),
   shouldExtractProfile: vi.fn(() => false),

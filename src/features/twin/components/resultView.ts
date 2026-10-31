@@ -18,6 +18,14 @@ export const RESULT_TEXT = {
   back: '回到上一页',
 } as const
 
+/** 我方契合度的顏色區間（只用 tokens.css 的顏色）：80+ 深綠、65–79 綠、50–64 琥珀橘、50 以下紅。 */
+export function scoreColor(score: number): string {
+  if (score >= 80) return 'var(--color-success)'
+  if (score >= 65) return 'var(--color-leaf)'
+  if (score >= 50) return 'var(--color-accent-deep)'
+  return 'var(--color-error)'
+}
+
 /** 「对你来说：合适 · 走势持平」；还没有判定时给提示。 */
 export function verdictLine(verdict: ResultView['verdict']): string {
   const text = verdictText(verdict)

@@ -60,13 +60,13 @@ export interface ResultMessage extends ChatMessageView {
   round: number
 }
 
-/** C5 结果页：只有我方视角，没有任何分数。 */
+/** C5 结果页：只有我方视角；score 是我方的契合度 0–100，对方视角的分数不回。 */
 export interface ResultView {
   conversationId: string
   status: ConversationStatus
   me: { userId: string; controller: Controller }
   other: { userId: string; name: string; controller: Controller }
-  verdict: { value: VerdictValue; trend: Trend } | null
+  verdict: { value: VerdictValue; trend: Trend; score?: number } | null
   mutual: boolean
   fitPoints: FitPointView[]
   outline: OutlineView | null
@@ -153,6 +153,8 @@ export type LobbyAssistantView =
 export interface LobbyFilterInput {
   purpose?: LobbyPurpose
   q?: string
+  /** 用名字（帳號 ID）找人 */
+  name?: string
 }
 
 /** 失败时丢出的错误，message 是可以直接给用户看的简体中文；status 是 HTTP 状态码（连不上时为 0）。 */
@@ -225,6 +227,7 @@ export function getLobby(filter: LobbyFilterInput = {}): Promise<LobbyCardView[]
   const params = new URLSearchParams()
   if (filter.purpose) params.set('purpose', filter.purpose)
   if (filter.q?.trim()) params.set('q', filter.q.trim())
+  if (filter.name?.trim()) params.set('name', filter.name.trim())
   const query = params.toString()
   return request('GET', query ? `/api/lobby?${query}` : '/api/lobby')
 }
