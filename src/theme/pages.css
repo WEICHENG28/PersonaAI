@@ -127,20 +127,21 @@
   overflow: hidden;
 }
 
-/* 手机：chromabot fixed 铺满全屏背景，z-index 低于 tabbar（300） */
+/* 手机：chromabot fixed 贴顶，高度只占上方 38svh，不铺满全屏 */
 .friend-avatar-col {
   position: fixed;
-  inset: 0;
+  top: 0; left: 0; right: 0;
+  height: 38svh;   /* 只占上方一段，留出足够空间显示脸部 */
   z-index: 1;
   overflow: hidden;
-  pointer-events: none; /* 不拦截触摸事件 */
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--fibre), var(--color-paper-2);
 }
-/* 手机 bot 同样 scale 1.5× */
-.friend-avatar-rive { display: block; width: 100%; height: 100%; transform: scale(1.5); transform-origin: center center; }
+/* 手机 bot 不放大（1×），Rive 自然填满容器 */
+.friend-avatar-rive { display: block; width: 100%; height: 100%; }
 
 .friend-chat-col {
   display: flex;
@@ -151,8 +152,8 @@
   /* 相对于 fixed 背景浮在上面 */
   position: relative;
   z-index: 2;
-  /* 上半屏留给 chromabot 露出；聊天从 45svh 处开始叠在 bot 上 */
-  margin-top: 45svh;
+  /* chromabot 高度 38svh；聊天从 26svh 处开始叠在 bot 下半身上，保留脸部可见 */
+  margin-top: 26svh;
   /* 聊天区域背景：覆盖下半屏，隐藏 bot 下半部分 */
   background: var(--color-paper);
   border-radius: 16px 16px 0 0;
@@ -212,6 +213,7 @@
     /* 桌机：脱离 fixed，回到正常 flex 左栏 */
     position: relative;
     inset: auto;
+    height: auto; /* 覆盖手机的 38svh */
     pointer-events: auto;
     display: flex;
     align-items: center;
@@ -492,6 +494,8 @@
 .cand-style { font-size: var(--text-xs); color: var(--color-muted); }
 .cand-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); margin-top: auto; }
 .cand-fit b { color: var(--color-mint-deep); font-size: var(--text-lg); }
+/* AI 预估三级用色：差异较大＝深橘（警示），其余维持薄荷 */
+.cand-fit[data-fit='different'] b { color: var(--color-coral-deep); }
 .cand-mbti { min-height: 26px; font-size: 11px; }
 .mbti-note { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-sm); }
 
