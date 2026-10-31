@@ -5,6 +5,7 @@ import { Button, Chip } from '@components/ui/Button'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { Modal } from '@components/ui/Modal'
 import { useDemoStore } from '@store/useDemoStore'
+import { usePrivacyCheck } from '@components/PrivacyWarning'
 import { useAutoScrollBottom } from '@hooks/useAutoScrollBottom'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
@@ -25,6 +26,8 @@ import {
  */
 export function FriendPage() {
   const s = useDemoStore()
+  // 送出前檢查隱私（微信號、手機號等），有就先跳警告
+  const privacy = usePrivacyCheck('friend')
   const navigate = useNavigate()
   const [draft, setDraft] = useState('')
 
@@ -145,6 +148,7 @@ export function FriendPage() {
 
   return (
     <div className="page friend-page">
+      {privacy.dialog}
       {/* 桌机左栏：chromabot 大头像（手机隐藏；占屏幕高度 60%） */}
       <aside className="friend-avatar-col" aria-hidden>
         <RiveAvatar name="chromabot" fill className="friend-avatar-rive" />
@@ -197,12 +201,12 @@ export function FriendPage() {
             placeholder={t('friend.inputPlaceholder')}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void send()}
+            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && privacy.guard(draft, () => void send())}
             disabled={isHttpMode ? httpTyping : s.friendTyping}
           />
           <Button
             small
-            onClick={() => void send()}
+            onClick={() => privacy.guard(draft, () => void send())}
             disabled={!draft.trim() || (isHttpMode ? httpTyping : s.friendTyping)}
           >
             {t('friend.send')}

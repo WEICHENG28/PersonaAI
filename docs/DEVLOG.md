@@ -313,6 +313,15 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜送出前隱私警告｜Peter（AI 協助）
+- **做了什麼**：和真人聊天（http 的 `LiveChatRoom`、mock 接手後的 `ProxyChatPage`）和阿澈聊天（`FriendPage`）按送出前先檢查；有微信號／QQ 等帳號、手機號、座機、身份證號、地址、email、網址、銀行卡號、密碼／驗證碼、「加我微信」時，跳出紅色警告視窗（偵測到什麼、誰會看到、防詐提醒），選「返回修改」或「我确定，仍要发送」。只提醒不擋。
+- **怎麼做**：C2 隱私守門的規則（`maskByRules`）原封不動搬到 `src/lib/privacy/rules.ts`，前後端共用一套；`server/twin/guard.ts` 改成從那裡 import 並 re-export（行為不變，C 的 59 則測試照過）。警告另外多認銀行卡號、密碼／驗證碼、「加我微信」，只用在警告、不影響 C2 遮蔽。元件 `src/components/PrivacyWarning.tsx`（`usePrivacyCheck('human'|'friend')`）。
+- **跨線**：Peter 同意由 B 的 AI 直接改 A（`FriendPage`）、C（`guard.ts`、`LiveChatRoom`、`ProxyChatPage`），每處只加幾行。Jerry 的 `c/ux-audit-fixes` 合併時，這幾個檔案的送出函式要保留 `privacy.guard(...)` 和 `{privacy.dialog}`。
+- **改了哪些檔案**：`src/lib/privacy/rules.ts`、`src/components/PrivacyWarning.tsx`、`server/twin/guard.ts`、`src/features/friend/FriendPage.tsx`、`src/features/twin/ProxyChatPage.tsx`、`src/features/twin/components/LiveChatRoom.tsx`、`tests/social/privacy-warning.test.ts`。
+- **驗證**：`tsc -b`、vitest 631/631（10 種要警告、5 句一般句子不誤報、身份證不重複算成銀行卡）、build。
+
+---
+
 ### 2026-10-31｜登入頁自動填入上次的名字｜Peter（AI 協助）
 - **做了什麼**：登入成功後把名字記在這個瀏覽器（localStorage `personaai:lastName`）；下次打開登入頁（例如登出後）自動填入，顯示「这是你上次用的名字」，按開始直接回到原帳號、不再問「是你吗」。改名字或按隨機就照原本流程。
 - **為什麼**：用戶不用記自己的名字、也不用重打。同一個瀏覽器視為本人（Demo 取捨，和名字帳號一致）。
