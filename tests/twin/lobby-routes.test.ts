@@ -1,4 +1,4 @@
-// C9 大廳路由：登入、查詢與 body 驗證、錯誤格式 { ok, error }（大廳邏輯用假的）。
+// C9／C10 大廳路由：登入、查詢與 body 驗證、錯誤格式 { ok, error }（大廳邏輯用假的）。
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from 'hono'
 import { createTwinRoutes, type TwinRouteDeps } from '../../server/routes/twin'
@@ -13,13 +13,13 @@ const CARD: LobbyCardView = {
   tags: ['登山'],
   chatStyle: '慢热、短句',
   mbti: null,
-  purposes: ['sport'],
   fit: 'likely',
 }
 
 function app(opts: { userId?: string | null; lobby?: Partial<LobbyApi> } = {}) {
   const lobby: LobbyApi = {
     listLobby: vi.fn(async () => [CARD]),
+    ask: vi.fn(async () => ({ kind: 'answer' as const, answer: '小安也爱登山。', cards: [{ ...CARD, fit: null }] })),
     startHumanChat: vi.fn(async () => ({ conversationId: 'conv-1' })),
     startTwinChat: vi.fn(async () => ({ taskId: 'task-1' })),
     ...opts.lobby,
@@ -100,5 +100,22 @@ describe('POST /lobby/twin-chat（讓分身去聊）', () => {
     const res = await routes.request('/lobby/twin-chat', post({ targetUserId: TARGET }))
     expect(await res.json()).toEqual({ ok: true, data: { taskId: 'task-1' } })
     expect(lobby.startTwinChat).toHaveBeenCalledWith('user-me', TARGET)
+  })
+})
+
+describe('POST /lobby/assistant（大廳 AI 助手）', () => {
+  it('成功回答＋小卡片', async () => {
+    const { routes, lobby } = app()
+    const res = await routes.request('/lobby/assistant', post({ question: '谁适合一起爬山？' }))
+    expect(await res.json()).toEqual({ ok: true, data: { kind: 'answer', answer: '小安也爱登山。', cards: [{ ...CARD, fit: null }] } })
+    expect(lobby.ask).toHaveBeenCalledWith('user-me', '谁适合一起爬山？')
+  })
+
+  it('問題空白或超過 200 字 → 400；沒登入 → 401', async () => {
+    const { routes, lobby } = app()
+    expect((await routes.request('/lobby/assistant', post({ question: '  ' }))).status).toBe(400)
+    expect((await routes.request('/lobby/assistant', post({ question: '问'.repeat(201) }))).status).toBe(400)
+    expect((await app({ userId: null }).routes.request('/lobby/assistant', post({ question: '你好' }))).status).toBe(401)
+    expect(lobby.ask).not.toHaveBeenCalled()
   })
 })

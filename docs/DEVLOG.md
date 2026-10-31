@@ -427,30 +427,27 @@
 
 ## C：分身與大廳線（Jerry）
 
-### 2026-10-31｜C9 大廳（卡片、篩選、我自己聊、讓分身去聊）｜Jerry（AI 協助）｜分支 c/C9-lobby｜Closes #29
+### 2026-10-31｜C9 大廳＋C10 大廳 AI 助手（和 PR #88 的大廳融合）｜Jerry（AI 協助）｜分支 c/C9-lobby｜Closes #29 #30
 - **做了什麼**：
-  - 後端（`server/twin/lobby.ts`、`lobbyStore.ts`，Prompt 10 在 `server/prompts/10_card.ts`）：`GET /api/lobby?purpose=&q=` 列出已開社交 Agent、已確認對外檔案的用戶（不含自己）。卡片讀 `user_profiles.card`，為 null 或格式不對就用 Prompt 10（`fast`、temperature 0.3）產生並快取；A 改對外檔案時會把 `card` 清成 null，下次打開大廳就重產。
-  - AI 預估：用**我和對方的 embedding** 算相似度，分成「很可能合得来」（≥ 0.65）／「可以聊聊看」（≥ 0.55）／「差异较大」，API 只回等級（`likely`／`maybe`／`different`），不回數字；我還沒有向量時回 null（畫面寫「确认档案后才能预估」）。卡片依相似度排序。
-  - 篩選：找人目的要在對方的 `purposes` 裡；興趣關鍵字和興趣雙向比對（「登山」對上「爱登山」），也看一句話介紹。
-  - `POST /api/conversations { targetUserId }`（我自己聊）：`startConversation({ aController: 'human', origin: 'manual' })`；已經有還沒結束的同一對手動對話就回那一段，不重開。
-  - `POST /api/lobby/twin-chat { targetUserId }`（讓分身去聊）：先確認我開了社交 Agent、檔案已確認（否則 403），再呼叫 B 的 `createSingleTargetTask`（經 `server/contracts/social`），回 `taskId`。
-  - 前端：http 模式的候選人改成真資料（`LiveLobby`），加上目的按鈕、關鍵字搜尋、兩個按鈕（我自己聊 → `/chat/<id>`；讓分身去聊 → `/tasks/<id>`）。mock 模式照舊用 demo 資料，但 AI 預估從數字改成同樣的三級文字。大廳 AI 助手沒動（C10）。
+  - **C9 大廳**（`server/twin/lobby.ts`、`lobbyStore.ts`，Prompt 10 在 `server/prompts/10_card.ts`）：`GET /api/lobby?purpose=&q=`。候選人與排序來自 B 的 `searchLobby`（contracts/social），查詢文字是「兴趣：…；想找：…」（我的對外檔案），所以 AI 預估是「我和對方合不合」：≥ 0.6「很可能合得来」、≥ 0.5「可以聊聊看」、其他「差异较大」，API 只回等級不回數字；我還沒確認對外檔案時不給預估（畫面寫「确认档案后才能预估」）。
+  - 卡片讀 `user_profiles.card`，為 null 或格式不對就用 Prompt 10（`fast`、0.3）產生並快取；A 改對外檔案會把 `card` 清成 null。自填 MBTI 讀 `fun_labels.user_mbti`，旁邊標「仅供娱乐」。
+  - 篩選由大廳自己做：目的照 `users.purposes` 字面比對、興趣關鍵字雙向比對（「登山」對上「爱登山」）。
+  - `POST /api/conversations { targetUserId }`（我自己聊）：我本人 ↔ 對方分身；已有未結束的同一段手動對話就接著聊。`POST /api/lobby/twin-chat { targetUserId }`（讓分身去聊）：先確認我開了社交 Agent、檔案已確認（否則 403），再呼叫 B 的 `createSingleTargetTask`。
+  - **C10 大廳 AI 助手**（`server/twin/lobbyAssistant.ts`、Prompt 11 `server/prompts/11_lobby_assistant.ts`，從 PR #88 搬來）：`POST /api/lobby/assistant { question }`。「帮我找／帮我约」→ B 的 `createTaskFromText`，畫面顯示 B 的 `<TaskConfirmCard>`；其他問題 → `searchLobby`（先搜 20 位、問題點名的人排前面、取 5 位）→ Prompt 11（`chat`、0.5）→ 回答＋最多 3 張候選人小卡片（和大廳同一種卡片、不放預估、有「我自己聊」「让分身去聊」）。回答有分數就重問一次，還有就拿掉。
+  - 前端：`LobbyPage` 在 http 模式改用 `LiveLobby`（助手 `LobbyAssistant`＋篩選＋卡片 `LobbyCard`），mock 模式照舊跑 demo，但 AI 預估從數字改成文字。
 - **為什麼這樣做**：
-  - **相似度不用 `searchLobby`**：`searchLobby` 是拿「查詢文字」的向量去比，每次都要多呼叫一次 embedding，還會寫一筆「搜索大厅」日誌（每開一次大廳就一筆，正是全線檢查說的洗日誌問題）；而且它不回卡片和 MBTI。大廳要的是「我和對方合不合」，直接比雙方已存的向量就好。cosine 自己寫一份（跨線只能經 contracts，B 的 `cosineSimilarity` 不在 contracts 裡）。
-  - **門檻依實測**：2026-10-31 只讀查詢雲端 29 位有向量的用戶，配對相似度 0.44～0.92、中位數 0.66；小安 ↔ 阿凯 0.44、阿哲 ↔ 子晴 0.66。
-  - **「讓分身去聊」需要 HTTP 端點**：B 的 `createSingleTargetTask` 只有函式沒有 API，所以加在 C 的路由（07C 第 4 節 API 表沒列，這是新增的 `/api/lobby/twin-chat`）。社交 Agent／檔案檢查自己先做，不依賴 B 的 `TaskError`（那是 B 的內部類別）。
-  - **卡片的 MBTI 以 `fun_labels.user_mbti` 為準**，不用快取裡的（用戶改了 MBTI 不會清卡片）。標籤只留對外檔案裡真的有的興趣，LLM 一個都沒對上就用檔案的興趣。
-  - **長度**：Prompt 照 07C 要求 20／15 字內，但實測模型偶爾超過幾個字，硬切 15 字會變成「…很多照片和小发」；程式改成 30／24 字才截斷。
-  - LLM 失敗時卡片直接用對外檔案（不快取），大廳照樣打得開；快取存不進去也照樣顯示。
-- **改了哪些檔案**：`server/twin/lobby.ts`、`server/twin/lobbyStore.ts`、`server/prompts/10_card.ts`、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/LobbyPage.tsx`、`src/features/twin/components/{LiveLobby.tsx,useLobby.ts,lobbyView.ts}`、`tests/twin/{lobby,lobby-routes,lobby-view}.test.ts`、`tests/twin/chat-room-routes.test.ts`（路由 deps 多一個 `lobby`）。沒動共用檔。
+  - **和 #88 融合**：兩個對話同時做了大廳（#87 先做 C9，#88 在分身品質任務裡也做了 C9／C10），檔名相同一定衝突。保留 #87 有而 #88 沒有的 07C 規格（Prompt 10 卡片快取、MBTI、會真的刷掉人的篩選），改用 #88 的 `searchLobby` 當候選人來源（全線檢查指定要用 B 的 contract）和它依實測定的門檻，並把 #88 的 C10 助手搬過來。#88 只留分身修正。
+  - **篩選自己做**：`searchLobby` 的關鍵字只加分不篩掉（「运动＋登山」會留下小林），目的 friend 等於全部；所以先請它照「我的興趣＋想找」排好整個大廳（limit 100、不帶關鍵字加分，預估才不會被灌水），再自己篩。
+  - **代價**：`searchLobby` 每次會呼叫一次 embedding、寫一筆「搜索大厅」日誌（B 的行為），每開一次大廳就多一筆。
+  - 「讓分身去聊」的端點是新增的（B 的 `createSingleTargetTask` 沒有 HTTP 入口，07C 第 4 節 API 表沒列）。B 的 `TaskError` 不能 import，用 `err.name === 'TaskError'` 轉成給用戶看的錯誤（#88 的做法）。
+  - 卡片長度：Prompt 要求 20／15 字內，實測模型偶爾超過幾個字，硬切會變成「…很多照片和小发」；程式 30／24 字才截斷。LLM 失敗用對外檔案當卡片（不快取）。
+  - 文字預估比原本的數字長，和 MBTI 放同一行在手機上會被擠成「差异较／大」，所以各占一行。
+- **改了哪些檔案**：`server/twin/{lobby,lobbyStore,lobbyAssistant}.ts`、`server/prompts/{10_card,11_lobby_assistant}.ts`、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/LobbyPage.tsx`、`src/features/twin/components/{LiveLobby,LobbyAssistant,LobbyCard}.tsx`、`{useLobby,lobbyView}.ts`、`tests/twin/{lobby,lobby-assistant,lobby-routes,lobby-view}.test.ts`、`tests/twin/chat-room-routes.test.ts`。沒動共用檔。
 - **踩到的坑／注意事項**：
-  - 第一次打開大廳要替每位產生卡片（實測 13 張約 7.5 秒），之後讀快取。
-  - 「交友」篩選是照 `purposes` 字面比對（B 的 `searchLobby` 把 friend 當成所有人），所以選「交友」只會出現目的有勾交友的人。
-  - 只讀實測（真 Supabase＋真 LLM，但不存快取、不建對話或任務）：13 張卡片、回應裡沒有數字或分數欄位；「运动＋登山」→ 小安、子晴、阿哲。
-  - 真資料端到端（Jerry 同意寫入，用 c-test3 `56648581…`）：13 張卡片寫入快取（之前 0 張），第二次打開不再呼叫 LLM；「我自己聊」小安 → 我方本人、對方分身、沒有分身先開場，打字後小安的分身回覆；再按一次回到同一段；「讓分身去聊」子晴 → 單人任務 running，推進一步後出現分身開場訊息。c-test1（`68ebcf2d…`）沒開社交 Agent，讓分身去聊正確回 403；它和小安之前就有一段沒結束的對話，所以我自己聊接著那段。
-  - 瀏覽器（headless Chrome，`/api` 攔截假資料）20 項通過：篩選帶對參數、按鈕處理中與失敗訊息、跳轉 `/chat/<id>`／`/tasks/<id>`、載入失敗重試、375px 不超出、mock 模式也是文字。
-  - 文字預估比原本的數字長，和 MBTI 放同一行在手機上會被擠成「差异较／大」，所以預估和 MBTI 各占一行（live 與 mock 都改）。
-- **還沒做完／待辦**：mock 模式的卡片沒有兩個按鈕（demo 沒有對應的真對話）；大廳 AI 助手（C10）http 模式仍是 mock 回答。
+  - 第一次打開大廳要替每位產生卡片（13 張約 8 秒），之後讀快取。
+  - **真瀏覽器＋真後端實測**（Jerry 同意新建匿名帳號 `c9测试-0124`，id `e62e3b5a…`）：登入 → 檔案沒確認時預估寫「确认档案后才能预估」、讓分身去聊回 403 提示 → 確認檔案＋開社交 Agent → 13 張卡片（文字預估）→「运动＋登山」只剩小安、子晴、阿哲 → 小安「我自己聊」進聊天室、打字後小安的分身即時回覆 → 子晴「让分身去聊」到任務頁，推進一步（`/api/tasks/:id/step`，代替 worker）後出現代聊訊息。融合後再測：助手「谁适合一起爬山？」44 字＋小安、阿哲小卡片、沒有分數；「小安和子晴谁比较适合我？」兩人各一句理由；「帮我找 2 个喜欢动漫的人」跳出任務確認卡；小卡片「我自己聊」進聊天室。
+  - 另外寫入：c-test3 和小安的一段對話、c-test3 讓分身去聊子晴的任務。
+- **還沒做完／待辦**：mock 模式的卡片沒有兩個按鈕（demo 沒有對應的真對話）。
 
 ### 2026-10-31｜C8 言行異常提醒｜Jerry（AI 協助）｜PR #83｜Closes #28
 - **做了什麼**：

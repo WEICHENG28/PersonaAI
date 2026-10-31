@@ -18,7 +18,12 @@ export const LOBBY_TEXT = {
   empty: '没有符合条件的人，换个目的或关键字试试',
   loadFailed: '大厅暂时打不开',
   retry: '重新载入',
+  noCards: '大厅里暂时没有符合的人',
+  taskHint: '这听起来像要交给社交 Agent 的任务，确认后它会帮你去找：',
 } as const
+
+/** 助手问题的字数上限（和后端一致）。 */
+export const QUESTION_MAX = 200
 
 export const PURPOSE_OPTIONS: readonly LobbyPurpose[] = ['friend', 'study', 'sport', 'hobby']
 

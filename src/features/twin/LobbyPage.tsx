@@ -9,8 +9,13 @@ import { t } from '@i18n/t'
 import { LiveLobby } from './components/LiveLobby'
 import { fitFromPercent, fitText } from './components/lobbyView'
 
-/** 画面 10：大厅（候选人卡片 + fish Rive + 大厅 AI 助手）。http 模式的候选人是真资料（C9），助手还是 demo（C10）。 */
+/** 画面 10：大厅（候选人卡片 + fish Rive + 大厅 AI 助手）。http 模式是真资料（C9／C10），mock 模式照旧跑 demo。 */
 export function LobbyPage() {
+  return isLiveChat ? <LiveLobby /> : <DemoLobby />
+}
+
+/** mock 模式：A 的 demo 假资料（助手也是 demo 回答）。 */
+function DemoLobby() {
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
   const [asking, setAsking] = useState(false)
@@ -57,7 +62,7 @@ export function LobbyPage() {
       </Card>
 
       {/* 候选人卡片 */}
-      {isLiveChat ? <LiveLobby /> : <DemoCandidates />}
+      <DemoCandidates />
       <p className="mbti-note">{t('lobby.mbtiNote')}</p>
     </div>
   )

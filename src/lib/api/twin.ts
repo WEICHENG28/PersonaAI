@@ -139,10 +139,14 @@ export interface LobbyCardView {
   chatStyle: string
   /** 自填才有，画面要标「仅供娱乐」。 */
   mbti: string | null
-  purposes: LobbyPurpose[]
-  /** 我的档案还没确认（没有向量）时是 null。 */
+  /** 我的档案还没确认时、以及助手附的小卡片是 null。 */
   fit: FitLevel | null
 }
+
+/** C10 大厅助手：像交办任务就回 taskId（显示任务确认卡），否则回答＋候选人小卡片（都没有分数）。 */
+export type LobbyAssistantView =
+  | { kind: 'task'; taskId: string }
+  | { kind: 'answer'; answer: string; cards: LobbyCardView[] }
 
 export interface LobbyFilterInput {
   purpose?: LobbyPurpose
@@ -221,6 +225,11 @@ export function getLobby(filter: LobbyFilterInput = {}): Promise<LobbyCardView[]
   if (filter.q?.trim()) params.set('q', filter.q.trim())
   const query = params.toString()
   return request('GET', query ? `/api/lobby?${query}` : '/api/lobby')
+}
+
+/** C10 问大厅助手（要等 AI，几秒）。 */
+export function askLobbyAssistant(question: string): Promise<LobbyAssistantView> {
+  return request('POST', '/api/lobby/assistant', { question })
 }
 
 /** C9「我自己聊」：我本人 ↔ 对方分身；已经有还没结束的就接着聊。 */

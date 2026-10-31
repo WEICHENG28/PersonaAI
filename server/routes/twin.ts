@@ -26,7 +26,8 @@ import { createConversationApi, defaultConversationDeps, type ConversationApi } 
 import { supabaseTwinStore } from '../twin/store'
 import { createLobbyApi, lobbyQuerySchema, targetBodySchema, type LobbyApi } from '../twin/lobby'
 import { supabaseLobbyStore } from '../twin/lobbyStore'
-import { createSingleTargetTask } from '../contracts/social'
+import { createSingleTargetTask, createTaskFromText, searchLobby } from '../contracts/social'
+import { QUESTION_MAX } from '../twin/lobbyAssistant'
 
 /** 回 users.id；失敗回已寫好的 401／403 Response。 */
 export type ResolveUserId = (c: Context) => Promise<string | Response>
@@ -43,6 +44,7 @@ export interface TwinRouteDeps {
 }
 
 const idSchema = z.uuid()
+const questionSchema = z.object({ question: z.string().trim().min(1).max(QUESTION_MAX) })
 const NOTIFICATION_NOT_FOUND = '找不到这则通知'
 // request_human：now／later／decline；anomaly（C8）：continue／end／report
 const respondBodySchema = z.object({ response: z.union([humanResponseSchema, anomalyChoiceSchema]) })
@@ -166,6 +168,15 @@ export function createTwinRoutes(deps: TwinRouteDeps): Hono {
     respondAsUser(c, deps, async (userId) => deps.lobby().startHumanChat(userId, await readTarget(c))),
   )
 
+  // C10 大廳 AI 助手：{ question }；像交辦任務就建任務（回 taskId），否則回答＋候選人小卡片（都沒有分數）
+  routes.post('/lobby/assistant', (c) =>
+    respondAsUser(c, deps, async (userId) => {
+      const body = questionSchema.safeParse(await c.req.json().catch(() => null))
+      if (!body.success) throw new ChatRoomError(`问题要在 1–${QUESTION_MAX} 字之间`, 400)
+      return deps.lobby().ask(userId, body.data.question)
+    }),
+  )
+
   // C9「讓分身去聊」：B 的 createSingleTargetTask，回 taskId（前端導向任務頁）
   routes.post('/lobby/twin-chat', (c) =>
     respondAsUser(c, deps, async (userId) => deps.lobby().startTwinChat(userId, await readTarget(c))),
@@ -240,7 +251,15 @@ export const twinRoutes = createTwinRoutes({
     })),
   anomaly: getAnomalyApi,
   lobby: () =>
-    (lobbyApi ??= createLobbyApi({ store: supabaseLobbyStore(), llmJson, startConversation, createSingleTargetTask })),
+    (lobbyApi ??= createLobbyApi({
+      store: supabaseLobbyStore(),
+      searchLobby,
+      getShareableProfile,
+      createTaskFromText,
+      createSingleTargetTask,
+      startConversation,
+      llmJson,
+    })),
   notifications: () => (notificationApi ??= createNotificationApi({ store: supabaseNotificationStore(), now: () => new Date() })),
   resolveUserId: resolveAppUserId,
 })

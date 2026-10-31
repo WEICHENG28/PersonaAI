@@ -1,6 +1,7 @@
-// C9 大廳：篩選、AI 預估分級（不回數字）、卡片快取與產生（LLM mock）、「我自己聊」「讓分身去聊」的檢查。
+// C9 大廳：候選人來自 B 的 searchLobby（用我的興趣＋想找當查詢）、篩選、AI 預估分級（不回數字）、
+// 卡片快取與產生（LLM mock）、「我自己聊」「讓分身去聊」的檢查。
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentTask, ShareableProfile } from '../../shared/types'
+import type { AgentTask, LobbyCandidate, ShareableProfile } from '../../shared/types'
 import { ChatRoomError } from '../../server/twin/chatRoom'
 import {
   NOT_READY_FOR_TWIN,
@@ -9,12 +10,11 @@ import {
   keepProfileTags,
   lobbyQuerySchema,
   matchesFilter,
+  myQueryText,
+  type CardRow,
   type LobbyDeps,
-  type LobbyMe,
-  type LobbyRow,
 } from '../../server/twin/lobby'
 import { lobbyCardSchema } from '../../server/prompts/10_card'
-import { parseVector } from '../../server/twin/lobbyStore'
 
 const ME = '11111111-1111-4111-8111-111111111111'
 const AN = '22222222-2222-4222-8222-222222222222'
@@ -25,57 +25,63 @@ function profile(intro: string, interests: string[]): ShareableProfile {
   return { intro, interests, chat_style: '慢热、短句', looking_for: '一起爬山的朋友' }
 }
 
+const MY_PROFILE = profile('周末爬山', ['登山', '摄影'])
 const CACHED = { headline: '慢热的登山爱好者', tags: ['登山', '摄影'], chat_style: '慢热、短句', mbti: null }
 
-function rows(): LobbyRow[] {
-  return [
-    { user_id: ME, display_name: '我', purposes: ['sport'], shareable: profile('我', ['登山']), card: CACHED, embedding: [1, 0], self_mbti: null },
-    // 和我方向一樣 → 很可能合得來；有快取卡片
-    { user_id: AN, display_name: '小安', purposes: ['sport', 'friend'], shareable: profile('慢热的登山爱好者', ['登山', '摄影', '看展']), card: CACHED, embedding: [1, 0], self_mbti: 'INFP' },
-    // cos = 0.6 → 可以聊聊看；沒有卡片要產生
-    { user_id: ZHE, display_name: '阿哲', purposes: ['sport'], shareable: profile('越野跑和登山都爱', ['登山', '越野跑', '重训']), card: null, embedding: [0.6, 0.8], self_mbti: null },
-    // 垂直 → 差異較大；不是運動
-    { user_id: XIA, display_name: '夏夏', purposes: ['hobby', 'friend'], shareable: profile('爱画画的动漫迷', ['动漫', '漫展', '绘图']), card: null, embedding: [0, 1], self_mbti: null },
-  ]
+// searchLobby 已經照相似度排好（B 的排序）
+const FOUND: LobbyCandidate[] = [
+  { user_id: AN, display_name: '小安', shareable: profile('慢热的登山爱好者', ['登山', '摄影', '看展']), similarity: 0.72 },
+  { user_id: ZHE, display_name: '阿哲', shareable: profile('越野跑和登山都爱', ['登山', '越野跑', '重训']), similarity: 0.55 },
+  { user_id: XIA, display_name: '夏夏', shareable: profile('爱画画的动漫迷', ['动漫', '漫展', '绘图']), similarity: 0.44 },
+]
+
+function rows(): Map<string, CardRow> {
+  return new Map<string, CardRow>([
+    [AN, { card: CACHED, self_mbti: 'INFP', purposes: ['sport', 'friend'] }],
+    [ZHE, { card: null, self_mbti: null, purposes: ['sport'] }],
+    [XIA, { card: null, self_mbti: null, purposes: ['hobby', 'friend'] }],
+  ])
 }
 
-function deps(opts: { me?: Partial<LobbyMe>; llm?: LobbyDeps['llmJson']; open?: string | null } = {}) {
-  const me: LobbyMe = { socialAgentEnabled: true, shareableConfirmed: true, embedding: [1, 0], ...opts.me }
-  const d = {
+function deps(opts: { me?: ShareableProfile | null; ready?: boolean; inLobby?: boolean; llm?: LobbyDeps['llmJson']; open?: string | null } = {}) {
+  return {
     store: {
-      listLobbyUsers: vi.fn(async () => rows()),
-      getMe: vi.fn(async () => me),
+      getCardRows: vi.fn(async () => rows()),
       saveCard: vi.fn(async () => undefined),
+      isReadyForTwin: vi.fn(async () => opts.ready ?? true),
+      isInLobby: vi.fn(async () => opts.inLobby ?? true),
       findOpenManualChat: vi.fn(async () => opts.open ?? null),
     },
+    searchLobby: vi.fn(async () => FOUND),
+    getShareableProfile: vi.fn(async () => (opts.me === undefined ? MY_PROFILE : opts.me)),
+    createTaskFromText: vi.fn(async () => ({ id: 'task-search' }) as AgentTask),
+    createSingleTargetTask: vi.fn(async () => ({ id: 'task-1' }) as AgentTask),
+    startConversation: vi.fn(async () => ({ conversationId: 'conv-new' })),
     llmJson: vi.fn(
       opts.llm ??
         (async (o) => o.schema.parse({ headline: '新卡片', tags: ['登山', '跳伞'], chat_style: '节奏快、话多', mbti: null })),
     ) as LobbyDeps['llmJson'],
-    startConversation: vi.fn(async () => ({ conversationId: 'conv-new' })),
-    createSingleTargetTask: vi.fn(async () => ({ id: 'task-1' }) as AgentTask),
   }
-  return d
 }
 
 describe('fitLevel：相似度分三級', () => {
-  it('0.65 以上很可能合得來、0.55 以上可以聊聊看、其他差異較大', () => {
-    expect(fitLevel(0.92)).toBe('likely')
-    expect(fitLevel(0.65)).toBe('likely')
-    expect(fitLevel(0.6)).toBe('maybe')
+  it('0.6 以上很可能合得來、0.5 以上可以聊聊看、其他差異較大', () => {
+    expect(fitLevel(0.82)).toBe('likely')
+    expect(fitLevel(0.6)).toBe('likely')
     expect(fitLevel(0.55)).toBe('maybe')
+    expect(fitLevel(0.5)).toBe('maybe')
     expect(fitLevel(0.44)).toBe('different')
   })
 })
 
 describe('篩選', () => {
-  it('目的要在對方的目的裡、關鍵字雙向比對興趣', () => {
-    const [, an, zhe, xia] = rows()
-    expect(matchesFilter(an!, { purpose: 'sport', q: '登山' })).toBe(true)
-    expect(matchesFilter(xia!, { purpose: 'sport' })).toBe(false)
-    expect(matchesFilter(zhe!, { q: '爱登山' })).toBe(true)
-    expect(matchesFilter(xia!, { q: '登山' })).toBe(false)
-    expect(matchesFilter(xia!, {})).toBe(true)
+  it('目的照字面比對、關鍵字雙向比對興趣', () => {
+    const [an, zhe, xia] = FOUND
+    expect(matchesFilter(['sport'], an!.shareable, { purpose: 'sport', q: '登山' })).toBe(true)
+    expect(matchesFilter(['hobby', 'friend'], xia!.shareable, { purpose: 'sport' })).toBe(false)
+    expect(matchesFilter(['sport'], zhe!.shareable, { q: '爱登山' })).toBe(true)
+    expect(matchesFilter(undefined, xia!.shareable, { q: '登山' })).toBe(false)
+    expect(matchesFilter(undefined, xia!.shareable, {})).toBe(true)
   })
 
   it('查詢參數：空字串當作沒篩選；目的不合法、關鍵字太長都不通過', () => {
@@ -86,9 +92,11 @@ describe('篩選', () => {
 })
 
 describe('listLobby', () => {
-  it('不含自己、照相似度排序，AI 預估只有文字等級，沒有任何數字或向量', async () => {
-    const api = createLobbyApi(deps())
-    const cards = await api.listLobby(ME, {})
+  it('用我的興趣＋想找的人呼叫 searchLobby（不帶關鍵字加分），照 B 的排序，AI 預估只有文字等級', async () => {
+    const d = deps()
+    const cards = await createLobbyApi(d).listLobby(ME, {})
+    expect(d.searchLobby).toHaveBeenCalledWith(ME, { text: myQueryText(MY_PROFILE), limit: 100 })
+    expect(myQueryText(MY_PROFILE)).toBe('兴趣：登山、摄影；想找：一起爬山的朋友')
     expect(cards.map((c) => [c.name, c.fit])).toEqual([
       ['小安', 'likely'],
       ['阿哲', 'maybe'],
@@ -99,9 +107,16 @@ describe('listLobby', () => {
     expect(json).not.toMatch(/0\.\d/)
   })
 
-  it('篩選運動＋登山只剩運動且喜歡登山的人', async () => {
+  it('篩選運動＋登山：searchLobby 不會刷掉人，由大廳自己篩', async () => {
     const cards = await createLobbyApi(deps()).listLobby(ME, { purpose: 'sport', q: '登山' })
     expect(cards.map((c) => c.name)).toEqual(['小安', '阿哲'])
+  })
+
+  it('我還沒確認對外檔案時不放預估（相似度不是「跟我合不合」）', async () => {
+    const d = deps({ me: null })
+    const cards = await createLobbyApi(d).listLobby(ME, {})
+    expect(d.searchLobby).toHaveBeenCalledWith(ME, { text: undefined, limit: 100 })
+    expect(cards.every((c) => c.fit === null)).toBe(true)
   })
 
   it('有快取就不呼叫 LLM；沒有卡片的用 Prompt 10 產生並快取，標籤只留檔案裡有的興趣', async () => {
@@ -110,8 +125,7 @@ describe('listLobby', () => {
     expect(cards.find((c) => c.name === '小安')).toMatchObject({ headline: '慢热的登山爱好者', mbti: 'INFP' })
     expect(d.llmJson).toHaveBeenCalledTimes(1)
     expect(d.llmJson).toHaveBeenCalledWith(expect.objectContaining({ role: 'fast', temperature: 0.3 }))
-    const zhe = cards.find((c) => c.name === '阿哲')!
-    expect(zhe).toMatchObject({ headline: '新卡片', chatStyle: '节奏快、话多', tags: ['登山'] })
+    expect(cards.find((c) => c.name === '阿哲')).toMatchObject({ headline: '新卡片', chatStyle: '节奏快、话多', tags: ['登山'] })
     expect(d.store.saveCard).toHaveBeenCalledWith(ZHE, { headline: '新卡片', tags: ['登山'], chat_style: '节奏快、话多', mbti: null })
   })
 
@@ -125,17 +139,11 @@ describe('listLobby', () => {
   })
 
   it('LLM 失敗時用對外檔案當備用卡片，不快取、大廳照樣打得開', async () => {
-    const d = deps({
-      llm: async () => {
-        throw new Error('timeout')
-      },
-    })
+    const d = deps({ llm: async () => Promise.reject(new Error('timeout')) })
     const err = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const cards = await createLobbyApi(d).listLobby(ME, { q: '动漫' })
     err.mockRestore()
-    expect(cards).toEqual([
-      expect.objectContaining({ name: '夏夏', headline: '爱画画的动漫迷', tags: ['动漫', '漫展', '绘图'], chatStyle: '慢热、短句' }),
-    ])
+    expect(cards).toEqual([expect.objectContaining({ name: '夏夏', headline: '爱画画的动漫迷', tags: ['动漫', '漫展', '绘图'], chatStyle: '慢热、短句' })])
     expect(d.store.saveCard).not.toHaveBeenCalled()
   })
 
@@ -146,11 +154,6 @@ describe('listLobby', () => {
     const cards = await createLobbyApi(d).listLobby(ME, { q: '越野' })
     err.mockRestore()
     expect(cards[0]).toMatchObject({ headline: '新卡片' })
-  })
-
-  it('我還沒有向量（檔案沒確認）時 AI 預估是 null', async () => {
-    const cards = await createLobbyApi(deps({ me: { embedding: null } })).listLobby(ME, {})
-    expect(cards.every((c) => c.fit === null)).toBe(true)
   })
 })
 
@@ -170,12 +173,6 @@ describe('卡片格式', () => {
     const p = profile('x', ['登山', '摄影'])
     expect(keepProfileTags({ headline: 'x', tags: ['跳伞'], chat_style: '', mbti: null }, p).tags).toEqual(['登山', '摄影'])
   })
-
-  it('pgvector 字串解析成數字陣列', () => {
-    expect(parseVector('[0.5,-1]')).toEqual([0.5, -1])
-    expect(parseVector(null)).toBeNull()
-    expect(parseVector('oops')).toBeNull()
-  })
 })
 
 describe('我自己聊', () => {
@@ -192,9 +189,8 @@ describe('我自己聊', () => {
   })
 
   it('對方不在大廳 → 404；找自己 → 400', async () => {
-    const api = createLobbyApi(deps())
-    await expect(api.startHumanChat(ME, '55555555-5555-4555-8555-555555555555')).rejects.toMatchObject({ status: 404 })
-    await expect(api.startHumanChat(ME, ME)).rejects.toMatchObject({ status: 400 })
+    await expect(createLobbyApi(deps({ inLobby: false })).startHumanChat(ME, AN)).rejects.toMatchObject({ status: 404 })
+    await expect(createLobbyApi(deps()).startHumanChat(ME, ME)).rejects.toMatchObject({ status: 400 })
   })
 })
 
@@ -206,12 +202,16 @@ describe('讓分身去聊', () => {
   })
 
   it('沒開社交 Agent 或檔案沒確認 → 403，不建任務', async () => {
-    for (const me of [{ socialAgentEnabled: false }, { shareableConfirmed: false }]) {
-      const d = deps({ me })
-      const err = await createLobbyApi(d).startTwinChat(ME, ZHE).catch((e: unknown) => e)
-      expect(err).toBeInstanceOf(ChatRoomError)
-      expect(err).toMatchObject({ status: 403, message: NOT_READY_FOR_TWIN })
-      expect(d.createSingleTargetTask).not.toHaveBeenCalled()
-    }
+    const d = deps({ ready: false })
+    const err = await createLobbyApi(d).startTwinChat(ME, ZHE).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ChatRoomError)
+    expect(err).toMatchObject({ status: 403, message: NOT_READY_FOR_TWIN })
+    expect(d.createSingleTargetTask).not.toHaveBeenCalled()
+  })
+
+  it('B 的 TaskError 原樣回給用戶（狀態碼照帶）', async () => {
+    const d = deps()
+    d.createSingleTargetTask.mockRejectedValue(Object.assign(new Error('找不到这个人'), { name: 'TaskError', status: 404 }))
+    await expect(createLobbyApi(d).startTwinChat(ME, ZHE)).rejects.toMatchObject({ name: 'ChatRoomError', status: 404, message: '找不到这个人' })
   })
 })
