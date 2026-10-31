@@ -6,6 +6,8 @@
   margin-inline: auto;
   padding: 0 var(--gutter);
   display: grid;
+  /* --space-3xl 尚未進 tokens.css（全站只在此頁使用），先局部定義：96px＝2xl(64) 的下一級 */
+  --space-3xl: 96px;
   gap: var(--space-3xl);
   padding-block: var(--space-lg) var(--space-3xl);
 }
