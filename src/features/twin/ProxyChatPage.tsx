@@ -9,6 +9,7 @@ import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
 import { isLiveChat } from '@lib/api/twin'
 import { LiveChatRoom } from './components/LiveChatRoom'
+import { usePrivacyCheck } from '@components/PrivacyWarning'
 
 /** 画面 5：聊天室。http 模式且网址有对话 id（/chat/:id）→ 真资料；其他情况照旧跑 demo。 */
 export function ProxyChatPage() {
@@ -27,14 +28,20 @@ function DemoProxyChat() {
   const lastRound = s.proxyMessages.at(-1)?.round ?? 0
   const latestVerdict = [...s.verdicts].reverse().find((v) => v.round <= lastRound)
 
+  // 接手後是本人在和對方聊：送出前檢查隱私
+  const privacy = usePrivacyCheck('human')
   const send = () => {
-    if (!draft.trim()) return
-    s.sendProxyMessage(draft.trim())
-    setDraft('')
+    const text = draft.trim()
+    if (!text) return
+    privacy.guard(text, () => {
+      s.sendProxyMessage(text)
+      setDraft('')
+    })
   }
 
   return (
     <div className="page">
+      {privacy.dialog}
       <div className="page-head">
         <h1>{t('proxyChat.withWho', { name: '林小山' })}</h1>
         <p>

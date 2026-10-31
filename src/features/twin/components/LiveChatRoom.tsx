@@ -19,6 +19,7 @@ import {
   statusChip,
   verdictText,
 } from './chatRoomView'
+import { usePrivacyCheck } from '@components/PrivacyWarning'
 import { HandoffCard } from './HandoffCard'
 import { HANDOFF_TEXT, readHandoffState, takeoverBlockOf } from './handoffView'
 import { useChatRoom, type ChatRoomState } from './useChatRoom'
@@ -82,14 +83,19 @@ function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
   const anyTwin = room.me.controller === 'twin' || room.other.controller === 'twin'
   const notice = state.notice ?? state.loadError
 
-  const send = async () => {
+  // 送出前檢查隱私：和真人聊天，訊息會直接被對方看到
+  const privacy = usePrivacyCheck('human')
+  const send = () => {
     const text = draft.trim()
     if (!text || state.sending) return
-    if (await state.send(text)) setDraft('')
+    privacy.guard(text, () => {
+      void state.send(text).then((ok) => ok && setDraft(''))
+    })
   }
 
   return (
     <div className="page">
+      {privacy.dialog}
       <div className="page-head">
         <h1>{t('proxyChat.withWho', { name: room.other.name })}</h1>
         <p>
@@ -128,10 +134,10 @@ function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
               value={draft}
               maxLength={1000}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && void send()}
+              onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && send()}
               disabled={!typable || state.sending}
             />
-            <Button small onClick={() => void send()} disabled={!typable || state.sending || !draft.trim()}>
+            <Button small onClick={send} disabled={!typable || state.sending || !draft.trim()}>
               {CHAT_TEXT.send}
             </Button>
           </div>
