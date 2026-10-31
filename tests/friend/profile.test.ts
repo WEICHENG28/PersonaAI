@@ -279,6 +279,17 @@ describe('getShareableView / updateShareable', () => {
     expect(tables['user_profiles']!.list[0]).toMatchObject({ shareable_confirmed: true, card: null })
     expect(embed).toHaveBeenCalled()
   })
+
+  it('updateShareable：繁体兴趣统一转简体（「攝影」→「摄影」，与种子用户可比对）', async () => {
+    await updateShareable('u1', {
+      intro: '喜歡攝影',
+      interests: ['攝影', '看漫畫'],
+      chat_style: '溫和',
+      looking_for: '找運動夥伴',
+    })
+    const saved = tables['user_profiles']!.list[0] as { shareable_profile: { interests: string[] } }
+    expect(saved.shareable_profile.interests).toEqual(['摄影', '看漫画'])
+  })
 })
 
 describe('contracts（无 DB 设定回退 fixtures；有 DB 读库）', () => {

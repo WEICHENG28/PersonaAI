@@ -171,6 +171,18 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-10-31｜全線檢查後的 A 線修正｜Vincent（AI 協助）｜分支 a/audit-fixes
+- **做了什麼**（對應檢查報告的 A①–A⑥）：
+  - **① 任務確認卡**：FriendPage http 模式 `callFriendChat` 回 `taskId` 時改顯示 B 的 `<TaskConfirmCard taskId=…>`（真任務 pending_confirm → 確認 running），`onStarted` 導向 `/tasks/<id>`；mock 模式保留原 demo `TaskConfirmModal`。
+  - **② 工作日誌面板**：http 模式改用後端 `dev_mode`（mount 時 `fetchSettings`），`AgentLogPanel` http 模式本來就自己讀真資料；mock 仍用 demo store 的 `devMode`。
+  - **③ 導覽**：NavBar TABS 加「我的任务」（`/tasks`，桌機頂欄＋手機底欄第 4 格），`strings.json` 加 `nav.tasks`。
+  - **④ 設定頁**：社交 Agent 卡改「点击开启／点击关闭」按鈕＋狀態文案（開啟中／關閉中／未確認）；未確認檔案按開關先顯示「请先到「我的档案」确认对外档案」1.2 秒再跳頁；新增「每日代聊上限」輸入（1–20，`PUT /api/settings` 的 `daily_chat_limit`）。
+  - **⑤ 興趣簡體化**：新增 `server/lib/zh.ts`（繁→簡字元表 + `toSimplified`/`shareableToSimplified`），`updateShareable` 存檔前轉換（「攝影」→「摄影」，與種子用戶可比對）。不引入套件：demo 階段不想加依賴，常見興趣字表已足夠；沒涵蓋的字原樣保留（寧可少轉不轉錯）。
+  - **⑥ mock 分數**：MockApi `askLobbyHelper` 回答拿掉「契合度 82、74、69」與「预估契合度最高」，改質化描述（產品原則不顯示分數）。
+- **驗證**：`tsc -b` 0 errors；vitest **510/510**（新增 `tests/friend/zh.test.ts` 4 測 + `updateShareable` 繁轉簡 1 測）；`npm run build` 過（僅既有 chunk 大小警告）。手動驗證：http 模式跟阿澈說「帮我找 3 个喜欢登山的人」→ 彈出 B 的確認卡（Agent 理解結果）→ 開始 → 跳 `/tasks/<id>`；設定頁開關文案與提示按上述行為。
+- **坑**：zh.ts 初版物件字面量有重複鍵（TS1117），改成 `[trad, simp][]` 陣列再建 Map；「和」「与」這類簡繁同形字不列入表。
+- **還沒做完**：zh.ts 字表只覆蓋興趣／性格常用字，用戶輸入較冷門繁體字仍會保留原字（比對不到時 lobby 以 embedding 向量兜底）。
+
 ### 2026-10-31｜A4 修正：getShareableProfile 只回確認過的檔案｜Vincent（AI 協助）｜分支 a/A4-confirmed-only
 - **做了什麼**：`server/contracts/friend.ts` 的 `getShareableProfile` 有 DB 時連 `shareable_confirmed` 一起讀，不是 `true` 一律回 null（簽名不變；`getAgentProfile`／`getStyleProfile` 照舊；無 DB 設定回 fixtures 照舊）。`tests/friend/profile.test.ts` 補三個 case：confirmed=false 回 null、confirmed 缺省（null）回 null、原本「有值」測試改為明確帶 `shareable_confirmed: true`。
 - **為什麼**：`extractProfile` 每次重整會覆蓋 `shareable_profile` 並把 `shareable_confirmed` 歸 false，但舊版 `getShareableProfile` 不看確認狀態照樣回傳草稿——C 的分身與隱私守門會拿到「本人還沒確認」的內容去跟別人聊，違反 docs/02 F3「分身只能使用你確認可對外分享的資料」。未確認回 null 後，分身停止發言（C 的錯誤訊息「这位用户还没有确认对外档案」已存在，C 不用改）；B 的大廳本來就只列 confirmed=true、且只用 `getAgentProfile`，不受影響。

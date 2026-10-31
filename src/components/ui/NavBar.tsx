@@ -8,6 +8,7 @@ const TABS = [
   { to: '/friend', key: 'nav.friend' as const, match: /^\/(friend|chat)/ },
   { to: '/lobby', key: 'nav.lobby' as const, match: /^\/lobby/ },
   { to: '/history', key: 'nav.history' as const, match: /^\/history/ },
+  { to: '/tasks', key: 'nav.tasks' as const, match: /^\/tasks/ },
 ]
 
 /**
