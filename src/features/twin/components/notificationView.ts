@@ -1,6 +1,6 @@
 // C7 通知铃铛的纯函数与画面文字（不碰网络，方便测试）。拥有者：C。
 // 文字先放这里：messages/strings.json 是 A 的档案，之后要搬过去再和 A 讨论。
-import type { HumanResponse, NotificationView } from '../../../lib/api/twin'
+import type { AnomalyChoice, HumanResponse, NotificationView } from '../../../lib/api/twin'
 
 export const NOTIFY_TEXT = {
   bell: '通知',
@@ -22,8 +22,14 @@ export const NOTIFY_TEXT = {
   } satisfies Record<HumanResponse, string>,
   responding: '处理中…',
   takingOver: '正在整理接手卡片，大约十几秒…',
-  anomalyActions: ['继续聊', '结束对话', '检举'],
-  comingSoon: '即将上线',
+  anomalyEvidence: '对方的具体行为',
+  anomalyNote: '这只是提醒，只有你看得到，不会告诉对方。',
+  choose: { continue: '继续聊', end: '结束对话', report: '检举' } satisfies Record<AnomalyChoice, string>,
+  chosen: {
+    continue: '你选择了继续聊',
+    end: '已结束对话',
+    report: '已记录检举',
+  } satisfies Record<AnomalyChoice, string>,
   viewResult: '查看结果',
   goFriend: '去看看',
   goChat: '回到聊天室',
@@ -47,12 +53,18 @@ export function notificationTitle(n: NotificationView): string {
   return NOTIFY_TEXT.friendReport
 }
 
-/** 点了要去哪：match → 结果页、friend_report → /friend、回应过「现在聊」的请求 → 聊天室；其他不跳转。 */
+/** 言行异常提醒还在等我选择。 */
+export function isPendingAnomaly(n: NotificationView): boolean {
+  return n.type === 'anomaly' && n.choice === null && !n.read
+}
+
+/** 点了要去哪：match → 结果页、friend_report → /friend、回应过「现在聊」的请求或言行异常提醒 → 聊天室；其他不跳转。 */
 export function notificationLink(n: NotificationView): string | null {
   const conv = n.conversationId ? encodeURIComponent(n.conversationId) : null
   if (n.type === 'match') return conv ? `/chat/${conv}/result` : null
   if (n.type === 'friend_report') return '/friend'
   if (n.type === 'request_human' && n.response === 'now') return conv ? `/chat/${conv}` : null
+  if (n.type === 'anomaly') return conv ? `/chat/${conv}` : null
   return null
 }
 
@@ -68,6 +80,11 @@ export function timeLabel(iso: string, now: Date = new Date()): string {
 /** 用回应结果更新列表里那一则（不改原阵列）。 */
 export function withResponse(list: readonly NotificationView[], id: string, response: HumanResponse): NotificationView[] {
   return list.map((n) => (n.id === id ? { ...n, response, read: true } : n))
+}
+
+/** 用言行异常提醒的选择更新列表里那一则（不改原阵列）。 */
+export function withChoice(list: readonly NotificationView[], id: string, choice: AnomalyChoice): NotificationView[] {
+  return list.map((n) => (n.id === id ? { ...n, choice, read: true } : n))
 }
 
 /** 把那一则设为已读（不改原阵列）。 */
