@@ -237,9 +237,9 @@ export async function fetchMemories(): Promise<MemoryRow[]> {
   return apiCall<MemoryRow[]>('/api/memory')
 }
 
-/** DELETE /api/memory/:id：软删除一条记忆。 */
-export async function deleteMemory(id: string): Promise<void> {
-  await apiCall<null>(`/api/memory/${id}`, { method: 'DELETE' })
+/** DELETE /api/memory/:id：软删除一条记忆。keepalive：关页面时也要送出（撤销期间离开页面）。 */
+export async function deleteMemory(id: string, opts: { keepalive?: boolean } = {}): Promise<void> {
+  await apiCall<null>(`/api/memory/${id}`, { method: 'DELETE', keepalive: opts.keepalive })
 }
 
 /** PATCH /api/memory/:id：编辑记忆内容（source→user_edited, confidence=1）。 */

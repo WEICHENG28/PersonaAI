@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import type { ChatMessage, Memory } from '@lib/api/types'
 import { failedMatch, friendIntro, nextMeetLine } from '@demo/scenario'
@@ -33,6 +33,32 @@ function friendMsg(text: string): ChatMessage {
   return { id: uid(), speaker: 'friend', text, at: Date.now() }
 }
 
+type SetState = StoreApi<DemoState>['setState']
+type GetState = StoreApi<DemoState>['getState']
+
+/** 阿澈回一句（900 毫秒后）；挑回复时 userReplyCount 已含这一句 */
+function scheduleReply(set: SetState, get: GetState, text: string): void {
+  const s = get()
+  const recentTexts = s.friendMessages.filter((m) => m.speaker === 'friend').slice(-2).map((m) => m.text)
+  const reply = pickFriendReply({ text, usedIds: [...s.usedBeatIds], userCount: s.userReplyCount, recentTexts })
+  later(FRIEND_REPLY_MS, () => {
+    const cur = get()
+    const memories: Memory[] = reply.memory
+      ? [...cur.memories, { id: uid(), source: '用户主动提及', createdAt: Date.now(), ...reply.memory }]
+      : cur.memories
+    const draftReady = memories.length >= 1 || cur.userReplyCount >= DRAFT_AFTER_REPLIES
+    const keepProfile = cur.profileEdited || cur.profile.confirmed || !draftReady
+    set({
+      friendMessages: [...cur.friendMessages, friendMsg(reply.text)],
+      usedBeatIds: reply.once ? new Set(cur.usedBeatIds).add(reply.id) : cur.usedBeatIds,
+      memories,
+      friendTyping: false,
+      profileDraftReady: draftReady,
+      profile: keepProfile ? cur.profile : draftProfile(memories),
+    })
+  })
+}
+
 export const useDemoStore = create<DemoState>()(
   persist(
     (set, get) => ({
@@ -50,42 +76,36 @@ export const useDemoStore = create<DemoState>()(
       },
 
       // ── 朋友线 ──
+      // 进入朋友页时呼叫：开场白（重新整理时从没说完的地方接着说）；
+      // 若最后一则是用户的话但阿澈还没回（回复途中重新整理），补回一句，不会沉默
       friendIntro: () => {
-        if (introStarted || get().friendMessages.length > 0) return
+        if (introStarted) return
         introStarted = true
+        const s = get()
+        const last = s.friendMessages.at(-1)
+        if (last?.speaker === 'human') {
+          set({ friendTyping: true })
+          scheduleReply(set, get, last.text)
+          return
+        }
+        if (s.userReplyCount > 0) return
+        const rest = friendIntro.slice(s.friendMessages.length)
+        if (rest.length === 0) return
         set({ friendTyping: true })
-        friendIntro.forEach((text, i) => {
+        rest.forEach((text, i) => {
           later(700 + i * INTRO_GAP_MS, () => {
-            set((s) => ({ friendMessages: [...s.friendMessages, friendMsg(text)], friendTyping: i < friendIntro.length - 1 }))
+            set((cur) => ({ friendMessages: [...cur.friendMessages, friendMsg(text)], friendTyping: i < rest.length - 1 }))
           })
         })
       },
       sendFriendMessage: (text) => {
         const s = get()
-        const userCount = s.userReplyCount + 1
-        const recentTexts = s.friendMessages.filter((m) => m.speaker === 'friend').slice(-2).map((m) => m.text)
-        const reply = pickFriendReply({ text, usedIds: [...s.usedBeatIds], userCount, recentTexts })
         set({
           friendMessages: [...s.friendMessages, { id: uid(), speaker: 'human', text, at: Date.now() }],
-          userReplyCount: userCount,
+          userReplyCount: s.userReplyCount + 1,
           friendTyping: true,
         })
-        later(FRIEND_REPLY_MS, () => {
-          const cur = get()
-          const memories: Memory[] = reply.memory
-            ? [...cur.memories, { id: uid(), source: '用户主动提及', createdAt: Date.now(), ...reply.memory }]
-            : cur.memories
-          const draftReady = memories.length >= 1 || cur.userReplyCount >= DRAFT_AFTER_REPLIES
-          const keepProfile = cur.profileEdited || cur.profile.confirmed || !draftReady
-          set({
-            friendMessages: [...cur.friendMessages, friendMsg(reply.text)],
-            usedBeatIds: reply.once ? new Set(cur.usedBeatIds).add(reply.id) : cur.usedBeatIds,
-            memories,
-            friendTyping: false,
-            profileDraftReady: draftReady,
-            profile: keepProfile ? cur.profile : draftProfile(memories),
-          })
-        })
+        scheduleReply(set, get, text)
       },
       nextMeet: () => {
         // 模拟时间经过：阿澈带新近况 + 社交 Agent 回报（02 §F1 表）
@@ -112,6 +132,8 @@ export const useDemoStore = create<DemoState>()(
       // ── 任务线 ──
       createTask: (draft) => {
         if (get().task) return
+        // 代聊还没开始过：之前在大厅「我自己聊」留下的接手状态清掉，让这次任务的分身能开始
+        if (get().proxyTick === 0) set({ takenOver: false, controlNotes: [] })
         set((s) => ({
           task: {
             id: 'task-1',
@@ -128,7 +150,18 @@ export const useDemoStore = create<DemoState>()(
       },
       cancelTask: () => {
         stopProxyTimers()
-        set({ task: null })
+        const fresh = initialData()
+        set({
+          task: null,
+          proxyMessages: fresh.proxyMessages,
+          proxyStep: 0,
+          proxyTick: 0,
+          proxyDone: false,
+          taskLogs: fresh.taskLogs,
+          verdicts: fresh.verdicts,
+          takenOver: false,
+          controlNotes: fresh.controlNotes,
+        })
       },
       setSocialAgent: (on) => {
         const s = get()

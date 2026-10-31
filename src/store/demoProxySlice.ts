@@ -100,7 +100,9 @@ export function createProxyActions(set: Set, get: Get): ProxyActions {
     takeOver: () => {
       if (get().takenOver) return
       stopProxyTimers()
-      set({ takenOver: true, controlNotes: note(get, '你本人接手了，分身已停下') })
+      // 分身还没开始聊（大厅「我自己聊」）：不显示「分身已停下」
+      const text = get().proxyTick > 0 ? '你本人接手了，分身已停下' : '你以本人身份开始聊天'
+      set({ takenOver: true, controlNotes: note(get, text) })
     },
     handBack: () => {
       if (!get().takenOver) return

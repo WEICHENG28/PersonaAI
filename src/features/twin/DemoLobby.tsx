@@ -118,8 +118,9 @@ function DemoCandidateCard({ candidate: c, pastMismatch }: { candidate: Candidat
       setNotice('演示只开放和林小山的代聊')
       return
     }
+    // 先把控制权交回分身，再开始（或接着跑）代聊；startProxy 是幂等的
     if (s.takenOver) s.handBack()
-    else s.startProxy()
+    s.startProxy()
     navigate('/chat/lin')
   }
 

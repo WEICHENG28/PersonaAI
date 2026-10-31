@@ -96,11 +96,20 @@ function useHttpMemories(): MemoriesState {
     })
   }, [])
 
-  // 离开页面时还没撤销的删除照样送出
-  useEffect(() => () => {
-    if (!pending.current) return
-    clearTimeout(pending.current.timer)
-    void deleteMemory(pending.current.target.id).catch(() => {})
+  // 换页、重新整理或关掉分页时，还没撤销的删除照样送出（keepalive 让关页面时的请求也能送达）
+  useEffect(() => {
+    const flush = () => {
+      if (!pending.current) return
+      clearTimeout(pending.current.timer)
+      const id = pending.current.target.id
+      pending.current = null
+      void deleteMemory(id, { keepalive: true }).catch(() => {})
+    }
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
   }, [])
 
   const remove = useCallback(
