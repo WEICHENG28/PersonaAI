@@ -71,6 +71,11 @@ export function supabaseNotificationStore(): RequestHumanStore & NotificationSto
       if (error) throw new Error(`更新通知失败：${error.message}`)
     },
 
+    async clearResponse(id) {
+      const { error } = await getServiceClient().from('notifications').update({ response: null, read_at: null }).eq('id', id)
+      if (error) throw new Error(`改回未回应失败：${error.message}`)
+    },
+
     async listNotifications(userId, limit) {
       const { data, error } = await getServiceClient()
         .from('notifications')

@@ -1,21 +1,22 @@
 // C7 請求真人（docs/07C C7、02 F7）。擁有者：C。
 // POST /api/conversations/:id/request-human：我在和對方的分身聊天時，通知對方本人（type request_human，
 // payload { conversationId, fromName }）；對方是種子用戶時 3 秒後自動用 CONFIG.SEED_AUTO_RESPONSE 回應。
-// POST /api/notifications/:id/respond：now → C6 接手；later → 分身說「本人晚点会上线」，繼續輕聊；decline → 分身收尾、結束。
+// POST /api/notifications/:id/respond：now → C6 接手；later → 分身送出固定的「本人晚点会上线，我们可以先继续聊」，
+// 之後照常輕聊；decline → 拒絕的人的分身收尾、結束。動作失敗時把回應改回未回應，讓用戶可以重按。
 // 外部依賴（資料庫、C6 接手、分身、結束對話、日誌、計時）都放在 RequestHumanDeps，測試可以換成假的。
 import { z } from 'zod'
 import type { AgentLogInput } from '../../shared/types'
 import { ChatRoomError, loadSides, type ChatRoomStore } from './chatRoom'
 import type { TakeoverView } from './handoff'
-import type { TwinReplyFn } from './twin'
 
 /** 種子用戶被請求真人後，幾毫秒自動回應（07C C7）。 */
 export const SEED_RESPONSE_DELAY_MS = 3000
 
-/** 回應 later 時給分身的額外規則（Prompt 5 的 extra_instruction）。 */
-export const LATER_INSTRUCTION =
-  '- 【这一则优先于上面「接住对方、偶尔反问」的规则】告诉对方：本人晚点会上线，我们可以先继续聊。' +
-  '一到两句，语气自然，可以顺着刚才的话题接一句；不要说具体几点上线，也不要约时间地点。'
+/**
+ * 回應 later 時分身送出的話（07C C7 原句）。用固定文字不經過 LLM：
+ * 讓模型說時實測會改成「我／他晚点会上线」，對方分不清是誰要上線。
+ */
+export const LATER_MESSAGE = '本人晚点会上线，我们可以先继续聊。'
 
 export type HumanResponse = 'now' | 'later' | 'decline'
 export type NotificationType = 'match' | 'request_human' | 'friend_report' | 'anomaly'
@@ -50,15 +51,18 @@ export interface RequestHumanStore extends Pick<ChatRoomStore, 'getConversation'
   saveResponse(id: string, response: HumanResponse, readAt: string): Promise<boolean>
   /** 設為已讀（只改自己的、還沒讀過的）。 */
   markRead(id: string, userId: string, readAt: string): Promise<void>
+  /** 動作失敗時把回應與已讀改回 null，讓用戶可以重按。 */
+  clearResponse(id: string): Promise<void>
 }
 
 export interface RequestHumanDeps {
   store: RequestHumanStore
   /** C6 本人接手。 */
   takeOver(conversationId: string, userId: string): Promise<TakeoverView>
-  twinReply: TwinReplyFn
-  /** C3 結束對話（分身禮貌收尾）。 */
-  endConversation(conversationId: string, reason: 'declined'): Promise<void>
+  /** 以這位用戶的分身送出一則固定的 AI 訊息（is_ai = true）。 */
+  postTwinMessage(conversationId: string, speakerUserId: string, content: string): Promise<void>
+  /** C3 結束對話：closerUserId 的分身禮貌收尾。 */
+  endConversation(conversationId: string, reason: 'declined', closerUserId: string): Promise<void>
   writeLog(entry: AgentLogInput): Promise<void>
   schedule(ms: number, run: () => void): void
   now(): Date
@@ -78,10 +82,6 @@ export interface RequestHumanApi {
 }
 
 const payloadConversationSchema = z.object({ conversationId: z.string().min(1) })
-
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
 
 async function requestHuman(deps: RequestHumanDeps, running: Set<string>, conversationId: string, userId: string) {
   const { conv, me, other } = await loadSides(deps.store, conversationId, userId)
@@ -133,15 +133,24 @@ async function loadRequest(deps: RequestHumanDeps, notificationId: string, userI
   return payload.data.conversationId
 }
 
-/** later：我方分身告訴對方本人晚點上線；失敗只寫日誌（回應已經記下了）。 */
-async function sayLater(deps: RequestHumanDeps, conversationId: string, userId: string): Promise<string | null> {
+/** 照回應動作；我方已經本人在聊（例如先按了「我来聊」）時不再接手、不讓分身說話、不結束。 */
+async function act(deps: RequestHumanDeps, conversationId: string, userId: string, response: HumanResponse) {
+  if (response === 'now') return deps.takeOver(conversationId, userId)
+  if (response === 'later') await deps.postTwinMessage(conversationId, userId, LATER_MESSAGE)
+  if (response === 'decline') await deps.endConversation(conversationId, 'declined', userId)
+  return null
+}
+
+/** 動作失敗：回應改回未回應（用戶可以重按），再把原本的錯誤丟出去。 */
+async function rollback(deps: RequestHumanDeps, notificationId: string, err: unknown): Promise<never> {
+  console.error('[twin] 回应请求真人失败，改回未回应', notificationId, err)
   try {
-    await deps.twinReply(conversationId, userId, { extraInstruction: LATER_INSTRUCTION })
-    return null
-  } catch (err) {
-    console.error('[twin] 分身告知本人晚点上线失败', conversationId, err)
-    return errorText(err)
+    await deps.store.clearResponse(notificationId)
+  } catch (clearErr) {
+    console.error('[twin] 改回未回应失败', notificationId, clearErr)
   }
+  if (err instanceof ChatRoomError) throw err
+  throw new ChatRoomError('刚才没处理成功，请再选一次', 503)
 }
 
 async function respond(
@@ -164,25 +173,19 @@ async function respond(
     throw new ChatRoomError('你已经回应过了', 409)
   }
 
-  // 我方已經本人在聊（例如先按了「我来聊」）：只記下回應，不再接手、不讓分身說話、不結束
   const isTwin = me.controller === 'twin'
-  let handoff: TakeoverView | null = null
-  let laterError: string | null = null
-  if (isTwin && response === 'now') handoff = await deps.takeOver(conv.id, userId)
-  if (isTwin && response === 'later') laterError = await sayLater(deps, conv.id, userId)
-  if (isTwin && response === 'decline') await deps.endConversation(conv.id, 'declined')
+  const handoff = isTwin ? await act(deps, conv.id, userId, response).catch((err) => rollback(deps, notificationId, err)) : null
 
   const detail: Record<string, unknown> = { notification_id: notificationId, response }
   if (auto) detail.auto = true
   if (!isTwin) detail.already_human = true
-  if (laterError) detail.error = laterError
   await deps.writeLog({
     user_id: userId,
     agent: 'twin',
     conversation_id: conv.id,
     task_id: conv.task_id ?? undefined,
     action: `回应请求真人：${RESPONSE_TEXT[response]}`,
-    reason: auto ? `种子用户没有真人，自动回应「${RESPONSE_TEXT[response]}」` :`对方想和你本人聊，你选择了「${RESPONSE_TEXT[response]}」`,
+    reason: auto ? `种子用户没有真人，自动回应「${RESPONSE_TEXT[response]}」` : `对方想和你本人聊，你选择了「${RESPONSE_TEXT[response]}」`,
     detail,
   })
   return { response, conversationId: conv.id, handoff }

@@ -229,6 +229,15 @@ describe('twin 路由：C7 請求真人與通知', () => {
     expect(requestHuman.respond).not.toHaveBeenCalled()
   })
 
+  it('回應：沒登入一律 401（內容不對也一樣），不呼叫', async () => {
+    const { routes, requestHuman } = app({ userId: null })
+    for (const body of [{ response: 'now' }, { response: 'maybe' }, undefined]) {
+      const res = await routes.request(`/notifications/${NOTE_ID}/respond`, post(body))
+      expect(res.status).toBe(401)
+    }
+    expect(requestHuman.respond).not.toHaveBeenCalled()
+  })
+
   it('回應：成功回 { ok, data }；通知 id 不是 uuid → 404「找不到这则通知」', async () => {
     const { routes, requestHuman } = app()
     const res = await routes.request(`/notifications/${NOTE_ID}/respond`, post({ response: 'later' }))

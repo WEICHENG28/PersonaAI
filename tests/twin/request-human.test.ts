@@ -7,7 +7,7 @@ import type { ConversationRow } from '../../server/twin/conversation'
 import type { TakeoverView } from '../../server/twin/handoff'
 import {
   createRequestHumanApi,
-  LATER_INSTRUCTION,
+  LATER_MESSAGE,
   SEED_RESPONSE_DELAY_MS,
   type HumanResponse,
   type NotificationRow,
@@ -60,7 +60,7 @@ interface Harness {
   pending?: string | null
   notification?: NotificationRow | null
   saved?: boolean
-  twinFails?: boolean
+  actionFails?: boolean
 }
 
 function harness(opts: Harness = {}) {
@@ -81,15 +81,19 @@ function harness(opts: Harness = {}) {
     getNotification: vi.fn(async (id: string) => (note && note.id === id ? { ...note } : null)),
     saveResponse: vi.fn(async () => opts.saved ?? true),
     markRead: vi.fn(async () => undefined),
+    clearResponse: vi.fn(async () => undefined),
+  }
+  const fail = async () => {
+    if (opts.actionFails) throw new Error('db down')
   }
   const deps = {
     store,
-    takeOver: vi.fn(async () => TAKEOVER),
-    twinReply: vi.fn(async () => {
-      if (opts.twinFails) throw new Error('llm down')
-      return { id: 'm-later', conversation_id: CONV_ID, sender_id: AN, is_ai: true, content: '本人晚点会上线', created_at: '' }
+    takeOver: vi.fn(async () => {
+      await fail()
+      return TAKEOVER
     }),
-    endConversation: vi.fn(async () => undefined),
+    postTwinMessage: vi.fn(async () => fail()),
+    endConversation: vi.fn(async () => fail()),
     writeLog: vi.fn(async (e: AgentLogInput) => {
       logs.push(e)
     }),
@@ -127,11 +131,11 @@ describe('requestHuman 請求真人', () => {
     expect(h.scheduled).toHaveLength(1)
     expect(h.scheduled[0]!.ms).toBe(SEED_RESPONSE_DELAY_MS)
     expect(SEED_RESPONSE_DELAY_MS).toBe(3000)
-    expect(h.deps.twinReply).not.toHaveBeenCalled()
+    expect(h.deps.postTwinMessage).not.toHaveBeenCalled()
 
     h.scheduled[0]!.run()
-    await vi.waitFor(() => expect(h.deps.twinReply).toHaveBeenCalled())
-    expect(h.deps.twinReply).toHaveBeenCalledWith(CONV_ID, AN, { extraInstruction: LATER_INSTRUCTION })
+    await vi.waitFor(() => expect(h.deps.postTwinMessage).toHaveBeenCalled())
+    expect(h.deps.postTwinMessage).toHaveBeenCalledWith(CONV_ID, AN, LATER_MESSAGE)
     expect(h.store.saveResponse).toHaveBeenCalledWith('n-new', 'later', '2026-10-31T10:05:00.000Z')
     await vi.waitFor(() => expect(h.logs.some((l) => l.user_id === AN && l.detail?.auto === true)).toBe(true))
   })
@@ -187,25 +191,27 @@ describe('respond 回應請求真人', () => {
     expect(out).toEqual({ response: 'now', conversationId: CONV_ID, handoff: TAKEOVER })
     expect(h.deps.takeOver).toHaveBeenCalledWith(CONV_ID, AN)
     expect(h.store.saveResponse).toHaveBeenCalledWith('n-1', 'now', '2026-10-31T10:05:00.000Z')
-    expect(h.deps.twinReply).not.toHaveBeenCalled()
+    expect(h.deps.postTwinMessage).not.toHaveBeenCalled()
     expect(h.deps.endConversation).not.toHaveBeenCalled()
   })
 
-  it('later → 我方分身說「本人晚點會上線」，對話不結束', async () => {
+  it('later → 我方分身送出固定的「本人晚点会上线，我们可以先继续聊」，對話不結束', async () => {
     const h = harness()
     const out = await h.api.respond('n-1', AN, 'later')
     expect(out).toEqual({ response: 'later', conversationId: CONV_ID, handoff: null })
-    expect(h.deps.twinReply).toHaveBeenCalledWith(CONV_ID, AN, { extraInstruction: LATER_INSTRUCTION })
-    expect(LATER_INSTRUCTION).toContain('本人晚点会上线')
+    expect(h.deps.postTwinMessage).toHaveBeenCalledWith(CONV_ID, AN, LATER_MESSAGE)
+    expect(LATER_MESSAGE).toContain('本人晚点会上线')
+    expect(LATER_MESSAGE).toContain('我们可以先继续聊')
+    expect(LATER_MESSAGE).not.toMatch(/[我他她]晚点会上线/)
     expect(h.deps.endConversation).not.toHaveBeenCalled()
     expect(h.deps.takeOver).not.toHaveBeenCalled()
   })
 
-  it('decline → 分身禮貌收尾、對話結束（endConversation declined）', async () => {
+  it('decline → 拒絕的人的分身禮貌收尾、對話結束（endConversation declined）', async () => {
     const h = harness()
     const out = await h.api.respond('n-1', AN, 'decline')
     expect(out).toEqual({ response: 'decline', conversationId: CONV_ID, handoff: null })
-    expect(h.deps.endConversation).toHaveBeenCalledWith(CONV_ID, 'declined')
+    expect(h.deps.endConversation).toHaveBeenCalledWith(CONV_ID, 'declined', AN)
   })
 
   it('每個回應都寫日誌（回應的人、對話、理由）', async () => {
@@ -218,11 +224,24 @@ describe('respond 回應請求真人', () => {
     }
   })
 
-  it('later 時分身沒說成：回應照樣記下，日誌寫錯誤', async () => {
-    const h = harness({ twinFails: true })
+  it('動作失敗（接手、稍後聊、收尾）：回應改回未回應讓用戶重按，回 503，不寫回應日誌', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    await expect(h.api.respond('n-1', AN, 'later')).resolves.toMatchObject({ response: 'later' })
-    expect(h.logs.some((l) => l.detail?.error === 'llm down')).toBe(true)
+    for (const r of ['now', 'later', 'decline'] as const) {
+      const h = harness({ actionFails: true })
+      await expectError(h.api.respond('n-1', AN, r), 503, '刚才没处理成功，请再选一次')
+      expect(h.store.saveResponse).toHaveBeenCalled()
+      expect(h.store.clearResponse).toHaveBeenCalledWith('n-1')
+      expect(h.logs.some((l) => l.user_id === AN)).toBe(false)
+    }
+    spy.mockRestore()
+  })
+
+  it('動作丟出給用戶看的錯誤（例如正在接手）：改回未回應，原樣回給用戶', async () => {
+    const h = harness()
+    h.deps.takeOver.mockRejectedValueOnce(new ChatRoomError('正在整理接手卡片，稍等一下', 409))
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await expectError(h.api.respond('n-1', AN, 'now'), 409, '正在整理接手卡片，稍等一下')
+    expect(h.store.clearResponse).toHaveBeenCalledWith('n-1')
     spy.mockRestore()
   })
 
@@ -268,7 +287,7 @@ describe('respond 回應請求真人', () => {
       await expect(h.api.respond('n-1', AN, r)).resolves.toEqual({ response: r, conversationId: CONV_ID, handoff: null })
     }
     expect(h.deps.takeOver).not.toHaveBeenCalled()
-    expect(h.deps.twinReply).not.toHaveBeenCalled()
+    expect(h.deps.postTwinMessage).not.toHaveBeenCalled()
     expect(h.deps.endConversation).not.toHaveBeenCalled()
   })
 })
