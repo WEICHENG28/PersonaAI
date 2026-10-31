@@ -301,6 +301,16 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜修正：名字帳號登入失敗｜Peter（AI 協助）
+- **問題**：#95 上線後所有人登入都顯示「登录失败，请再试一次」（前端 `verifyOtp` 失敗）。
+- **原因（推斷）**：新帳號是讓 `generateLink(magiclink)` 順便建立，Supabase 這時給的是 signup 類型的憑證，前端用 magiclink 換就被拒。
+- **修正**：新帳號先用 `admin.createUser`（email 已驗證）建好，再產生登入憑證；後端回傳 `verificationType`，前端照它 `verifyOtp`（失敗時在 console 印原因）。之前失敗時留下的帳號也能用「是我，进入」登入。
+- **重新整理**：`RequireAuth` 本來就會從 Supabase session 還原登入；之前要重登是因為根本沒登入成功。
+- **改了哪些檔案**：`server/account/{nameLogin,supabaseDeps}.ts`、`server/routes/account.ts`、`src/lib/api/account.ts`、`tests/social/name-login.test.ts`。
+- **驗證**：`tsc -b`、vitest、build；真實登入要 Peter 在 Vercel 測（AI 不建帳號）。
+
+---
+
 ### 2026-10-31｜名字帳號：同名回到原帳號、隨機名字不重複｜Peter（AI 協助）
 - **做了什麼**：新增 `POST /api/account/enter`（`server/routes/account.ts`、`server/account/`）。登入頁（http 模式）改成：自己打的名字 → 有帳號就先提示「已经有帐号了」，按「是我，进入」回到原帳號、記錄都在；按「不是我」換名字。沒改過的隨機名字 → 後端保證不和現有帳號、種子用戶重複。這個瀏覽器已登入過就直接進。mock 模式不變。
 - **怎麼做到**：後端用 Supabase admin `generateLink(magiclink)` 產生一次性 token（不寄信，內部 email `<uuid>@users.personaai.app`），前端 `verifyOtp` 換成登入狀態。舊的匿名帳號第一次「是我」時補上內部 email。種子用戶的名字保留不能用。

@@ -27,14 +27,19 @@ export async function enterWithName(mode: EnterMode, name: string, confirmExisti
     throw new Error('连不上服务器，请稍后再试')
   }
   const json = (await res.json().catch(() => null)) as
-    | { ok: true; data: { displayName: string; tokenHash: string; created: boolean } }
+    | { ok: true; data: { displayName: string; tokenHash: string; verificationType?: string; created: boolean } }
     | { ok: false; code?: string; error?: string; displayName?: string }
     | null
   if (!json?.ok) {
     if (json?.code === 'exists') throw new NameExistsError(json.error ?? '这个名字已经有帐号了', json.displayName ?? name)
     throw new Error(json?.error ?? '出了点问题，再试一次？')
   }
-  const { error } = await supabase.auth.verifyOtp({ token_hash: json.data.tokenHash, type: 'magiclink' })
-  if (error) throw new Error('登录失败，请再试一次')
+  // 憑證類型照後端回的（signup／magiclink），不然 Supabase 會拒絕
+  const type = json.data.verificationType === 'signup' ? 'signup' : 'magiclink'
+  const { error } = await supabase.auth.verifyOtp({ token_hash: json.data.tokenHash, type })
+  if (error) {
+    console.error('[account] verifyOtp failed', error.message)
+    throw new Error('登录失败，请再试一次')
+  }
   return { displayName: json.data.displayName, created: json.data.created }
 }
