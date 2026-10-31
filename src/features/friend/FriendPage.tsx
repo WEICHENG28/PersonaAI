@@ -170,7 +170,7 @@ export function FriendPage() {
   return (
     <div className="page friend-page">
       {privacy.dialog}
-      {lobbyInvite}
+      {lobbyInvite.dialog}
       {/* 桌机左栏：chromabot 大头像（手机隐藏；占屏幕高度 60%） */}
       <aside className="friend-avatar-col" aria-hidden>
         <RiveAvatar name="chromabot" fill className="friend-avatar-rive" />
@@ -183,6 +183,7 @@ export function FriendPage() {
             <span className="typing-label">{t('friend.typing')}</span>
           )}
           {s.reportReady && <Chip tone="pear">{t('friend.hasNews')}</Chip>}
+          {lobbyInvite.banner}
         </div>
 
         <div className="chat" ref={chatRef}>

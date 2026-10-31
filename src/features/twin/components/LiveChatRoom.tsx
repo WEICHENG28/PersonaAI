@@ -18,6 +18,7 @@ import {
   speakerOf,
   statusChip,
   verdictText,
+  emptyChatHint,
 } from './chatRoomView'
 import { usePrivacyCheck } from '@components/PrivacyWarning'
 import { PersonKindChip } from '@components/PersonKindChip'
@@ -115,7 +116,7 @@ function ChatRoomBody({ room, state, onTakeOver }: ChatRoomBodyProps) {
           </div>
 
           <div className="chat" ref={chatRef}>
-            {room.messages.length === 0 && <p className="empty">{t('common.loading')}</p>}
+            {room.messages.length === 0 && <p className="empty">{emptyChatHint(room)}</p>}
             {room.messages.map((m) => (
               <ChatBubble key={m.id} speaker={speakerOf(m, room.me.userId)} aiChatting={m.is_ai} privacyRewrite={m.guard_rewritten}>
                 {m.content}

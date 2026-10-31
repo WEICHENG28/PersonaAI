@@ -59,6 +59,16 @@ export function supabaseLobbyStore(): LobbyStore {
     },
 
     isReadyForTwin: isReady,
+    async readinessOf(userId) {
+      const { data, error } = await getServiceClient()
+        .from('users')
+        .select('social_agent_enabled, user_profiles(shareable_confirmed)')
+        .eq('id', userId)
+        .maybeSingle()
+      if (error) throw new Error(`读取用户设置失败：${error.message}`)
+      const row = data as ReadyRow | null
+      return { socialAgentEnabled: Boolean(row?.social_agent_enabled), shareableConfirmed: Boolean(one(row?.user_profiles ?? null)?.shareable_confirmed) }
+    },
     // 大廳的條件和「能讓分身代聊」一樣：開了社交 Agent、對外檔案已確認
     isInLobby: isReady,
 

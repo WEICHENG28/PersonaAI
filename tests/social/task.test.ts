@@ -136,7 +136,8 @@ describe('任務狀態', () => {
     const id = await createTask()
     const res = await post(`/api/tasks/${id}/confirm`)
     expect(res.status).toBe(403)
-    expect(await res.json()).toEqual({ ok: false, error: '先到「我的档案」确认对外档案，并在设置开启社交 Agent' })
+    // 只缺檔案時只叫他去我的檔案（不再連帶說去設定）
+    expect(await res.json()).toEqual({ ok: false, error: '先到「我的档案」确认对外档案' })
   })
 
   it('不合法的轉換會被擋下', async () => {

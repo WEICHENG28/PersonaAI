@@ -4,10 +4,9 @@ import { Modal } from '@components/ui/Modal'
 import { Button, Chip } from '@components/ui/Button'
 import { useDemoStore } from '@store/useDemoStore'
 import { isHttpMode } from '@lib/api/friend'
-import { acceptLobbyInvite, getLobbyInvite, type LobbyShareable } from '@lib/api/social'
+import { acceptLobbyInvite, getLobbyInvite, type LobbyInviteView, type LobbyShareable } from '@lib/api/social'
+import { lobbyProgress } from '../lobbyProgress'
 
-/** 和後端 CONFIG.LOBBY_INVITE_MIN_MESSAGES 一致：說滿這麼多句才去問後端，省得每句都打 API。 */
-const MIN_MESSAGES = 8
 
 function dismissKey(userId: string) {
   return `personaai:lobbyInviteDismissed:${userId}`
@@ -24,9 +23,10 @@ function readDismissed(userId: string): boolean {
 /**
  * 真人進大廳的邀請（http 模式）：和阿澈聊夠了、對外檔案也夠完整，就跳出卡片，
  * 讓用戶看過自己的對外檔案後一鍵加入大廳（確認檔案＋開啟社交 Agent）。按「先不要」這個瀏覽器就不再問。
- * 用法：const lobbyInvite = useLobbyInvite(用戶說了幾句)；畫面放 {lobbyInvite}。
+ * 還沒達到條件時給一條進度（banner），告訴用戶還差什麼。
+ * 用法：const lobby = useLobbyInvite(用戶說了幾句)；畫面放 {lobby.dialog}、{lobby.banner}。
  */
-export function useLobbyInvite(userMessageCount: number): ReactNode {
+export function useLobbyInvite(userMessageCount: number): { dialog: ReactNode; banner: ReactNode } {
   const user = useDemoStore((s) => s.user)
   const pushNotification = useDemoStore((s) => s.pushNotification)
   const navigate = useNavigate()
@@ -34,14 +34,17 @@ export function useLobbyInvite(userMessageCount: number): ReactNode {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [notYet, setNotYet] = useState<Extract<LobbyInviteView, { status: 'not_yet' }> | null>(null)
 
+  // 每多說一句就問一次後端（進度要跟著動）
   useEffect(() => {
-    if (!isHttpMode || !user || done || shareable || userMessageCount < MIN_MESSAGES) return
+    if (!isHttpMode || !user || done || shareable) return
     if (readDismissed(user.id)) return
     let alive = true
     getLobbyInvite()
       .then((view) => {
         if (!alive) return
+        setNotYet(view.status === 'not_yet' ? view : null)
         if (view.status === 'invite') setShareable(view.shareable)
         if (view.status === 'in_lobby') setDone(true)
       })
@@ -51,7 +54,24 @@ export function useLobbyInvite(userMessageCount: number): ReactNode {
     }
   }, [user, userMessageCount, done, shareable])
 
-  if (!shareable || !user) return null
+  const banner =
+    notYet && !done && !shareable ? (
+      <div className="stack" style={{ gap: 'var(--space-2xs)', width: '100%' }} role="status">
+        <p className="hint-inline">
+          进大厅进度 <strong>{lobbyProgress(notYet)}%</strong>：{notYet.reason}，就能让社交 Agent 帮你找人、也能被别人找到。
+        </p>
+        <div className="grow" style={{ ['--g' as string]: String(lobbyProgress(notYet) / 100) }} />
+        {notYet.userMessages >= notYet.need && (
+          <div>
+            <Button small variant="secondary" onClick={() => navigate('/profile')}>
+              去「我的档案」整理
+            </Button>
+          </div>
+        )}
+      </div>
+    ) : null
+
+  if (!shareable || !user) return { dialog: null, banner }
 
   const later = () => {
     try {
@@ -85,7 +105,7 @@ export function useLobbyInvite(userMessageCount: number): ReactNode {
     }
   }
 
-  return (
+  const dialog = (
     <Modal open demo={false} onClose={later} title="你可以进大厅了" sub="和阿澈聊了这么多，你的对外档案已经准备好">
       <div className="stack">
         <div className="card stack">
@@ -125,4 +145,5 @@ export function useLobbyInvite(userMessageCount: number): ReactNode {
       </div>
     </Modal>
   )
+  return { dialog, banner }
 }

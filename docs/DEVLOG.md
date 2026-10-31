@@ -325,6 +325,24 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜只提示缺的那一步＋設定頁改版｜Peter（AI 協助）
+- **提示只講缺的那一步**：原本不管缺什麼都說「先到「我的档案」确认对外档案，并在设置开启社交 Agent」。新增 `server/social/readiness.ts` 的 `notReadyMessage`：只缺社交 Agent →「先到「设置」开启社交 Agent」；只缺檔案 →「先到「我的档案」确认对外档案」；都缺才兩句。用在 B 的確認任務、單人任務，以及 C 大廳「让分身去聊」（`LobbyStore.readinessOf` 選填）。確認卡也只顯示缺的那一步的按鈕。
+- **設定頁**：拿掉「人工平均时间」（Peter：看不懂用途；效率統計照用預設 20 分鐘）。六張卡片桌機左三右三、同樣大小（社交 Agent、每日代聊上限、對外檔案入口 ｜ 檔位、主動頻率、開發者模式），手機一欄；登出改成最下面一整條紅色按鈕。新增 `.settings-grid`。
+- **合併**：先把 main 合進來解 DEVLOG 衝突（#113 合併後）。
+- **跨線**（Peter 同意）：A 的 `SettingsPage.tsx`、`pages.css`；C 的 `server/twin/{lobby,lobbyStore}.ts`。
+- **驗證**：`tsc -b`；vitest 669/669（新增 readiness 4 則、改 task 驗收 2 的訊息）；build。
+
+---
+
+### 2026-10-31｜進大廳進度條＋空聊天室提示｜Peter（AI 協助）
+- **進大廳進度**：Peter 新帳號聊了好幾句沒看到邀請，也不知道還差什麼。AI 朋友頁上方加一條「进大厅进度 N%：再和阿澈聊 X 句／阿澈还不太了解你的兴趣…」＋進度條；句數夠了但檔案不完整時給「去「我的档案」整理」按鈕。每多說一句就重問 `GET /api/lobby-invite`（原本要滿 8 句才問，沒達標時畫面上什麼都沒有）。`useLobbyInvite` 改回傳 `{ dialog, banner }`。
+- **空聊天室顯示「加载中…」**：自己去找對方分身聊、還沒人開口時，聊天室其實已載入完，卻寫「加载中…」。改成「还没有消息。先打个招呼吧，对方的分身会回你。」（`emptyChatHint`）。
+- **worker 一直「读取任务失败」**：錯誤是 `fetch failed … ECONNRESET`（TLS 連線被中斷），是當下這台電腦連 Supabase 的網路問題，不是程式；之後測試 Node 與 curl 都正常。worker 會自己重試，網路恢復就繼續。
+- **改了哪些檔案**：`src/features/social/{lobbyProgress.ts,components/LobbyInvite.tsx}`、`FriendPage.tsx`（A）、`src/features/twin/components/{chatRoomView.ts,LiveChatRoom.tsx}`（C），Peter 同意；`tests/social/lobby-invite.test.ts`。
+- **驗證**：`tsc -b`、vitest 664/664、build。
+
+---
+
 ### 2026-10-31｜大廳：用名字（ID）找人＋卡片間距｜Peter（AI 協助）
 - **ID 搜尋**：大廳興趣關鍵字左邊加「用户 ID（名字）」欄位；`GET /api/lobby?name=`，名字包含就算、不分大小寫，和目的、興趣可以一起用（`matchesName`）。
 - **間距**：候選人卡片原本貼著上方篩選卡、彼此間距也小；`.lobby-grid` 間距與上邊距改 `--space-lg`，卡片內距改 `--space-lg`。
