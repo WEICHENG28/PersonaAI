@@ -60,13 +60,13 @@ export interface ResultMessage extends ChatMessageView {
   round: number
 }
 
-/** C5 结果页：只有我方视角，没有任何分数。 */
+/** C5 结果页：只有我方视角；score 是我方的契合度 0–100，对方视角的分数不回。 */
 export interface ResultView {
   conversationId: string
   status: ConversationStatus
   me: { userId: string; controller: Controller }
   other: { userId: string; name: string; controller: Controller }
-  verdict: { value: VerdictValue; trend: Trend } | null
+  verdict: { value: VerdictValue; trend: Trend; score?: number } | null
   mutual: boolean
   fitPoints: FitPointView[]
   outline: OutlineView | null

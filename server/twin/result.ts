@@ -38,8 +38,8 @@ export interface ResultView {
   status: ConversationStatus
   me: { userId: string; controller: Controller }
   other: { userId: string; name: string; controller: Controller }
-  /** 我方視角的最新判定；只有文字代碼，沒有分數。 */
-  verdict: { value: VerdictValue; trend: Trend } | null
+  /** 我方視角的最新判定；score 是「我方」的契合度 0–100（Peter 要求顯示）。對方視角的分數一律不回。 */
+  verdict: { value: VerdictValue; trend: Trend; score: number } | null
   /** 我方那筆 match_attempts 的結果是雙向合適。 */
   mutual: boolean
   /** 為什麼你們合：我方視角判定合適時才有。 */
@@ -142,7 +142,7 @@ async function getResult(deps: ResultDeps, conversationId: string, userId: strin
     deps.store.getMyLatestAttempt(conversationId, me.userId),
   ])
   const latest = scores[0]
-  const verdict = latest ? { value: toVerdictValue(latest.verdict), trend: trendOf(scores) } : null
+  const verdict = latest ? { value: toVerdictValue(latest.verdict), trend: trendOf(scores), score: Math.round(latest.direction_score) } : null
   const outline = parseOutline(attempt?.outline)
   return {
     conversationId: conv.id,
