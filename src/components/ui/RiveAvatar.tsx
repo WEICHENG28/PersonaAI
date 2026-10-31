@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
-import { useRive, useViewModel, useViewModelInstance, type UseRiveOptions } from '@rive-app/react-canvas'
+import { useRive, type UseRiveOptions } from '@rive-app/react-canvas'
 
 const SOURCES = {
-  /** chromabot.riv（Rive 7.5，ViewModel 数据绑定）——登录页 & AI 朋友阿澈 */
+  /** chromabot.riv（Rive 7.5，含 ViewModel + State Machine 1）——登录页 & AI 朋友 */
   chromabot: import.meta.env.BASE_URL + 'riv/chromabot.riv',
   fish: import.meta.env.BASE_URL + 'riv/fish_vase.riv',
   birdie: import.meta.env.BASE_URL + 'riv/red_birdie.riv',
@@ -19,40 +19,35 @@ interface RiveAvatarProps {
 
 /**
  * Rive 头像。
- * chromabot＝AI 朋友阿澈＆登录页主角（Rive 7.5 ViewModel 数据绑定格式）
- * fish＝分身大厅  birdie＝评审 Agent（landing 展示用）
  *
- * 关于 chromabot 的坑：
- * - 传 stateMachines → Rive 7.5 ViewModel 文件会让 canvas 变 0×0（运行时 bug）
- * - 不传 SM + 不初始化 ViewModel → canvas 尺寸正常但全空白（无颜色/形状数据）
- * - 正确做法：不传 SM，用 useViewModelInstance 绑默认实例 → canvas 正常渲染动画
+ * 关键：所有文件（包括 chromabot Rive 7.5 ViewModel 格式）都传 stateMachines。
+ * 之前的「0×0 bug」根本原因是 shouldResizeCanvasToContainer 默认 true，
+ * Rive 读容器 clientWidth/clientHeight（为 0）导致画布塌缩，
+ * 与 ViewModel 或 stateMachines 无关。
+ *
+ * 修复：
+ * 1. shouldResizeCanvasToContainer: false —— 不让 Rive 自动读容器
+ * 2. useEffect 在 rive 加载后手动把 canvas.style 设为目标尺寸并触发重算
  */
 export function RiveAvatar({ name, size = 120, className, options }: RiveAvatarProps) {
-  // chromabot.riv（Rive 7.5）：不传 SM 避免 0×0 bug；其余文件（7.0/7.4）正常传 SM
-  const isViewModelFile = name === 'chromabot'
-
   const { rive, canvas, RiveComponent } = useRive(
     {
       src: SOURCES[name],
+      stateMachines: 'State Machine 1',
       autoplay: true,
-      ...(isViewModelFile ? {} : { stateMachines: 'State Machine 1' }),
       ...options,
     },
     { shouldResizeCanvasToContainer: false },
   )
 
-  // 初始化 ViewModel 默认实例——对非 ViewModel 文件是空操作（vm 为 null）
-  const vm = useViewModel(rive)
-  const instance = useViewModelInstance(vm)
-
-  // Rive 7.5 ViewModel 文件：加载后 artboard 尺寸为 0×0，Rive 会覆盖 style prop。
-  // ViewModel 实例绑定后，强制把 canvas style 设回目标尺寸并触发重绘。
+  // Rive 加载后：强制设置 canvas 尺寸并触发重绘
+  // （Rive 内部会先按 artboard 原始尺寸设 style，我们在这里覆盖）
   useEffect(() => {
     if (!canvas || !rive) return
     canvas.style.width = `${size}px`
     canvas.style.height = `${size}px`
     rive.resizeDrawingSurfaceToCanvas()
-  }, [rive, instance, canvas, size])
+  }, [rive, canvas, size])
 
   return (
     <RiveComponent
