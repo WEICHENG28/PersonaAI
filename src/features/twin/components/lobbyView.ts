@@ -7,6 +7,7 @@ export const LOBBY_TEXT = {
   allPurposes: '全部',
   purpose: { friend: '交友', study: '学习', sport: '运动', hobby: '兴趣' } satisfies Record<LobbyPurpose, string>,
   searchPlaceholder: '兴趣关键字，例如：登山',
+  namePlaceholder: '用户 ID（名字）',
   search: '搜索',
   clear: '清除',
   fit: { likely: '很可能合得来', maybe: '可以聊聊看', different: '差异较大' } satisfies Record<FitLevel, string>,
