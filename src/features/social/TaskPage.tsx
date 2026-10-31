@@ -19,6 +19,7 @@ import {
   type TaskView,
 } from '@lib/api/social'
 import { StatsCard } from './components/StatsCard'
+import { DemoTaskList } from './components/DemoTaskList'
 
 const STATUS: Record<TaskView['status'], { label: string; tone: 'mint' | 'pear' | 'well' | 'coral' | 'ink' }> = {
   pending_confirm: { label: '待确认', tone: 'pear' },
@@ -29,7 +30,7 @@ const STATUS: Record<TaskView['status'], { label: string; tone: 'mint' | 'pear' 
   cancelled: { label: '已取消', tone: 'well' },
 }
 
-/** 画面：我的任务（B10）。/tasks 列表，/tasks/:id 任务详情。只在 http 模式有真资料。 */
+/** 画面：我的任务（B10）。/tasks 列表，/tasks/:id 任务详情。http 模式是真资料；mock 模式显示 demo 任务（UX #16）。 */
 export function TaskPage() {
   const { id } = useParams()
   return (
@@ -39,7 +40,7 @@ export function TaskPage() {
         <p>社交 Agent 替你找人的每一个任务，进度都在这里</p>
       </div>
       {!historyFromApi ? (
-        <p className="empty">Demo 模式没有真实任务，请到 AI 朋友页看示范的任务卡。</p>
+        <DemoTaskList />
       ) : id ? (
         <TaskDetail id={id} />
       ) : (

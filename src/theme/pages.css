@@ -328,6 +328,17 @@
 .helper-head { display: flex; gap: var(--space-md); align-items: center; }
 .helper-head strong { font-size: var(--text-md); }
 .helper-intro { font-size: var(--text-sm); color: var(--color-muted); }
+.helper-qa { gap: var(--space-2xs); }
+.helper-q {
+  justify-self: end;
+  max-width: 86%;
+  padding: var(--space-2xs) var(--space-md);
+  border-radius: var(--radius-stock);
+  background: var(--bubble-human);
+  font-size: var(--text-sm);
+}
+.number-field { gap: var(--space-2xs); }
+.number-field .input { max-width: 160px; }
 .helper-ans {
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-stock);

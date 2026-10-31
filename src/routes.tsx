@@ -61,13 +61,15 @@ function RequireAuth() {
 
 function NotFoundPage() {
   const navigate = useNavigate()
+  const user = useDemoStore((s) => s.user)
   return (
     <div className="page">
       <div className="page-head">
         <h1>{t('notFound.title')}</h1>
         <p>{t('notFound.description')}</p>
       </div>
-      <Button onClick={() => navigate('/friend')}>{t('notFound.back')}</Button>
+      {/* 未登录回落地页，登录了回 AI 朋友（UX #23） */}
+      <Button onClick={() => navigate(user ? '/friend' : '/landing')}>{user ? t('notFound.back') : t('notFound.backHome')}</Button>
     </div>
   )
 }

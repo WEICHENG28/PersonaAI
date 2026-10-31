@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { NavBar } from '@components/ui/NavBar'
 import { useDemoStore } from '@store/useDemoStore'
+import { Toasts } from './Toasts'
 
 /** 内容不足一屏就垂直置中的短页（登录） */
 const CENTER_PAGES = ['/']
@@ -12,8 +13,6 @@ const CENTER_PAGES = ['/']
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const user = useDemoStore((s) => s.user)
-  const notifications = useDemoStore((s) => s.notifications)
-  const dismissNotification = useDemoStore((s) => s.dismissNotification)
   const location = useLocation()
 
   const isCenter = CENTER_PAGES.includes(location.pathname)
@@ -31,24 +30,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
       <NavBar />
-      <main
-        className={`app-main ${isCenter ? 'page-center' : ''} ${
-          user && !isCenter ? 'has-nav' : ''
-        }`}
-      >
-        {children}
-      </main>
+      <main className={`app-main ${isCenter ? 'page-center' : ''} ${user && !isCenter ? 'has-nav' : ''}`}>{children}</main>
 
-      {/* 通知吐司（右下角，不挡输入） */}
-      <div className="toasts" aria-live="polite">
-        {notifications.map((n) => (
-          <button key={n.id} className="toast" onClick={() => dismissNotification(n.id)}>
-            <strong>{n.title}</strong>
-            <span>{n.body}</span>
-          </button>
-        ))}
-      </div>
-
+      {/* 通知吐司（手机在底栏与输入列上方、桌机右下角） */}
+      <Toasts />
     </div>
   )
 }

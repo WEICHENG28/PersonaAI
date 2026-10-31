@@ -137,10 +137,15 @@ function StartNowKnob() {
 function FriendKnob({ unread }: { unread: number }) {
   const navigate = useNavigate()
   const reportReady = useDemoStore((s) => s.reportReady)
+  const clearNotifications = useDemoStore((s) => s.clearNotifications)
   return (
     <button
       className="knob knob--friend"
-      onClick={() => navigate('/friend')}
+      onClick={() => {
+        // 红点和吐司共用同一份未读：点过阿澈就清掉（UX #18）
+        clearNotifications()
+        navigate('/friend')
+      }}
       title={reportReady ? '阿澈有事想跟你说' : '阿澈'}
     >
       <RiveAvatar name="robot" size={26} />

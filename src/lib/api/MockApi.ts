@@ -1,5 +1,6 @@
 import type { Api, Candidate, Memory, ShareableProfile } from './types'
 import { candidates, seedMemories, seedProfile } from '../../demo/fixtures'
+import { answerLobbyQuestion } from '../../demo/lobbyHelper'
 
 /**
  * MockApi：全部同步本地资料，零后端。
@@ -38,13 +39,7 @@ export const MockApi: Api = {
 
   async askLobbyHelper(q) {
     await delay(700)
-    if (q.includes('登山') || q.includes('爬山')) {
-      return '林小山和陈岭都常登山。林小山偏安静、节奏慢，跟你「慢热」的偏好更合；陈岭精力旺盛，可能聊得快一些。'
-    }
-    if (q.includes('合') || q.includes('适合')) {
-      return '以你的档案看，林小山跟你最聊得来：共同兴趣是登山与看展，聊天风格也偏慢热。可能的摩擦点是对方周末时间比较满。'
-    }
-    return '我帮你比了比：林小山跟你的共同兴趣最多，周予安其次，陈岭也不错。想看谁的卡片？'
+    return answerLobbyQuestion(q, candidates, [])
   },
 }
 

@@ -31,7 +31,8 @@ export function LandingPage() {
             <Button onClick={() => navigate(user ? '/friend' : '/')}>
               {user ? '回去找阿澈' : '免费开始（Demo）'}
             </Button>
-            <Button variant="secondary" onClick={() => navigate('/lobby')}>
+            {/* 未登录：先到登录页，并说明「登录后就能逛大厅」（UX #23） */}
+            <Button variant="secondary" onClick={() => navigate(user ? '/lobby' : '/?from=lobby')}>
               先逛逛大厅
             </Button>
           </div>

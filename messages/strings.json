@@ -31,7 +31,8 @@
     "usernameHint": "随机帮你取好了，想改也可以",
     "shuffle": "换一个",
     "start": "直接开始",
-    "demoHintStart": "不用注册，按「直接开始」就能进入"
+    "demoHintStart": "不用注册，按「直接开始」就能进入",
+    "lobbyHint": "登录后就能逛大厅"
   },
   "friend": {
     "title": "阿澈",
@@ -164,11 +165,16 @@
     "reasonFriction": "对话摩擦",
     "initiatedAuto": "系统推荐",
     "initiatedManual": "自行发起",
-    "viewChat": "看对话纪录",
+    "viewChat": "看结果",
     "selfInsight": "帮你了解自己",
     "selfInsightText": "最近 5 次没成的里面，有 3 次是对方偏好节奏比较慢的人。这不是谁的错，只是刚好不同步。",
     "restartRequestHuman": "直接请求真人",
-    "requestSent": "已通知对方本人，对方回应后会出现在通知里"
+    "requestSent": "已通知对方本人，对方回应后会出现在通知里",
+    "viewLive": "看代聊（进行中）",
+    "ended": "代聊已结束",
+    "requestSentTitle": "已发送请求",
+    "requestDone": "已发送请求",
+    "selfInsightFew": "再多几次尝试，阿澈就能帮你总结规律。"
   },
   "lobby": {
     "title": "大厅",
@@ -184,7 +190,10 @@
     "helperPlaceholder": "问问看：有没有喜欢登山、但个性比较安静的人？",
     "helperSend": "发送",
     "helperTyping": "大厅助手查询中…",
-    "helperIntro": "我可以帮你比较候选人、说明契合点和可能的摩擦点。"
+    "helperIntro": "我可以帮你比较候选人、说明契合点和可能的摩擦点。",
+    "pastMismatch": "之前聊过 · 不太合",
+    "chatMyself": "我自己聊",
+    "sendTwin": "派分身去聊"
   },
   "profile": {
     "title": "我的档案",
@@ -250,6 +259,7 @@
   "notFound": {
     "title": "这一页不存在",
     "description": "可能链接打错了，或者页面还在准备中。",
-    "back": "回到 AI 朋友"
+    "back": "回到 AI 朋友",
+    "backHome": "回到首页"
   }
 }

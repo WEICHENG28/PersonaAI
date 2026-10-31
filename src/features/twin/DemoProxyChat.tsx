@@ -51,7 +51,7 @@ export function DemoProxyChat() {
 
           <div className="chat" ref={chatRef}>
             {s.proxyMessages.length === 0 ? (
-              <p className="empty">{s.proxyTick > 0 ? t('common.loading') : t('proxyChat.notStarted')}</p>
+              !s.takenOver && <p className="empty">{s.proxyTick > 0 ? t('common.loading') : t('proxyChat.notStarted')}</p>
             ) : (
               <p className="chat-note">{t('proxyChat.twinsBelow')}</p>
             )}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button, Chip } from '@components/ui/Button'
 import { Card, CardHead } from '@components/ui/Card'
+import { Modal } from '@components/ui/Modal'
 import { t } from '@i18n/t'
 import { ApiError, getHistory, reopenHistory, type HistoryEntry } from '@lib/api/social'
 
@@ -95,28 +96,16 @@ export function HistoryList() {
         </Card>
       ))}
 
-      {restartId && (
-        <div className="modal-scrim" onClick={() => setRestartId(null)} role="presentation">
-          <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <header className="modal__head">
-              <div>
-                <h2 className="modal__title">{t('history.restart')}</h2>
-                <p className="modal__sub">{t('history.restartHint')}</p>
-              </div>
-            </header>
-            <div className="modal__body">
-              <div className="restart-opts">
-                <Button block variant="secondary" disabled={busy} onClick={() => restart('human')}>
-                  {t('history.restartSelf')}
-                </Button>
-                <Button block disabled={busy} onClick={() => restart('request_human')}>
-                  {t('history.restartRequestHuman')}
-                </Button>
-              </div>
-            </div>
-          </div>
+      <Modal open={restartId !== null} onClose={() => setRestartId(null)} title={t('history.restart')} sub={t('history.restartHint')}>
+        <div className="restart-opts">
+          <Button block variant="secondary" disabled={busy} onClick={() => restart('human')}>
+            {t('history.restartSelf')}
+          </Button>
+          <Button block disabled={busy} onClick={() => restart('request_human')}>
+            {t('history.restartRequestHuman')}
+          </Button>
         </div>
-      )}
+      </Modal>
     </div>
   )
 }

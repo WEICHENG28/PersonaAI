@@ -5,6 +5,7 @@ import { Card, CardHead } from '@components/ui/Card'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
+import { NumberField } from './NumberField'
 import {
   isHttpMode,
   logout as authLogout,
@@ -26,6 +27,8 @@ export function SettingsPage() {
   const [httpSettings, setHttpSettings] = useState<UserSettings | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // 想开社交 Agent 但档案未确认：显示提示＋「去确认档案」，不自动跳页（UX #21）
+  const [needProfile, setNeedProfile] = useState(false)
 
   // 加载设定（http 模式）
   useEffect(() => {
@@ -71,12 +74,11 @@ export function SettingsPage() {
   }
 
   const toggleSocialAgent = () => {
-    // 未确认对外档案：先提示，再跳去档案页（不静默跳页）
     if (!shareableConfirmed && !socialAgent) {
-      setSaveError('请先到「我的档案」确认对外档案，才能开启社交 Agent')
-      window.setTimeout(() => navigate('/profile'), 1200)
+      setNeedProfile(true)
       return
     }
+    setNeedProfile(false)
     setSaveError(null)
     if (isHttpMode) { void httpSave({ social_agent_enabled: !socialAgent }) }
     else { s.setSocialAgent(!socialAgent) }
@@ -121,9 +123,19 @@ export function SettingsPage() {
                   {socialAgent
                     ? '已开启：分身和大厅会使用你的对外档案，可随时关闭'
                     : shareableConfirmed
-                      ? '关闭中：开启后分身和大厅会使用你的对外档案'
+                      ? '关闭中：开启后分身和大厅会使用你的对外档案；进行中的任务会暂停'
                       : '请先到「我的档案」确认对外档案，才能开启'}
                 </p>
+                {needProfile && (
+                  <div className="confirm-inline" role="alert">
+                    <p>对外档案还没确认，分身和大厅不能使用。先去确认一下吧。</p>
+                    <div className="next-actions">
+                      <Button small onClick={() => navigate('/profile')}>
+                        去确认档案
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <Button
                     small
@@ -131,7 +143,7 @@ export function SettingsPage() {
                     onClick={toggleSocialAgent}
                     disabled={saving}
                   >
-                    {socialAgent ? '点击关闭' : '点击开启'}
+                    {socialAgent ? '关闭' : '开启'}
                   </Button>
                 </div>
               </div>
@@ -141,21 +153,13 @@ export function SettingsPage() {
             {isHttpMode && (
               <Card>
                 <CardHead title="每日代聊上限" sub="社交 Agent 每天最多帮你代聊几场" />
-                <input
-                  className="input"
-                  type="number"
+                <NumberField
+                  value={httpSettings?.daily_chat_limit ?? 10}
                   min={1}
                   max={20}
-                  value={httpSettings?.daily_chat_limit ?? 10}
-                  onChange={(e) => {
-                    const v = Math.max(1, Math.min(20, Number(e.target.value) || 10))
-                    setHttpSettings((prev) => (prev ? { ...prev, daily_chat_limit: v } : prev))
-                  }}
-                  onBlur={(e) => {
-                    const v = Math.max(1, Math.min(20, Number(e.target.value) || 10))
-                    if (v !== (httpSettings?.daily_chat_limit ?? 10)) void httpSave({ daily_chat_limit: v })
-                  }}
-                  style={{ maxWidth: 120 }}
+                  unit="场"
+                  disabled={saving}
+                  onCommit={(v) => void httpSave({ daily_chat_limit: v })}
                 />
               </Card>
             )}
@@ -227,23 +231,12 @@ export function SettingsPage() {
             {/* 人工平均时间 */}
             <Card>
               <CardHead title={t('settings.avgManualTime')} sub={t('settings.avgManualTimeNote')} />
-              <input
-                className="input"
-                type="number"
-                min={5}
-                max={120}
-                value={avgMin}
-                onChange={(e) => setAvgMin(Number(e.target.value) || 20)}
-                onBlur={(e) => {
-                  if (isHttpMode) void httpSave({ manual_minutes_per_chat: Number(e.target.value) || 20 })
-                }}
-                style={{ maxWidth: 160 }}
-              />
+              <NumberField value={avgMin} min={5} max={120} unit="分钟" disabled={saving} onCommit={setAvgMin} />
             </Card>
 
             {/* 账号：登出 */}
             <Card>
-              <CardHead title="账号" sub="登出后需重新登录" />
+              <CardHead title="账号" sub="退出登录后需要重新登录" />
               <Button small variant="danger" onClick={handleLogout}>
                 {t('settings.logout')}
               </Button>

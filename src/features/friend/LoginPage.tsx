@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { Button } from '@components/ui/Button'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { useDemoStore } from '@store/useDemoStore'
@@ -15,6 +15,9 @@ import { randomName } from './randomName'
 export function LoginPage() {
   const login = useDemoStore((s) => s.login)
   const navigate = useNavigate()
+  // 从落地页「先逛逛大厅」来的：提示一行，登录后直接去大厅
+  const [params] = useSearchParams()
+  const fromLobby = params.get('from') === 'lobby'
   const [name, setName] = useState(randomName)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -31,7 +34,7 @@ export function LoginPage() {
       } else {
         login('', nickname)
       }
-      navigate('/friend', { replace: true })
+      navigate(fromLobby ? '/lobby' : '/friend', { replace: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : t('login.errorGeneric'))
     } finally {
@@ -45,6 +48,7 @@ export function LoginPage() {
         <RiveAvatar name="birdie" size={140} className="login-bird" />
         <h1>{t('login.title')}</h1>
         <p className="login-sub">{t('login.subtitle')}</p>
+        {fromLobby && <p className="login-hint" role="status">{t('login.lobbyHint')}</p>}
       </div>
 
       <div className="login-card card">
