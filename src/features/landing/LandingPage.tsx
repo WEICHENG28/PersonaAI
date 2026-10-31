@@ -6,6 +6,11 @@ import { useDemoStore } from '@store/useDemoStore'
 /**
  * 落地页（点 wordmark 进入）：依 02 的功能模块展开，每个 section 讲一个细节。
  * 每格 1-2 短句（less wordy）；无 emoji，视觉锚点用三个 Rive（robot/fish/birdie）。
+ *
+ * 组件化展示（仿 Hallmark Hum 模板「One round, four moments」的构成）：
+ * 判定档位 / 记忆掌控 / 大厅 三个 section 不再用纯文字小卡，
+ * 而是左边讲功能、右边渲染「真实产品组件的缩小版」（档位选择器、
+ * 记忆列表、大厅卡片＋AI 导购输入框），让用户直接看到产品长相。
  */
 export function LandingPage() {
   const navigate = useNavigate()
@@ -57,7 +62,7 @@ export function LandingPage() {
       <section className="landing-roles">
         <h2>三个角色，替你社交</h2>
         <p className="landing-sec__sub">
-          AI 朋友只陪你聊；分身只替你对外；评审只管判定。各司其职，谁也不冒充谁。
+          AI 朋友只陪你聊；AI 人设由你编写、替你对外；评审只管判定。各司其职，谁也不冒充谁。
         </p>
         <div className="landing-roles__grid">
           <article className="role-card">
@@ -72,11 +77,11 @@ export function LandingPage() {
           </article>
           <article className="role-card">
             <RiveAvatar name="fish" size={96} />
-            <h3>你的分身</h3>
-            <p>替你去聊。只模仿你的说话风格，不使用你的原句。</p>
+            <h3>AI 人设</h3>
+            <p>你写的对外角色，替你去聊。想怎么被认识，就怎么写。</p>
             <ul className="role-card__list">
-              <li>句长、语气、emoji 习惯跟你</li>
-              <li>只用你确认可对外的资料</li>
+              <li>形象由你编写，不是被 AI 解读</li>
+              <li>只拿你确认可对外的资料</li>
               <li>不知道的事说「这我要问本人」</li>
             </ul>
           </article>
@@ -101,7 +106,7 @@ export function LandingPage() {
           <ol className="landing-flow__tiles">
             <li>跟阿澈聊天</li>
             <li>一句话交办找人</li>
-            <li>分身替你聊</li>
+            <li>人设替你聊</li>
             <li>判定合不合适</li>
             <li>朋友回报 · 你接手</li>
           </ol>
@@ -109,63 +114,114 @@ export function LandingPage() {
         <p className="landing-flow__note">全程可看 Agent 工作日志，每一笔附理由。</p>
       </section>
 
-      {/* ── 判定与档位 ── */}
-      <section className="landing-detail">
-        <h2>什么时候通知你，你说了算</h2>
-        <div className="landing-detail__grid">
-          <article className="detail-card">
-            <h3>单向合适档</h3>
-            <p>AI 认为对方符合你的条件，就通知你。</p>
-            <p className="detail-card__hint">机会多一些，适合先广聊。</p>
-          </article>
-          <article className="detail-card">
-            <h3>双向合适档</h3>
-            <p>两边都聊得来才通知，默认推荐。</p>
-            <p className="detail-card__hint">机会少一点，成功率更高。</p>
-          </article>
-          <article className="detail-card">
-            <h3>不合也有收获</h3>
-            <p>没成的原因会归类记下：不双向、条件不符、对话摩擦。</p>
-            <p className="detail-card__hint">AI 朋友会用这些帮你更了解自己。</p>
-          </article>
+      {/* ── 判定与档位：档位选择器的缩小渲染 ── */}
+      <section className="landing-feature">
+        <div className="landing-feature__text">
+          <h2>什么时候通知你，你说了算</h2>
+          <p className="landing-sec__sub">
+            两个档位自己选：单向合适机会多，双向合适更准。没成的也会记下原因，帮你更了解自己。
+          </p>
+        </div>
+        <div className="landing-mock">
+          <div className="landing-mock__bar">
+            <span>设置 · 判定档位</span>
+            <Chip tone="well">双向合适</Chip>
+          </div>
+          <div className="landing-mock__body landing-mock__gears">
+            <div className="mock-gear">
+              <strong>单向合适</strong>
+              <span>AI 认为对方符合你的条件，就通知你</span>
+            </div>
+            <div className="mock-gear is-on">
+              <strong>双向合适</strong>
+              <span>两边都聊得来才通知（默认推荐）</span>
+            </div>
+          </div>
+          <div className="landing-mock__foot">
+            <span className="mock-bell" aria-hidden />
+            评审 Agent：双向合适 84 / 80 · 现在通知你
+          </div>
         </div>
       </section>
 
-      {/* ── 记忆与掌控 ── */}
-      <section className="landing-detail">
-        <h2>它记得什么，你说了算</h2>
-        <div className="landing-detail__grid">
-          <article className="detail-card">
-            <h3>记得的事看得到</h3>
-            <p>每条记忆有内容、来源、置信度，不存聊天原文。</p>
-          </article>
-          <article className="detail-card">
-            <h3>改得了、删得掉</h3>
-            <p>觉得不像你，一句话归档；想删，立即硬删。</p>
-          </article>
-          <article className="detail-card">
-            <h3>对外档案经你确认</h3>
-            <p>大厅上的介绍由 AI 从记忆生成，首次发布前你过目一遍。</p>
-          </article>
+      {/* ── 记忆与掌控：记忆列表的缩小渲染 ── */}
+      <section className="landing-feature">
+        <div className="landing-feature__text">
+          <h2>它记得什么，你说了算</h2>
+          <p className="landing-sec__sub">
+            每条记忆看得到、改得了、删得掉。大厅上的对外档案由记忆生成，首次发布前你过目一遍。
+          </p>
+        </div>
+        <div className="landing-mock">
+          <div className="landing-mock__bar">
+            <span>我的档案 · 它记得的事</span>
+            <Chip tone="mint">不存聊天原文</Chip>
+          </div>
+          <div className="landing-mock__body">
+            <ul className="mock-mems">
+              <li>
+                <p>周末准备去登山，偏好入门路线</p>
+                <footer>
+                  <Chip tone="well">来源：用户主动提及</Chip>
+                  <span>置信度 高</span>
+                  <em>删除</em>
+                </footer>
+              </li>
+              <li>
+                <p>聊天节奏偏慢热，不喜欢被连番追问</p>
+                <footer>
+                  <Chip tone="well">来源：对话观察</Chip>
+                  <span>置信度 中</span>
+                  <em>编辑</em>
+                </footer>
+              </li>
+            </ul>
+          </div>
+          <div className="landing-mock__foot">
+            <span className="mock-shield" aria-hidden />
+            不存聊天原文 · 删除立即生效
+          </div>
         </div>
       </section>
 
-      {/* ── 大厅 ── */}
-      <section className="landing-detail">
-        <h2>一个逛得起来的大厅</h2>
-        <div className="landing-detail__grid">
-          <article className="detail-card">
-            <h3>卡片浏览</h3>
-            <p>每人是 AI 生成的一张卡：一句话介绍、兴趣、聊天风格。</p>
-          </article>
-          <article className="detail-card">
-            <h3>问 AI 该跟谁聊</h3>
-            <p>「有没有喜欢登山、但个性安静的人？」——像导购一样问。</p>
-          </article>
-          <article className="detail-card">
-            <h3>随时本人接手</h3>
-            <p>代聊中任何时候按「我来说」，先看接手重点再开口。</p>
-          </article>
+      {/* ── 大厅：大厅卡片 + AI 导购输入框的缩小渲染 ── */}
+      <section className="landing-feature">
+        <div className="landing-feature__text">
+          <h2>一个逛得起来的大厅</h2>
+          <p className="landing-sec__sub">
+            每人是 AI 生成的一张卡。像导购一样问 AI 该跟谁聊；代聊中随时按「我来说」，本人接手。
+          </p>
+        </div>
+        <div className="landing-mock">
+          <div className="landing-mock__bar">
+            <span>大厅 · 候选人</span>
+            <Chip tone="mint">本人在网上</Chip>
+          </div>
+          <div className="landing-mock__body">
+            <div className="mock-cand">
+              <div className="mock-cand__head">
+                <strong>小周</strong>
+                <span>AI 预估：很可能合</span>
+              </div>
+              <p>周末爬山、话不多但接得住冷笑话。</p>
+              <div className="chips">
+                <Chip tone="well">登山</Chip>
+                <Chip tone="well">慢热</Chip>
+                <Chip tone="paper">INFP · 仅供娱乐</Chip>
+              </div>
+              <div className="chips">
+                <span className="mock-btn">本人去聊</span>
+                <span className="mock-btn mock-btn--ghost">让 AI 人设先聊</span>
+              </div>
+            </div>
+            <div className="mock-ask">
+              <p className="mock-ask__q">有没有喜欢登山、但个性安静的人？</p>
+              <div className="mock-ask__input">
+                <span>问问大厅 AI…</span>
+                <b>发送</b>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
