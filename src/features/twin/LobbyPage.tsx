@@ -95,10 +95,10 @@ function DemoCandidates() {
                 ))}
               </div>
               <p className="cand-style">{c.chatStyle}</p>
+              <p className="cand-fit">
+                {t('lobby.fitPredict')} <b>{fitText(fitFromPercent(c.fitPredict))}</b>
+              </p>
               <footer className="cand-foot">
-                <span className="cand-fit">
-                  {t('lobby.fitPredict')} <b>{fitText(fitFromPercent(c.fitPredict))}</b>
-                </span>
                 <Chip tone="paper" className="cand-mbti">
                   {c.mbti} · {t('lobby.mbtiBadge')}
                 </Chip>

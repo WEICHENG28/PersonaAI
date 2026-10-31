@@ -117,16 +117,17 @@ function LobbyCard({ card, state, onStart }: LobbyCardProps) {
         ))}
       </div>
       <p className="cand-style">{card.chatStyle}</p>
-      <footer className="cand-foot">
-        <span className="cand-fit">
-          {t('lobby.fitPredict')} <b>{fitText(card.fit)}</b>
-        </span>
-        {card.mbti && (
+      {/* 文字预估比原本的数字长，和 MBTI 放同一行在手机上会挤成两行，所以各占一行 */}
+      <p className="cand-fit">
+        {t('lobby.fitPredict')} <b>{fitText(card.fit)}</b>
+      </p>
+      {card.mbti && (
+        <footer className="cand-foot">
           <Chip tone="paper" className="cand-mbti">
             {card.mbti} · {t('lobby.mbtiBadge')}
           </Chip>
-        )}
-      </footer>
+        </footer>
+      )}
       <div className="chips">
         <Button small disabled={busy} onClick={() => onStart(card.userId, 'human')}>
           {pendingHere === 'human' ? LOBBY_TEXT.starting : LOBBY_TEXT.chatMyself}
