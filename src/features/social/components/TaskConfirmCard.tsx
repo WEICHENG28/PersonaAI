@@ -7,15 +7,18 @@ import { ApiError, PURPOSE_LABEL, describeDone, getTask, updateTask, type TaskVi
 /**
  * 任務確認卡（02 F12、07B B1）：顯示 Agent 對一句話任務的理解，用戶按「开始」才執行。
  * 用法：<TaskConfirmCard taskId={id} onStarted={...} onCancelled={...} />（A 的 AI 朋友聊天頁會放進來）
+ * 有給 onLater 時，「再想想」只關掉卡片、任務留在「我的任务」等確認；沒給才是取消任務。
  */
 export function TaskConfirmCard({
   taskId,
   onStarted,
   onCancelled,
+  onLater,
 }: {
   taskId: string
   onStarted?: (task: TaskView) => void
   onCancelled?: (task: TaskView) => void
+  onLater?: (task: TaskView) => void
 }) {
   const [task, setTask] = useState<TaskView | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -94,7 +97,7 @@ export function TaskConfirmCard({
       )}
       {pending ? (
         <div>
-          <Button variant="secondary" disabled={busy} onClick={() => act('cancel')}>
+          <Button variant="secondary" disabled={busy} onClick={() => (onLater ? onLater(task) : act('cancel'))}>
             {t('task.cancel')}
           </Button>
           <Button disabled={busy} onClick={() => act('confirm')}>

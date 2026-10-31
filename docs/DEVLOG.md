@@ -313,6 +313,18 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜任務確認卡關掉後的通知｜Peter（AI 協助）
+- **做了什麼**（http 模式的 AI 朋友頁）：
+  - 按「再想想」或點旁邊關掉：任務**保留**在「我的任务」等確認（原本「再想想」會取消任務），右下角通知「任务先帮你留着…点这里去看看」。
+  - 按「确认，开始找人」：留在聊天頁（原本跳到任務頁），通知「已开始找人，进度和结果都在「我的任务」…」。
+  - 通知點了就到 `/tasks/<id>`，10 秒後自動消失。真任務的確認視窗拿掉「Demo」標籤。
+- **怎麼做**：`Notification` 加選填 `link`、`ttlMs`；`AppShell` 吐司點擊導頁、時間到自動關（沒設的通知行為不變）；`Modal` 加 `demo`（預設 true，不影響其他視窗）；`TaskConfirmCard` 加 `onLater`（有給時「再想想」只關卡片，大廳助手沒給、行為不變）。
+- **跨線**：經 Peter 同意改 A 的 `FriendPage`、`AppShell`、`Modal` 與 `src/lib/api/types.ts`（只加選填欄位）。
+- **改了哪些檔案**：上述 5 檔＋`src/features/social/components/TaskConfirmCard.tsx`。
+- **驗證**：`tsc -b`、vitest、build；畫面請 Peter 在瀏覽器確認。
+
+---
+
 ### 2026-10-31｜修正：隱私警告按 Enter 一閃就關｜Peter（AI 協助）
 - **問題**：在輸入框按 Enter，警告視窗跳出後立刻被同一次 Enter 觸發「返回修改」關掉，看起來像 Enter 沒反應（按送出按鈕正常）。
 - **修正**：「返回修改」改成等這次按鍵事件跑完（setTimeout 0）才取得焦點，不用 autoFocus。三個聊天輸入框都靠這個元件，一起修好。
