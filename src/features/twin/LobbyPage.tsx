@@ -4,10 +4,18 @@ import { Card } from '@components/ui/Card'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { api } from '@lib/api'
 import type { Candidate } from '@lib/api/types'
+import { isLiveChat } from '@lib/api/twin'
 import { t } from '@i18n/t'
+import { LiveLobby } from './components/LiveLobby'
+import { FIT_TEXT, fitOfPercent } from './components/lobbyView'
 
-/** 画面 10：大厅（候选人卡片 + fish Rive + 大厅 AI 助手） */
+/** 画面 10：大厅（候选人卡片 + fish Rive + 大厅 AI 助手）。http 模式用真的候选人（C9／C10）。 */
 export function LobbyPage() {
+  return isLiveChat ? <LiveLobby /> : <DemoLobby />
+}
+
+/** mock 模式：照 A 的 demo 假资料。 */
+function DemoLobby() {
   const [candidates, setCandidates] = useState<Candidate[] | null>(null)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
@@ -83,7 +91,7 @@ export function LobbyPage() {
               <p className="cand-style">{c.chatStyle}</p>
               <footer className="cand-foot">
                 <span className="cand-fit">
-                  {t('lobby.fitPredict')} <b>{c.fitPredict}</b>
+                  {t('lobby.fitPredict')} <b>{FIT_TEXT[fitOfPercent(c.fitPredict)]}</b>
                 </span>
                 <Chip tone="paper" className="cand-mbti">
                   {c.mbti} · {t('lobby.mbtiBadge')}

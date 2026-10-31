@@ -7,7 +7,11 @@ import { isAuthFailure, requireAuth } from '../lib/auth'
 import { writeLog } from '../lib/log'
 import { CONFIG } from '../lib/config'
 import { getServiceClient } from '../lib/supabase'
-import { runTwinRounds } from '../contracts/twin'
+import { runTwinRounds, startConversation } from '../contracts/twin'
+import { createSingleTargetTask, createTaskFromText, searchLobby } from '../contracts/social'
+import { getShareableProfile } from '../contracts/friend'
+import { createLobbyApi, type LobbyApi } from '../twin/lobby'
+import { createLobbyRoutes } from '../twin/lobbyRoutes'
 import { ChatRoomError, createChatRoomApi, MESSAGE_MAX, messageBodySchema, type ChatRoomApi } from '../twin/chatRoom'
 import { supabaseChatRoomStore } from '../twin/chatRoomStore'
 import { createHandoffApi, type HandoffApi } from '../twin/handoff'
@@ -130,6 +134,7 @@ let handoffApi: HandoffApi | null = null
 let requestHumanApi: RequestHumanApi | null = null
 let notificationApi: NotificationApi | null = null
 let conversationApi: ConversationApi | null = null
+let lobbyApi: LobbyApi | null = null
 
 const getHandoffApi = (): HandoffApi =>
   (handoffApi ??= createHandoffApi({ store: supabaseHandoffStore(), llmJson, writeLog }))
@@ -168,3 +173,20 @@ export const twinRoutes = createTwinRoutes({
   notifications: () => (notificationApi ??= createNotificationApi({ store: supabaseNotificationStore(), now: () => new Date() })),
   resolveUserId: resolveAppUserId,
 })
+
+// C9／C10 大廳：候選人來自 B 的 searchLobby，按鈕走 B 的 createSingleTargetTask／C3 的 startConversation
+twinRoutes.route(
+  '/',
+  createLobbyRoutes({
+    lobby: () =>
+      (lobbyApi ??= createLobbyApi({
+        searchLobby,
+        getShareableProfile,
+        createTaskFromText,
+        createSingleTargetTask,
+        startConversation,
+        llmJson,
+      })),
+    resolveUserId: resolveAppUserId,
+  }),
+)

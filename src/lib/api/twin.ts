@@ -212,6 +212,50 @@ export function subscribeNotifications(onChange: () => void, onFailed: () => voi
   }
 }
 
+/** C9 大厅卡片上的 AI 预估：只有三级文字，没有分数。 */
+export type LobbyFit = 'likely' | 'maybe' | 'different'
+export type LobbyPurpose = 'friend' | 'study' | 'sport' | 'hobby'
+
+/** C9 大厅候选人卡片（来自对外档案）；助手附的小卡片 fit 为 null。 */
+export interface LobbyCardView {
+  userId: string
+  name: string
+  intro: string
+  interests: string[]
+  chatStyle: string
+  lookingFor: string
+  fit: LobbyFit | null
+}
+
+/** C10 大厅助手：像交办任务就回 taskId（显示任务确认卡），否则回答＋候选人小卡片。 */
+export type LobbyAssistantView =
+  | { kind: 'task'; taskId: string }
+  | { kind: 'answer'; answer: string; cards: LobbyCardView[] }
+
+/** C9 大厅里可以聊的人（依自己的对外档案排序；有关键字时依关键字）。 */
+export function getLobby(filter: { purpose?: LobbyPurpose; q?: string } = {}): Promise<LobbyCardView[]> {
+  const params = new URLSearchParams()
+  if (filter.purpose) params.set('purpose', filter.purpose)
+  if (filter.q?.trim()) params.set('q', filter.q.trim())
+  const query = params.toString()
+  return request('GET', `/api/lobby${query ? `?${query}` : ''}`)
+}
+
+/** C10 问大厅助手（要等 LLM，几秒）。 */
+export function askLobbyAssistant(question: string): Promise<LobbyAssistantView> {
+  return request('POST', '/api/lobby/assistant', { question })
+}
+
+/** C9「让分身去聊」：建立只找这一位的任务，回 taskId。 */
+export function startTwinChat(targetUserId: string): Promise<{ taskId: string }> {
+  return request('POST', `/api/lobby/${encodeURIComponent(targetUserId)}/twin-chat`)
+}
+
+/** C9「自己聊」：本人发起对话，回 conversationId（导向聊天室）。 */
+export function startHumanChat(targetUserId: string): Promise<{ conversationId: string }> {
+  return request('POST', '/api/conversations', { targetUserId })
+}
+
 export interface MessageSubscription {
   /** 新消息（Realtime INSERT）。 */
   onMessage(message: ChatMessageView): void
