@@ -325,6 +325,15 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜大廳：用名字（ID）找人＋卡片間距｜Peter（AI 協助）
+- **ID 搜尋**：大廳興趣關鍵字左邊加「用户 ID（名字）」欄位；`GET /api/lobby?name=`，名字包含就算、不分大小寫，和目的、興趣可以一起用（`matchesName`）。
+- **間距**：候選人卡片原本貼著上方篩選卡、彼此間距也小；`.lobby-grid` 間距與上邊距改 `--space-lg`，卡片內距改 `--space-lg`。
+- **分數沒變大／上色**：#111 的程式已在 main，但線上網站還是 #110 的版本——Vercel 沒有替 #111 合併後的 commit 部署（commit 上沒有 Vercel 狀態），請 Peter 到 Vercel 後台看原因（可能是免費方案每日部署次數用完），必要時手動 Redeploy。
+- **跨線**（Peter 同意）：C 的 `server/twin/lobby.ts`、`src/features/twin/components/{LiveLobby.tsx,useLobby.ts,lobbyView.ts}`、`src/lib/api/twin.ts`、`tests/twin/lobby.test.ts`；A 的 `src/theme/pages.css`（兩行）。
+- **驗證**：`tsc -b`、vitest、build。
+
+---
+
 ### 2026-10-31｜回報通知一定會清掉＋任務進度條｜Peter（AI 協助）
 - **通知「阿澈有事想跟你说」點了不消失**：#109 之後打開 AI 朋友頁會讓阿澈說回報並設已讀，但 Prompt 8 失敗時會還原成未讀。改成 AI 失敗就用固定句子回報（`fallbackReportText`：代聊幾場、合適的人名含真人／示范用户），只有寫入訊息失敗才還原。Peter 截圖時 #109 可能還沒部署完，部署後請重新整理再試。
 - **進度條不動**：原本只有「合適人數」一條，合適數為 0 時整個任務都看起來沒動；而且只靠 Realtime，沒開或斷線就不更新。改成兩條（代聊 x / 最多場數、合適 y / 目標），進行中每 10 秒備援重抓；已完成但 0 位合適時說明「已经代聊满 N 场，这次没有遇到合适的」。

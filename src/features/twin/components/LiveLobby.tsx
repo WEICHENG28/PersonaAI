@@ -16,13 +16,20 @@ export function LiveLobby() {
   const [purpose, setPurpose] = useState<LobbyPurpose | undefined>(undefined)
   const [draft, setDraft] = useState('')
   const [q, setQ] = useState('')
-  const lobby = useLobbyCards({ purpose, q })
+  const [nameDraft, setNameDraft] = useState('')
+  const [name, setName] = useState('')
+  const lobby = useLobbyCards({ purpose, q, name })
   const chat = useStartChat()
 
-  const search = () => setQ(draft.trim())
+  const search = () => {
+    setQ(draft.trim())
+    setName(nameDraft.trim())
+  }
   const clear = () => {
     setDraft('')
     setQ('')
+    setNameDraft('')
+    setName('')
   }
   const start = async (userId: string, action: LobbyAction) => {
     const id = await chat.start(userId, action)
@@ -44,9 +51,22 @@ export function LiveLobby() {
             </Button>
           ))}
         </div>
-        <div className="chat-input">
+        <div className="chat-input" style={{ flexWrap: 'wrap' }}>
+          {/* 先用名字（ID）找人，再用興趣關鍵字；兩個都填就兩個都要符合 */}
           <input
             className="input"
+            style={{ flex: '1 1 160px' }}
+            placeholder={LOBBY_TEXT.namePlaceholder}
+            aria-label={LOBBY_TEXT.namePlaceholder}
+            maxLength={LOBBY_QUERY_MAX}
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && search()}
+          />
+          <input
+            className="input"
+            style={{ flex: '2 1 220px' }}
+            aria-label={LOBBY_TEXT.searchPlaceholder}
             placeholder={LOBBY_TEXT.searchPlaceholder}
             maxLength={LOBBY_QUERY_MAX}
             value={draft}
@@ -56,7 +76,7 @@ export function LiveLobby() {
           <Button small onClick={search}>
             {LOBBY_TEXT.search}
           </Button>
-          {q && (
+          {(q || name) && (
             <Button small variant="secondary" onClick={clear}>
               {LOBBY_TEXT.clear}
             </Button>

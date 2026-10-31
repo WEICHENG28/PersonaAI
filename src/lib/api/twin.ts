@@ -153,6 +153,8 @@ export type LobbyAssistantView =
 export interface LobbyFilterInput {
   purpose?: LobbyPurpose
   q?: string
+  /** 用名字（帳號 ID）找人 */
+  name?: string
 }
 
 /** 失败时丢出的错误，message 是可以直接给用户看的简体中文；status 是 HTTP 状态码（连不上时为 0）。 */
@@ -225,6 +227,7 @@ export function getLobby(filter: LobbyFilterInput = {}): Promise<LobbyCardView[]
   const params = new URLSearchParams()
   if (filter.purpose) params.set('purpose', filter.purpose)
   if (filter.q?.trim()) params.set('q', filter.q.trim())
+  if (filter.name?.trim()) params.set('name', filter.name.trim())
   const query = params.toString()
   return request('GET', query ? `/api/lobby?${query}` : '/api/lobby')
 }
