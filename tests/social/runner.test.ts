@@ -155,6 +155,19 @@ describe('runTaskStep', () => {
     expect(store.tasks.get('t1')).toMatchObject({ active_conversation_id: null, progress: { suitable: 1 } })
   })
 
+  it('雙向合適且對方是真人：對方也收到通知；對方是示範用戶就不通知', async () => {
+    put(chatting())
+    await runTaskStep('t1', deps)
+    expect(store.notifications.map((n) => n.userId)).toEqual(['me', 'xiaoan'])
+    expect(store.notifications[1]?.payload).toMatchObject({ conversationId: 'conv-1', targetName: 'me（真人）', mutual: true })
+
+    store.notifications = []
+    store.seedUserIds.add('xiaoan')
+    put(chatting())
+    await runTaskStep('t1', deps)
+    expect(store.notifications.map((n) => n.userId)).toEqual(['me'])
+  })
+
   it('雙方都記一筆歷史（對方不是種子用戶時），各用自己視角的結果', async () => {
     put(chatting())
     deps.evaluate = vi.fn(async () => evaluation('suitable', 'suitable'))

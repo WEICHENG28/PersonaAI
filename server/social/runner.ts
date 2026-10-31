@@ -255,6 +255,15 @@ async function decideNext(task: AgentTask, conversationId: string, ev: Evaluatio
       mutual: result === 'mutual',
       taskId: task.id,
     })
+    // 雙向合適、對方又是真人：也通知對方（他的分身替他聊、他的評審也說合適）。單向合適不通知對方。
+    if (result === 'mutual' && !targetIsSeed) {
+      await deps.store.notifyMatch(targetId, {
+        conversationId,
+        targetName: withPersonTag(await deps.store.displayName(task.user_id), await deps.store.isSeedUser(task.user_id)),
+        targetIsSeed: false,
+        mutual: true,
+      })
+    }
     await deps.store.updateTask(task.id, { active_conversation_id: null, progress: { ...task.progress, suitable: task.progress.suitable + 1 } })
     await log(task, result === 'mutual' ? '双向合适，通知你' : '对你来说合适，通知你', plannerReason ?? `第 ${ev.round} 轮判定`, { conversation_id: conversationId })
     return 'notified'
