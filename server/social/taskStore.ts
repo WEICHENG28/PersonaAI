@@ -15,6 +15,9 @@ export interface NewTask {
   status: TaskStatus
 }
 
+/** 確認卡上可以改的欄位。 */
+export type TaskFieldsPatch = Pick<AgentTask, 'purpose' | 'conditions' | 'target_count' | 'done_condition' | 'restatement'>
+
 /** 開始執行前要符合的條件（02 F4、07B B1）。 */
 export interface UserReadiness {
   socialAgentEnabled: boolean
@@ -25,6 +28,8 @@ export interface TaskStore {
   insert(task: NewTask): Promise<AgentTask>
   get(id: string): Promise<AgentTask | null>
   setStatus(id: string, status: TaskStatus): Promise<AgentTask>
+  /** 用戶在確認卡修改任務內容（只在待確認時）。 */
+  updateFields(id: string, patch: TaskFieldsPatch): Promise<AgentTask>
   /** 這位用戶最近的任務，新的在前。 */
   listByUser(userId: string, limit: number): Promise<AgentTask[]>
   readiness(userId: string): Promise<UserReadiness>
@@ -78,6 +83,13 @@ export function createMemoryTaskStore(
       tasks.set(id, next)
       return { ...next }
     },
+    async updateFields(id, patch) {
+      const row = tasks.get(id)
+      if (!row) throw new Error(`task ${id} not found`)
+      const next = { ...row, ...patch }
+      tasks.set(id, next)
+      return { ...next }
+    },
     async listByUser(userId, limit) {
       return [...tasks.values()].filter((t) => t.user_id === userId).reverse().slice(0, limit).map((t) => ({ ...t }))
     },
@@ -108,6 +120,16 @@ function supabaseStore(db: Db): TaskStore {
       const { data, error } = await db
         .from('agent_tasks')
         .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select(TASK_COLUMNS)
+        .single()
+      if (error) throw error
+      return data as AgentTask
+    },
+    async updateFields(id, patch) {
+      const { data, error } = await db
+        .from('agent_tasks')
+        .update({ ...patch, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select(TASK_COLUMNS)
         .single()

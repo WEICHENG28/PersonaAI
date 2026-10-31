@@ -313,6 +313,16 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-10-31｜任務確認卡可編輯＋頂欄「我的聊天」｜Peter（AI 協助）
+- **確認卡可編輯**：待確認時目的（下拉）、條件（用「、」分開）、人數、找到幾位就停、最多代聊幾場都能改；數字有 −／＋ 也能直接輸入，離開欄位夾回範圍（人數 1–10、合適數 ≤ 人數、代聊場數 ≥ 合適數且 ≤ 30），上方複述即時更新。按確認或「再想想」時有改過就先存（`POST /api/tasks/:id/edit`，只限 `pending_confirm`，後端再夾一次範圍並重寫複述、寫日誌）。
+- **我的聊天**：鈴鐺左邊新增聊天按鈕，點開列出還沒結束、和我有關的對話（`GET /api/chats`）：對方名字＋真人／示范用户、狀態（等你接手／你们在聊／分身代聊中）、最後一句、時間；等你接手的排前面並顯示在角標；點一下到 `/chat/<id>`。每 30 秒更新。只在 http 模式顯示。
+- **為什麼**：Peter 實測：確認卡只能接受或放棄；配對後下次進來找不到正在聊的人。
+- **跨線**（Peter 同意）：A 的 `NavBar`（加一行）、`Icons`（加 `ChatIcon`）；面板樣式與位置沿用 C 的通知鈴鐺（`notificationBell.css`、`panelPlacement`、`timeLabel`）。
+- **改了哪些檔案**：`server/social/{task,taskStore,chats}.ts`、`server/routes/social.ts`、`src/lib/api/social.ts`、`src/features/social/{taskEdit.ts,components/TaskConfirmCard.tsx,components/ChatListButton.tsx}`、`src/components/ui/{NavBar,Icons}.tsx`、`tests/social/task-edit-chats.test.ts`。
+- **驗證**：`tsc -b`；vitest 659/659（編輯、範圍、已開始不能改、別人的任務、複述、聊天狀態與排序）；build。畫面請 Peter 在瀏覽器確認。
+
+---
+
 ### 2026-10-31｜標示「真人／示范用户」＋挑人時真人優先｜Peter（AI 協助）
 - **做了什麼**：示範用戶（種子用戶）是虛構角色，接手聊天不會有真人回覆，所以每個看得到對方的地方都標出來：
   - 阿澈回報：`buildReport` 的名字變成「小安（真人）」「子晴（示范用户）」，真人排前面；`suitable` 多 `is_seed`。

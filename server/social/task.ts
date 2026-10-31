@@ -112,6 +112,43 @@ export async function getOwnTask(userId: string, taskId: string): Promise<AgentT
   return task
 }
 
+/** 確認卡上用戶改的內容。 */
+export interface TaskEdit {
+  purpose: Purpose
+  conditions: string[]
+  count: number
+  suitable_count: number
+  max_chats: number
+}
+
+export const MAX_CHATS_LIMIT = 30
+
+/** 改完重寫一句複述，和 Prompt 14 的說法一致（不再呼叫 LLM）。 */
+export function restateTask(e: TaskEdit): string {
+  const cond = e.conditions.length ? `${e.conditions.join('、')}的` : ''
+  return `帮你找 ${e.count} 位${cond}${PURPOSE_LABEL[e.purpose]}，找到 ${e.suitable_count} 位合适就停，最多代聊 ${e.max_chats} 场，可以吗？`
+}
+
+/** 只有還沒開始（待確認）的任務能改；數字照規則夾在合理範圍內。 */
+export async function editTask(userId: string, taskId: string, edit: TaskEdit): Promise<AgentTask> {
+  const task = await getOwnTask(userId, taskId)
+  if (task.status !== 'pending_confirm') throw new TaskError('任务已经开始，不能再修改')
+  const count = clamp(edit.count, 1, MAX_COUNT)
+  const suitable = clamp(edit.suitable_count, 1, count)
+  const maxChats = clamp(edit.max_chats, suitable, MAX_CHATS_LIMIT)
+  const conditions = edit.conditions.map((c) => c.trim()).filter(Boolean).slice(0, 8)
+  const clean: TaskEdit = { purpose: edit.purpose, conditions, count, suitable_count: suitable, max_chats: maxChats }
+  const updated = await getTaskStore().updateFields(taskId, {
+    purpose: clean.purpose,
+    conditions,
+    target_count: count,
+    done_condition: { ...task.done_condition, suitable_count: suitable, max_chats: maxChats },
+    restatement: restateTask(clean),
+  })
+  await writeLog({ user_id: userId, agent: 'social', action: `修改任务：${updated.restatement ?? ''}`, reason: '用户在确认卡上修改', task_id: taskId })
+  return updated
+}
+
 const TRANSITIONS: Record<'confirm' | 'pause' | 'resume' | 'cancel', { from: TaskStatus[]; to: TaskStatus; verb: string }> = {
   confirm: { from: ['pending_confirm'], to: 'running', verb: '开始' },
   pause: { from: ['running'], to: 'paused', verb: '暂停' },
