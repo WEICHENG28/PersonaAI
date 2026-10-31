@@ -3,11 +3,11 @@
  * POST /api/profile/fun → Prompt 12 → 存入 user_profiles.fun_labels。
  */
 import { z } from 'zod'
-import { getServiceClient } from '../lib/supabase'
-import { llmJson } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { renderFunSystem, funLabelSchema } from '../prompts/12_fun'
-import type { ShareableProfile } from '../../shared/types'
+import { getServiceClient } from '../lib/supabase.js'
+import { llmJson } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { renderFunSystem, funLabelSchema } from '../prompts/12_fun.js'
+import type { ShareableProfile } from '../../shared/types.js'
 
 export class FunLabelsError extends Error {
   constructor(message = '娱乐标签生成失败') {

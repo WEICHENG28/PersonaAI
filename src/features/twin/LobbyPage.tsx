@@ -4,18 +4,21 @@ import { Card } from '@components/ui/Card'
 import { RiveAvatar } from '@components/ui/RiveAvatar'
 import { api } from '@lib/api'
 import type { Candidate } from '@lib/api/types'
+import { isLiveChat } from '@lib/api/twin'
 import { t } from '@i18n/t'
+import { LiveLobby } from './components/LiveLobby'
+import { fitFromPercent, fitText } from './components/lobbyView'
 
-/** 画面 10：大厅（候选人卡片 + fish Rive + 大厅 AI 助手） */
+/** 画面 10：大厅（候选人卡片 + fish Rive + 大厅 AI 助手）。http 模式是真资料（C9／C10），mock 模式照旧跑 demo。 */
 export function LobbyPage() {
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null)
+  return isLiveChat ? <LiveLobby /> : <DemoLobby />
+}
+
+/** mock 模式：A 的 demo 假资料（助手也是 demo 回答）。 */
+function DemoLobby() {
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
   const [asking, setAsking] = useState(false)
-
-  useEffect(() => {
-    api.getLobby().then(setCandidates)
-  }, [])
 
   const ask = async () => {
     if (!question.trim() || asking) return
@@ -59,6 +62,22 @@ export function LobbyPage() {
       </Card>
 
       {/* 候选人卡片 */}
+      <DemoCandidates />
+      <p className="mbti-note">{t('lobby.mbtiNote')}</p>
+    </div>
+  )
+}
+
+/** mock 模式的候选人（demo 假资料）；AI 预估显示成文字，不显示数字。 */
+function DemoCandidates() {
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null)
+
+  useEffect(() => {
+    api.getLobby().then(setCandidates)
+  }, [])
+
+  return (
+    <>
       <h2 className="section-title">{t('lobby.candidatesTitle')}</h2>
       {!candidates ? (
         <p className="empty">{t('common.loading')}</p>
@@ -81,10 +100,10 @@ export function LobbyPage() {
                 ))}
               </div>
               <p className="cand-style">{c.chatStyle}</p>
+              <p className="cand-fit">
+                {t('lobby.fitPredict')} <b>{fitText(fitFromPercent(c.fitPredict))}</b>
+              </p>
               <footer className="cand-foot">
-                <span className="cand-fit">
-                  {t('lobby.fitPredict')} <b>{c.fitPredict}</b>
-                </span>
                 <Chip tone="paper" className="cand-mbti">
                   {c.mbti} · {t('lobby.mbtiBadge')}
                 </Chip>
@@ -93,7 +112,6 @@ export function LobbyPage() {
           ))}
         </div>
       )}
-      <p className="mbti-note">{t('lobby.mbtiNote')}</p>
-    </div>
+    </>
   )
 }

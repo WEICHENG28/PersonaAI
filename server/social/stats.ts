@@ -1,5 +1,5 @@
 // B8｜效率統計（02 第 4 節）：附計算依據，人工平均時間由用戶設定。擁有者：B。
-import type { TaskProgress } from '../../shared/types'
+import type { TaskProgress } from '../../shared/types.js'
 
 export interface TaskStats {
   screened: number

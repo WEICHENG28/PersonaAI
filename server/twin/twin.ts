@@ -9,15 +9,15 @@ import type {
   GuardResult,
   ShareableProfile,
   StyleProfile,
-} from '../../shared/types'
-import { getShareableProfile, getStyleProfile } from '../contracts/friend'
-import { guardText } from './guard'
-import { llmJson, type LlmJsonOptions } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { CONFIG } from '../lib/config'
-import { renderTwinSystem, twinReplySchema, type TwinReply } from '../prompts/05_twin'
-import { supabaseTwinStore } from './store'
-import { askedQuestions, dropRepeatedSentences, repeatProblem } from './repeat'
+} from '../../shared/types.js'
+import { getShareableProfile, getStyleProfile } from '../contracts/friend.js'
+import { guardText } from './guard.js'
+import { llmJson, type LlmJsonOptions } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { CONFIG } from '../lib/config.js'
+import { renderTwinSystem, twinReplySchema, type TwinReply } from '../prompts/05_twin.js'
+import { supabaseTwinStore } from './store.js'
+import { askedQuestions, dropRepeatedSentences, repeatProblem } from './repeat.js'
 
 /**
  * 帶入 Prompt 的最近訊息數：涵蓋整場代聊（每輪雙方各一則），分身才記得前面說過什麼、問過什麼。

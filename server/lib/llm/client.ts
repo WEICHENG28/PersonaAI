@@ -1,7 +1,7 @@
 // 呼叫模型平台的薄封裝。測試時用 setLlmClient() 換成假的，不會真的打 API。
 import OpenAI from 'openai'
-import { CONFIG } from '../config'
-import { llmEnv } from './env'
+import { CONFIG } from '../config.js'
+import { llmEnv } from './env.js'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'

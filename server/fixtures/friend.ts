@@ -1,5 +1,5 @@
 // A 線 stub 假資料（server/contracts/friend.ts 用）。A 換成真實作後可刪。
-import type { AgentProfile, ShareableProfile, StyleProfile } from '../../shared/types'
+import type { AgentProfile, ShareableProfile, StyleProfile } from '../../shared/types.js'
 
 export const fakeShareable: ShareableProfile = {
   intro: '慢热的登山爱好者',

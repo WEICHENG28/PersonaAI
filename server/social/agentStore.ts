@@ -1,8 +1,8 @@
 // 社交 Agent 迴圈要讀寫的資料。有 Supabase 就用資料庫，沒有就用記憶體（本機開發、測試）。擁有者：B。
 // 注意：conversations 是 C 的表，這裡只「讀」狀態（是否結束、我方是否已接手）；寫入一律透過 C 的 contracts。
-import type { AgentName, AgentTask, AttemptResult, Controller, MatchTier, Outline, Preferences, ReasonType } from '../../shared/types'
-import { getAdminDb } from './db'
-import { sharedMemoryTasks } from './taskStore'
+import type { AgentName, AgentTask, AttemptResult, Controller, MatchTier, Outline, Preferences, ReasonType } from '../../shared/types.js'
+import { getAdminDb } from './db.js'
+import { sharedMemoryTasks } from './taskStore.js'
 
 export type TaskPatch = Partial<Pick<AgentTask, 'status' | 'progress' | 'active_conversation_id' | 'attempted_user_ids'>>
 

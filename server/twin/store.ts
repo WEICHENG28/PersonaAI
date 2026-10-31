@@ -1,9 +1,9 @@
 // C 線讀寫 conversations、messages 的 Supabase 實作（twin.ts 的 TwinStore、conversation.ts 的 ConversationStore）。擁有者：C。
 // 用 A0b 的 service role client，只在後端使用。
-import type { ChatMessage } from '../../shared/types'
-import { getServiceClient } from '../lib/supabase'
-import type { ConversationPatch, ConversationRow, ConversationStore, NewConversationRow } from './conversation'
-import type { NewTwinMessage, TwinConversation, TwinMessageRow, TwinStore } from './twin'
+import type { ChatMessage } from '../../shared/types.js'
+import { getServiceClient } from '../lib/supabase.js'
+import type { ConversationPatch, ConversationRow, ConversationStore, NewConversationRow } from './conversation.js'
+import type { NewTwinMessage, TwinConversation, TwinMessageRow, TwinStore } from './twin.js'
 
 const MESSAGE_COLUMNS = 'id, conversation_id, sender_id, is_ai, content, created_at'
 

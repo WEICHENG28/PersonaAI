@@ -3,11 +3,11 @@
 // 有改寫就寫日誌。第一次 LLM 檢查失敗時只送出規則處理後的版本。
 // 個資格式以中國大陸為準（手機號 1 開頭 11 碼、18 位身份證號、微信／QQ 等帳號、小區＋棟＋單元地址）；簡繁字形都認。
 // MASK、hits、issues、日誌會出現在畫面和工作日誌上，所以用簡體中文。
-import type { AgentLogInput, GuardResult, ShareableProfile } from '../../shared/types'
-import { getShareableProfile } from '../contracts/friend'
-import { llmJson, type LlmJsonOptions } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { guardResultSchema, renderGuardSystem, renderGuardUserMessage, type GuardLlmResult } from '../prompts/13_guard'
+import type { AgentLogInput, GuardResult, ShareableProfile } from '../../shared/types.js'
+import { getShareableProfile } from '../contracts/friend.js'
+import { llmJson, type LlmJsonOptions } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { guardResultSchema, renderGuardSystem, renderGuardUserMessage, type GuardLlmResult } from '../prompts/13_guard.js'
 
 export const MASK = '（已隐藏）'
 /** Prompt 13：LLM 判定洩漏卻沒給改寫版時用。 */

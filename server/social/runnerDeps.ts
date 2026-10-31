@@ -1,14 +1,14 @@
 // runTaskStep 的預設依賴：跨線一律走 contracts。
-import { deliverReport, getAgentProfile, getShareableProfile } from '../contracts/friend'
-import { searchLobby } from '../contracts/social'
-import { endConversation, getTranscript, guardText, markWaitingHuman, runTwinRounds, startConversation } from '../contracts/twin'
-import { getAgentStore } from './agentStore'
-import { evaluate } from './judge'
-import { decide, pick } from './planner'
-import { buildReport } from './report'
-import type { RunnerDeps } from './runner'
+import { deliverReport, getAgentProfile, getShareableProfile } from '../contracts/friend.js'
+import { searchLobby } from '../contracts/social.js'
+import { endConversation, getTranscript, guardText, markWaitingHuman, runTwinRounds, startConversation } from '../contracts/twin.js'
+import { getAgentStore } from './agentStore.js'
+import { evaluate } from './judge.js'
+import { decide, pick } from './planner.js'
+import { buildReport } from './report.js'
+import type { RunnerDeps } from './runner.js'
 
-export { pickMostSimilar } from './planner'
+export { pickMostSimilar } from './planner.js'
 
 export function defaultRunnerDeps(): RunnerDeps {
   const store = getAgentStore()

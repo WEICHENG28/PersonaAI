@@ -1,6 +1,6 @@
 // LLM 相關環境變數。A0b 建好 server/lib/env.ts 後可以改成從那裡讀。
 import { z } from 'zod'
-import type { ModelRole } from '../../../shared/types'
+import type { ModelRole } from '../../../shared/types.js'
 
 const schema = z.object({
   LLM_BASE_URL: z.string().url(),

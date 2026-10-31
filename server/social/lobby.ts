@@ -1,10 +1,10 @@
 // B2｜搜尋大廳（docs/07B 的 B2、02 F4）。擁有者：B。
-import type { LobbyCandidate, LobbyQuery, Purpose, ShareableProfile } from '../../shared/types'
-import { embed } from '../lib/llm'
-import { writeLog } from '../lib/log'
-import { SEED_USERS } from '../fixtures/seed-users'
-import { getAdminDb } from './db'
-import { PURPOSE_LABEL } from './task'
+import type { LobbyCandidate, LobbyQuery, Purpose, ShareableProfile } from '../../shared/types.js'
+import { embed } from '../lib/llm/index.js'
+import { writeLog } from '../lib/log.js'
+import { SEED_USERS } from '../fixtures/seed-users.js'
+import { getAdminDb } from './db.js'
+import { PURPOSE_LABEL } from './task.js'
 
 const DEFAULT_LIMIT = 5
 const KEYWORD_BONUS = 0.1

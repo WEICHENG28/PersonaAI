@@ -1,8 +1,8 @@
 // C5 結果頁的 Supabase 實作（result.ts 的 ResultStore）。擁有者：C。
 // match_attempts 只讀「這位用戶自己」那一筆（user_id = 登入者）；對方那一筆不讀。
-import { getServiceClient } from '../lib/supabase'
-import { supabaseChatRoomStore } from './chatRoomStore'
-import type { AttemptRow, ResultStore } from './result'
+import { getServiceClient } from '../lib/supabase.js'
+import { supabaseChatRoomStore } from './chatRoomStore.js'
+import type { AttemptRow, ResultStore } from './result.js'
 
 export function supabaseResultStore(): ResultStore {
   const { getConversation, getDisplayName, listMessages, listMyScores } = supabaseChatRoomStore()

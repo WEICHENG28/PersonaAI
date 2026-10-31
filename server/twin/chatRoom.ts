@@ -2,9 +2,9 @@
 // 讀聊天室（雙方是誰、誰在聊、訊息）、目前判定（只有我方視角，不回任何數字）、本人發言（對方是分身就讓它回覆）。
 // 外部依賴（資料庫、twinReply、日誌）都放在 ChatRoomDeps，測試可以換成假的。
 import { z } from 'zod'
-import type { AgentLogInput, ChatMessage, Controller, VerdictValue } from '../../shared/types'
-import type { ConversationRow } from './conversation'
-import type { ConversationStatus, TwinReplyFn } from './twin'
+import type { AgentLogInput, ChatMessage, Controller, VerdictValue } from '../../shared/types.js'
+import type { ConversationRow } from './conversation.js'
+import type { ConversationStatus, TwinReplyFn } from './twin.js'
 
 /** 本人一則訊息的字數上限（07C C4）。 */
 export const MESSAGE_MAX = 1000

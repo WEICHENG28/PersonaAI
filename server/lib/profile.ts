@@ -3,8 +3,8 @@
  * users.id 是 app 内用户 id；auth_id 链到 auth.users。
  */
 import { z } from 'zod'
-import type { AuthedUser } from './auth'
-import { getServiceClient } from './supabase'
+import type { AuthedUser } from './auth.js'
+import { getServiceClient } from './supabase.js'
 
 const InitResultSchema = z.object({
   userId: z.string().uuid(),

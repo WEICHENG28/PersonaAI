@@ -9,7 +9,7 @@
 // Demo 結果不保證每次一樣，Demo 前要預跑，必要時調整這裡的資料。
 // 畫面上會出現的內容一律簡體、大陸用語。
 
-import type { AgentProfile, Preferences, Purpose, ShareableProfile } from '../../shared/types'
+import type { AgentProfile, Preferences, Purpose, ShareableProfile } from '../../shared/types.js'
 
 export interface SeedUser {
   key: string // 穩定識別碼，給 fixtures／stub 用；資料庫的 users.id 由 seed 產生，重跑時用 is_seed 找舊資料

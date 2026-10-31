@@ -1,7 +1,7 @@
 // Agent 工作日誌（docs/07 第 6 節）：每個 Agent 動作都要寫，並附一句理由。
 // 寫入失敗只在 console 記錯誤，不中斷主流程。
-import type { AgentLogInput } from '../../shared/types'
-import { getAdminDb } from '../social/db'
+import type { AgentLogInput } from '../../shared/types.js'
+import { getAdminDb } from '../social/db.js'
 
 export type LogWriter = (entry: AgentLogInput) => Promise<void>
 

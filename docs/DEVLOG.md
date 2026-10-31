@@ -26,6 +26,24 @@
 
 ## 共用與決策
 
+### 2026-10-31｜修正：Vercel 上 /api 全部 FUNCTION_INVOCATION_FAILED｜Peter（AI 協助）
+- **問題**：#89 部署後，Vercel 上連 `/api/health` 都回 500（`FUNCTION_INVOCATION_FAILED`）。Vercel 把每個 TS 檔各自編成 Node ESM，ESM 的相對 import 必須寫副檔名，`import { app } from '../server/app'` 會找不到模組（本機用 tsc 照 Vercel 方式編譯後實際重現：`ERR_MODULE_NOT_FOUND ... server\app`）。本機的 tsx／vitest／Vite 會自動補，所以一直沒發現。
+- **修正**：`server/`、`shared/`、`api/` 所有相對 import／export 補上 `.js`（例如 `'./routes/friend'` → `'./routes/friend.js'`、資料夾 → `'/index.js'`），共 64 個檔案、259 處，**只改 import 路徑、沒改任何邏輯**。TypeScript、tsx、vitest、Vite 都認得 `.js` 對到 `.ts`。新增測試 `tests/social/esm-imports.test.ts`：之後有人寫了沒副檔名的相對 import，`npm test` 會失敗並列出位置。
+- **給 A、C（重要）**：這次改到了大家的 `server/` 檔案（只有 import 那幾行）。請先合入最新 main 再繼續開發；**之後在 `server/`、`shared/`、`api/` 新增 import 一律寫 `.js` 結尾**（`'../lib/supabase.js'`），不然測試會擋、Vercel 上會整個掛掉。前端 `src/` 不受影響。
+- **驗證**：用 tsc 照 Vercel 方式編成 ESM 後直接 import `api/index.js` 並送請求：`/api/health` 200、`/api/tasks`／`/api/settings`／`/api/conversations/x` 未登入 401；`tsc -b`、vitest 574/574、`npm run build`、本機 tsx 跑後端正常。
+
+---
+
+### 2026-10-31｜後端部署到 Vercel（/api 改成 Vercel Function）｜Peter（AI 協助）
+- **問題**：Peter 把專案接上 Vercel 後，多數功能顯示「出了点问题」。原因是 Vercel 只部署了前端靜態頁，`/api/*` 沒有後端在回應，`vercel.json` 還把 `/api` 也導回首頁；登入能用只是因為它直接連 Supabase。
+- **做法**：新增 `api/index.ts`，用 `hono/vercel` 把 `server/app.ts`（同一份後端）包成 Vercel Function；`vercel.json` 把 `/api/*` 轉給它（其他路徑仍回 `index.html`），函式最長執行 60 秒。本機開發照舊 `npm run server`。`tsconfig.server.json` 加入 `api`。
+- **限制**：社交 Agent 的背景迴圈（`npm run worker`）是一直跑的程式，Vercel 不能放；任務要往前推進時，要有一台電腦開 worker（Demo 時用 Peter 的電腦即可，它直接連雲端 Supabase，和網站在哪裡無關）。單次 API 超過 60 秒會被 Vercel 中斷（目前最慢的是阿澈聊天帶任務解析，約 10～20 秒）。
+- **Vercel 要設的環境變數**（Project Settings → Environment Variables，設完要 Redeploy）：前端 `VITE_API_MODE=http`、`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY`；後端 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`LLM_BASE_URL`、`LLM_API_KEY`、`MODEL_CHAT`、`MODEL_REASON`、`MODEL_FAST`、`MODEL_EMBED`、`EMBEDDING_DIM`。名稱要和 `.env.example` 完全一樣（Supabase 整合自動加的 `NEXT_PUBLIC_*` 我們用不到）。
+- **給 A**：部署是 A 的任務（A-deploy），這次因為 Peter 已接好 Vercel、由 B 的 AI 先補上後端部署；之後部署相關改動請以這份為準。
+- **驗證**：`tsc -b`；用 Web Request 直接呼叫 `api/index.ts` 的 handler：`/api/health` 200、`/api/tasks` 未登入 401、不存在路徑 404；esbuild 打包成功；vitest 全過；`npm run build`。實際在 Vercel 上的效果要 Peter 部署後確認。
+
+---
+
 ### 2026-10-31｜全線檢查結果（Peter 請 AI 檢查 A／B／C）｜Peter（AI 協助）
 - **檢查方式**：`tsc -b`、vitest 388 項、`npm run build` 全過；比對前端呼叫的 `/api` 與後端路由（全部對得上）；後端所有需要登入的 API 未登入都回 401；**只用公開金鑰讀 14 張表都讀到 0 筆**（資料表權限正確）；讀 Peter 實跑主線的 3 場分身對話原文。
 - **B（已修，本 PR）**：規劃器沒拿到用戶自己的興趣，開場話題用了對方單方面的興趣（「露营时手冲咖啡」），用戶的分身因此編造「咖啡是我露营不会漏掉的东西」→ 規劃器輸入加上用戶對外檔案、Prompt 4 規定話題要雙方都有、程式再檢查一次（`chooseOpeningTopic`）。另：任務結束時回報寫入失敗不再算成任務失敗；`POST /api/tasks`、`/history/:id/reopen` 改成先驗登入。
@@ -440,7 +458,30 @@
   - **16 輪實跑**（`.local/try-duet-16.ts`，記憶體存對話、真的 LLM、守門直通、不寫資料庫）：小安×子晴（開場「登山」）、小安×阿哲（開場「最近爬过的山」）各 32 則，**整則、逐句、口頭禪都沒有重複**；工作日誌各 0～2 筆（只有阿哲提議一起去時雙方的「需要问本人」）。小安×子晴回應具體、會換話題；小安×阿哲（慢慢走 vs 越野跑）小安仍會多次提起看展，兩人本來就不合，判不合適是合理的。
   - **真資料**（Jerry 同意寫入）：c-test1 本人和小安分身聊，問「你平时都去哪些山啊？」小安分身回「没有特别固定的地方，主要是周末去郊区走走。你平时也常去郊区吗？」（不再答非所問）；問「你拍照一般用什么相机？」回「其实手机随手拍拍就挺好的…」；這段對話（`ce86c4ac-…`）只有一筆「开始代聊」日誌，沒有「代聊发言」。
 - **踩到的坑／注意事項**：Prompt 裡的例句會被模型照抄，規則要用描述的方式寫。
+- **合入 main（#90 import 補 .js）**：衝突只在 `server/twin/twin.ts` 的 import 區和本檔；邏輯保留 #88，import 用 main 的 `.js` 寫法，#88 新增的 `./repeat.js`、`../lib/config.js` 也補上。合併後 `npx tsc -b`、vitest 597/597（含 `esm-imports`）、`npm run build` 通過。
 - **還沒做完／待辦**：無。C5（#76）、C6（#80）已在 2026-10-30 合併，歷史頁「看对话纪录」的 `/chat/<id>/result` 路由已存在。
+
+### 2026-10-31｜C9 大廳＋C10 大廳 AI 助手（和 PR #88 的大廳融合）｜Jerry（AI 協助）｜分支 c/C9-lobby｜Closes #29 #30
+- **做了什麼**：
+  - **C9 大廳**（`server/twin/lobby.ts`、`lobbyStore.ts`，Prompt 10 在 `server/prompts/10_card.ts`）：`GET /api/lobby?purpose=&q=`。候選人與排序來自 B 的 `searchLobby`（contracts/social），查詢文字是「兴趣：…；想找：…」（我的對外檔案），所以 AI 預估是「我和對方合不合」：≥ 0.6「很可能合得来」、≥ 0.5「可以聊聊看」、其他「差异较大」，API 只回等級不回數字；我還沒確認對外檔案時不給預估（畫面寫「确认档案后才能预估」）。
+  - 卡片讀 `user_profiles.card`，為 null 或格式不對就用 Prompt 10（`fast`、0.3）產生並快取；A 改對外檔案會把 `card` 清成 null。自填 MBTI 讀 `fun_labels.user_mbti`，旁邊標「仅供娱乐」。
+  - 篩選由大廳自己做：目的照 `users.purposes` 字面比對、興趣關鍵字雙向比對（「登山」對上「爱登山」）。
+  - `POST /api/conversations { targetUserId }`（我自己聊）：我本人 ↔ 對方分身；已有未結束的同一段手動對話就接著聊。`POST /api/lobby/twin-chat { targetUserId }`（讓分身去聊）：先確認我開了社交 Agent、檔案已確認（否則 403），再呼叫 B 的 `createSingleTargetTask`。
+  - **C10 大廳 AI 助手**（`server/twin/lobbyAssistant.ts`、Prompt 11 `server/prompts/11_lobby_assistant.ts`，從 PR #88 搬來）：`POST /api/lobby/assistant { question }`。「帮我找／帮我约」→ B 的 `createTaskFromText`，畫面顯示 B 的 `<TaskConfirmCard>`；其他問題 → `searchLobby`（先搜 20 位、問題點名的人排前面、取 5 位）→ Prompt 11（`chat`、0.5）→ 回答＋最多 3 張候選人小卡片（和大廳同一種卡片、不放預估、有「我自己聊」「让分身去聊」）。回答有分數就重問一次，還有就拿掉。
+  - 前端：`LobbyPage` 在 http 模式改用 `LiveLobby`（助手 `LobbyAssistant`＋篩選＋卡片 `LobbyCard`），mock 模式照舊跑 demo，但 AI 預估從數字改成文字。
+- **為什麼這樣做**：
+  - **和 #88 融合**：兩個對話同時做了大廳（#87 先做 C9，#88 在分身品質任務裡也做了 C9／C10），檔名相同一定衝突。保留 #87 有而 #88 沒有的 07C 規格（Prompt 10 卡片快取、MBTI、會真的刷掉人的篩選），改用 #88 的 `searchLobby` 當候選人來源（全線檢查指定要用 B 的 contract）和它依實測定的門檻，並把 #88 的 C10 助手搬過來。#88 只留分身修正。
+  - **篩選自己做**：`searchLobby` 的關鍵字只加分不篩掉（「运动＋登山」會留下小林），目的 friend 等於全部；所以先請它照「我的興趣＋想找」排好整個大廳（limit 100、不帶關鍵字加分，預估才不會被灌水），再自己篩。
+  - **代價**：`searchLobby` 每次會呼叫一次 embedding、寫一筆「搜索大厅」日誌（B 的行為），每開一次大廳就多一筆。
+  - 「讓分身去聊」的端點是新增的（B 的 `createSingleTargetTask` 沒有 HTTP 入口，07C 第 4 節 API 表沒列）。B 的 `TaskError` 不能 import，用 `err.name === 'TaskError'` 轉成給用戶看的錯誤（#88 的做法）。
+  - 卡片長度：Prompt 要求 20／15 字內，實測模型偶爾超過幾個字，硬切會變成「…很多照片和小发」；程式 30／24 字才截斷。LLM 失敗用對外檔案當卡片（不快取）。
+  - 文字預估比原本的數字長，和 MBTI 放同一行在手機上會被擠成「差异较／大」，所以各占一行。
+- **改了哪些檔案**：`server/twin/{lobby,lobbyStore,lobbyAssistant}.ts`、`server/prompts/{10_card,11_lobby_assistant}.ts`、`server/routes/twin.ts`、`src/lib/api/twin.ts`、`src/features/twin/LobbyPage.tsx`、`src/features/twin/components/{LiveLobby,LobbyAssistant,LobbyCard}.tsx`、`{useLobby,lobbyView}.ts`、`tests/twin/{lobby,lobby-assistant,lobby-routes,lobby-view}.test.ts`、`tests/twin/chat-room-routes.test.ts`。沒動共用檔。
+- **踩到的坑／注意事項**：
+  - 第一次打開大廳要替每位產生卡片（13 張約 8 秒），之後讀快取。
+  - **真瀏覽器＋真後端實測**（Jerry 同意新建匿名帳號 `c9测试-0124`，id `e62e3b5a…`）：登入 → 檔案沒確認時預估寫「确认档案后才能预估」、讓分身去聊回 403 提示 → 確認檔案＋開社交 Agent → 13 張卡片（文字預估）→「运动＋登山」只剩小安、子晴、阿哲 → 小安「我自己聊」進聊天室、打字後小安的分身即時回覆 → 子晴「让分身去聊」到任務頁，推進一步（`/api/tasks/:id/step`，代替 worker）後出現代聊訊息。融合後再測：助手「谁适合一起爬山？」44 字＋小安、阿哲小卡片、沒有分數；「小安和子晴谁比较适合我？」兩人各一句理由；「帮我找 2 个喜欢动漫的人」跳出任務確認卡；小卡片「我自己聊」進聊天室。
+  - 另外寫入：c-test3 和小安的一段對話、c-test3 讓分身去聊子晴的任務。
+- **還沒做完／待辦**：mock 模式的卡片沒有兩個按鈕（demo 沒有對應的真對話）。
 
 ### 2026-10-31｜C8 言行異常提醒｜Jerry（AI 協助）｜PR #83｜Closes #28
 - **做了什麼**：

@@ -1,8 +1,8 @@
 // C8 言行異常提醒的 Supabase 實作（anomaly.ts 的 AnomalyStore）。擁有者：C。
 // 用 A0b 的 service role client，只在後端使用；anomaly_flags 前端只讀得到 notify_user_id 是自己的列（RLS）。
-import { getServiceClient } from '../lib/supabase'
-import type { AnomalyChoice, AnomalyFlagRow, AnomalyStore, NewAnomalyFlag } from './anomaly'
-import { supabaseNotificationStore } from './notificationStore'
+import { getServiceClient } from '../lib/supabase.js'
+import type { AnomalyChoice, AnomalyFlagRow, AnomalyStore, NewAnomalyFlag } from './anomaly.js'
+import { supabaseNotificationStore } from './notificationStore.js'
 
 export function supabaseAnomalyStore(): AnomalyStore {
   const { getConversation, getNotification, markRead, clearResponse } = supabaseNotificationStore()

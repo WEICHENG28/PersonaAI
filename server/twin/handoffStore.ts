@@ -1,8 +1,8 @@
 // C6 本人接手的 Supabase 實作（handoff.ts 的 HandoffStore）。擁有者：C。
 // 用 A0b 的 service role client，只在後端使用。
-import { getServiceClient } from '../lib/supabase'
-import { supabaseChatRoomStore } from './chatRoomStore'
-import type { HandoffStore, NewHandoff, Side } from './handoff'
+import { getServiceClient } from '../lib/supabase.js'
+import { supabaseChatRoomStore } from './chatRoomStore.js'
+import type { HandoffStore, NewHandoff, Side } from './handoff.js'
 
 const CONTROLLER_COLUMN: Record<Side, 'side_a_controller' | 'side_b_controller'> = {
   a: 'side_a_controller',

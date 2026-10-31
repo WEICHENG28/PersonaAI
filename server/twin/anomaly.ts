@@ -4,17 +4,17 @@
 // 用戶在通知上的選擇寫回 user_choice：end → 結束對話；report → 只記錄；continue → 只記錄。
 // 外部依賴（資料庫、A 的檔案、LLM、日誌、結束對話）都放在 AnomalyDeps，測試可以換成假的。
 import { z } from 'zod'
-import type { AgentLogInput, ShareableProfile, StyleProfile } from '../../shared/types'
-import type { LlmJsonOptions } from '../lib/llm'
+import type { AgentLogInput, ShareableProfile, StyleProfile } from '../../shared/types.js'
+import type { LlmJsonOptions } from '../lib/llm/index.js'
 import {
   anomalyResultSchema,
   anomalyUserMessage,
   renderAnomalySystem,
   type AnomalyResult,
   type AnomalyType,
-} from '../prompts/09_anomaly'
-import { ChatRoomError, type ChatRoomStore } from './chatRoom'
-import type { NotificationRow } from './requestHuman'
+} from '../prompts/09_anomaly.js'
+import { ChatRoomError, type ChatRoomStore } from './chatRoom.js'
+import type { NotificationRow } from './requestHuman.js'
 
 /** 帶入 Prompt 9 的本人訊息最多幾則（取最新的）。 */
 export const ANOMALY_MESSAGES_LIMIT = 30

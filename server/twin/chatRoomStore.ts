@@ -1,8 +1,8 @@
 // C4 聊天室的 Supabase 實作（chatRoom.ts 的 ChatRoomStore）。擁有者：C。
 // 用 A0b 的 service role client，只在後端使用；match_scores 只讀呼叫者自己視角那幾列。
-import { getServiceClient } from '../lib/supabase'
-import type { ChatMessageView, ChatRoomStore, NewHumanMessage, ScoreRow } from './chatRoom'
-import type { ConversationRow } from './conversation'
+import { getServiceClient } from '../lib/supabase.js'
+import type { ChatMessageView, ChatRoomStore, NewHumanMessage, ScoreRow } from './chatRoom.js'
+import type { ConversationRow } from './conversation.js'
 
 const MESSAGE_COLUMNS = 'id, conversation_id, sender_id, is_ai, guard_rewritten, content, created_at'
 const CONVERSATION_COLUMNS =
