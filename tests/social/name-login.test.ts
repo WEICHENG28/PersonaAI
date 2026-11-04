@@ -107,6 +107,15 @@ describe('游客', () => {
     expect(accounts[1]).toMatchObject({ guest: true, hasPassword: false })
   })
 
+  it('游客可以自己取名字；名字有人用了就請他換，不會進別人的帳號', async () => {
+    const { deps, calls } = fakeDeps([mingWithPassword], ['小安'])
+    expect(await enterAsGuest({ name: '阿花', random: false }, deps)).toMatchObject({ ok: true, displayName: '阿花', guest: true })
+    expect(await enterAsGuest({ name: '小明', random: false }, deps)).toMatchObject({ ok: false, code: 'exists' })
+    expect(await enterAsGuest({ name: '小安', random: false }, deps)).toMatchObject({ ok: false, code: 'exists' })
+    expect(await enterAsGuest({ name: '字'.repeat(21), random: false }, deps)).toMatchObject({ code: 'invalid' })
+    expect(calls.issued).toHaveLength(1)
+  })
+
   it('游客設名字＋密碼變成正式帳號，之後能用名字＋密碼登入', async () => {
     const { deps } = fakeDeps()
     const g = await enterAsGuest({ name: '星星' }, deps)

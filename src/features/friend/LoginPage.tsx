@@ -6,17 +6,25 @@ import { ShuffleIcon } from '@components/ui/Icons'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { currentUser, isHttpMode, initProfile } from '@lib/api/friend'
-import { enterAsGuest, lastUsedName, loginAccount, registerAccount } from '@lib/api/account'
+import { GUEST_KEEP_DAYS, enterAsGuest, lastUsedName, loginAccount, registerAccount } from '@lib/api/account'
 import { randomName } from './randomName'
 
-type Mode = 'login' | 'register'
+type Mode = 'guest' | 'login' | 'register'
+
+const TABS: { mode: Mode; label: string }[] = [
+  { mode: 'guest', label: '游客体验' },
+  { mode: 'login', label: '登录' },
+  { mode: 'register', label: '注册' },
+]
 
 const hintStyle = { color: 'var(--color-muted)', fontSize: 'var(--text-sm)' }
 
 /**
- * 画面 1：登录／注册（名字＋密码），或「游客体验」一键进入（评审、想先看看的人用）。
- * 游客之后可以在「设置」设密码，变成正式帐号，记录都保留。这个浏览器已经登录过就直接进入。
- * mock 模式：任何按钮都是假登录。
+ * 画面 1：三种进入方式
+ * - 游客体验（默认）：和原本一样只要名字，随机预填、可以自己改，不用密码。评审或想先看看的人用。
+ *   游客资料保留 GUEST_KEEP_DAYS 天；想留下来到「设置」设密码就变正式帐号。
+ * - 登录／注册：名字＋密码。这个浏览器之前用过名字登录，就默认「登录」并填好名字。
+ * 这个浏览器已经登录过就直接进入。mock 模式：任何按钮都是假登录。
  *
  * 桌机：左＝chromabot Rive 头像（大）；右＝PersonaAI 标题 + 副标题 + 登录卡。
  * 手机：上＝chromabot（登录卡稍微遮住底部）；中＝登录卡；下＝副标题。
@@ -24,9 +32,11 @@ const hintStyle = { color: 'var(--color-muted)', fontSize: 'var(--text-sm)' }
 export function LoginPage() {
   const login = useDemoStore((s) => s.login)
   const navigate = useNavigate()
-  // 这个浏览器上次用的名字：有的话默认「登录」并填入名字
   const [remembered] = useState(() => (isHttpMode ? lastUsedName() : null))
-  const [mode, setMode] = useState<Mode>(remembered ? 'login' : 'register')
+  const [mode, setMode] = useState<Mode>(remembered ? 'login' : 'guest')
+  // 游客名字：随机预填；没改过＝随机（后端保证不重复），改过＝用这个名字（有人用了会请他换）
+  const [guestName, setGuestName] = useState(() => randomName())
+  const [guestTyped, setGuestTyped] = useState(false)
   const [name, setName] = useState(() => remembered ?? '')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
@@ -74,6 +84,10 @@ export function LoginPage() {
   }
 
   const submit = () => {
+    if (mode === 'guest') {
+      const nickname = guestName.trim() || randomName()
+      return void run(() => enterAsGuest(nickname, !guestTyped), nickname)
+    }
     const nickname = name.trim()
     if (isHttpMode) {
       if (!nickname) return setError('请输入名字')
@@ -83,8 +97,6 @@ export function LoginPage() {
     void run(() => (mode === 'login' ? loginAccount(nickname, password) : registerAccount(nickname, password)), nickname || randomName())
   }
 
-  const guest = () => void run(() => enterAsGuest(randomName()), randomName())
-
   const switchMode = (next: Mode) => {
     setMode(next)
     setError(null)
@@ -92,6 +104,12 @@ export function LoginPage() {
   }
 
   const onEnter = (e: React.KeyboardEvent) => e.key === 'Enter' && !busy && submit()
+
+  const shuffleButton = (onClick: () => void) => (
+    <button type="button" className="knob knob--icon" onClick={onClick} title={t('login.shuffle')} aria-label={t('login.shuffle')}>
+      <ShuffleIcon size={20} />
+    </button>
+  )
 
   return (
     <div className="login-page">
@@ -110,54 +128,87 @@ export function LoginPage() {
 
         {/* 登录卡 */}
         <div className="login-card card">
-          <div className="login-tabs" role="tablist">
-            <button type="button" role="tab" aria-selected={mode === 'login'} className={`login-tab ${mode === 'login' ? 'is-on' : ''}`} onClick={() => switchMode('login')}>
-              登录
-            </button>
-            <button type="button" role="tab" aria-selected={mode === 'register'} className={`login-tab ${mode === 'register' ? 'is-on' : ''}`} onClick={() => switchMode('register')}>
-              注册
-            </button>
+          <div className="login-tabs" role="tablist" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            {TABS.map((tab) => (
+              <button
+                key={tab.mode}
+                type="button"
+                role="tab"
+                aria-selected={mode === tab.mode}
+                className={`login-tab ${mode === tab.mode ? 'is-on' : ''}`}
+                onClick={() => switchMode(tab.mode)}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          <label className="field">
-            <span>{t('login.username')}</span>
-            <div className="login-name-row">
-              <input
-                className="input"
-                value={name}
-                placeholder={mode === 'register' ? '取一个名字，别人会看到' : '你注册时用的名字'}
-                autoComplete="username"
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={onEnter}
-                maxLength={20}
-              />
-              {mode === 'register' && (
-                <button type="button" className="knob knob--icon" onClick={() => setName(randomName())} title={t('login.shuffle')} aria-label={t('login.shuffle')}>
-                  <ShuffleIcon size={20} />
-                </button>
+          {mode === 'guest' ? (
+            <>
+              <label className="field">
+                <span>{t('login.username')}</span>
+                <div className="login-name-row">
+                  <input
+                    className="input"
+                    value={guestName}
+                    onChange={(e) => {
+                      setGuestName(e.target.value)
+                      setGuestTyped(true)
+                    }}
+                    onKeyDown={onEnter}
+                    maxLength={20}
+                  />
+                  {shuffleButton(() => {
+                    setGuestName(randomName())
+                    setGuestTyped(false)
+                  })}
+                </div>
+              </label>
+              {isHttpMode && (
+                <p style={hintStyle}>
+                  不用密码，马上体验完整流程。游客记录保留 {GUEST_KEEP_DAYS} 天，想留下来到「设置」设一个密码就好。
+                </p>
               )}
-            </div>
-          </label>
+            </>
+          ) : (
+            <>
+              <label className="field">
+                <span>{t('login.username')}</span>
+                <div className="login-name-row">
+                  <input
+                    className="input"
+                    value={name}
+                    placeholder={mode === 'register' ? '取一个名字，别人会看到' : '你注册时用的名字'}
+                    autoComplete="username"
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={onEnter}
+                    maxLength={20}
+                  />
+                  {mode === 'register' && shuffleButton(() => setName(randomName()))}
+                </div>
+              </label>
 
-          <label className="field">
-            <span>密码</span>
-            <input
-              className="input"
-              type="password"
-              value={password}
-              placeholder={mode === 'register' ? '至少 6 个字' : ''}
-              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={onEnter}
-              maxLength={64}
-            />
-          </label>
+              <label className="field">
+                <span>密码</span>
+                <input
+                  className="input"
+                  type="password"
+                  value={password}
+                  placeholder={mode === 'register' ? '至少 6 个字' : ''}
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={onEnter}
+                  maxLength={64}
+                />
+              </label>
 
-          {mode === 'register' && (
-            <label className="field">
-              <span>再输入一次密码</span>
-              <input className="input" type="password" value={password2} autoComplete="new-password" onChange={(e) => setPassword2(e.target.value)} onKeyDown={onEnter} maxLength={64} />
-            </label>
+              {mode === 'register' && (
+                <label className="field">
+                  <span>再输入一次密码</span>
+                  <input className="input" type="password" value={password2} autoComplete="new-password" onChange={(e) => setPassword2(e.target.value)} onKeyDown={onEnter} maxLength={64} />
+                </label>
+              )}
+            </>
           )}
 
           {error && (
@@ -167,16 +218,8 @@ export function LoginPage() {
           )}
 
           <Button block disabled={busy} onClick={submit}>
-            {busy ? t('login.loading') : mode === 'login' ? '登录' : '注册并开始'}
+            {busy ? t('login.loading') : mode === 'guest' ? t('login.start') : mode === 'login' ? '登录' : '注册并开始'}
           </Button>
-
-          {/* 游客：评审或只想先看看的人，一键进入完整流程 */}
-          <div style={{ display: 'grid', gap: 'var(--space-2xs)', borderTop: '1px solid var(--color-rule)', paddingTop: 'var(--space-md)' }}>
-            <Button block variant="secondary" disabled={busy} onClick={guest}>
-              游客体验（不用注册）
-            </Button>
-            <p style={hintStyle}>马上体验完整流程。想保留记录的话，之后到「设置」设一个密码就好。</p>
-          </div>
         </div>
 
         {/* 手机专用：副标题在卡片下方 */}

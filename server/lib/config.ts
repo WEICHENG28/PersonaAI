@@ -7,6 +7,7 @@ export const CONFIG = {
   MAX_ROUNDS: 16,                  // 最多聊幾輪
   WORKER_INTERVAL_MS: 2000,
   WORKER_CONCURRENCY: 5,           // worker 同時推進幾個任務（現場多人時不用排隊；太大會撞到模型平台每分鐘上限）
+  GUEST_KEEP_DAYS: 3,              // 游客帳號建立幾天後自動刪除（前端 src/lib/api/account.ts 的 GUEST_KEEP_DAYS 要一起改）
   LLM_MAX_RETRIES: 2,
   LLM_TIMEOUT_MS: 30000,
   TOOL_MAX_RETRIES: 1,

@@ -4,6 +4,9 @@ import { supabase } from '../supabase'
 
 const LAST_NAME_KEY = 'personaai:lastName'
 
+/** 游客帳號保留幾天（和後端 CONFIG.GUEST_KEEP_DAYS 一樣；改的話兩邊一起改）。 */
+export const GUEST_KEEP_DAYS = 3
+
 export interface AccountStatus {
   guest: boolean
   hasPassword: boolean
@@ -65,9 +68,9 @@ export async function loginAccount(name: string, password: string) {
   return signIn(await post<LoginData>('/api/account/login', { name, password }))
 }
 
-/** 游客体验：不用名字密碼，一鍵進入。 */
-export async function enterAsGuest(suggestedName?: string) {
-  return signIn(await post<LoginData>('/api/account/guest', { name: suggestedName }))
+/** 游客体验：不用密碼，自己取名字或用隨機名字（random=true 時後端保證不重複）。 */
+export async function enterAsGuest(name: string, random: boolean) {
+  return signIn(await post<LoginData>('/api/account/guest', { name, random }))
 }
 
 /** 設定／修改密碼（游客可順便換名字）。成功後刷新登入狀態，畫面上的帳號狀態才會更新。 */

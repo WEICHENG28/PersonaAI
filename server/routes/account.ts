@@ -1,15 +1,16 @@
-// 帳號：註冊、登入、游客、設定密碼。擁有者：A（登入），由 B 的 AI 依 Peter 需求撰寫。
+// 帳號：註冊、登入、游客、設定密碼、游客自動刪除。擁有者：A（登入），由 B 的 AI 依 Peter 需求撰寫。
 // 登入成功回一次性 token_hash，前端用 supabase.auth.verifyOtp 換成登入狀態（不寄任何信）。
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { enterAsGuest, loginAccount, registerAccount, setAccountPassword, type AccountErrorCode, type LoginResult } from '../account/nameLogin.js'
 import { supabaseAccountDeps } from '../account/supabaseDeps.js'
+import { cleanupGuests, supabaseGuestCleanupDeps } from '../account/guestCleanup.js'
 import { isAuthFailure, requireAuth } from '../lib/auth.js'
 
 export const accountRoutes = new Hono()
 
 const credentialsBody = z.object({ name: z.string().max(60), password: z.string().max(200) })
-const guestBody = z.object({ name: z.string().max(60).optional() })
+const guestBody = z.object({ name: z.string().max(60).optional(), random: z.boolean().optional() })
 const passwordBody = z.object({ password: z.string().max(200), name: z.string().max(60).optional() })
 
 const STATUS: Record<AccountErrorCode, 400 | 401 | 404 | 409> = {
@@ -68,4 +69,12 @@ accountRoutes.post('/account/password', async (c) => {
     if (!result.ok) return c.json({ ok: false, code: result.code, error: result.error }, STATUS[result.code])
     return c.json({ ok: true, data: { displayName: result.displayName || auth.displayName } })
   })
+})
+
+// 游客帳號自動刪除（Vercel Cron 每天呼叫一次，見 vercel.json）。
+// Vercel 會帶 Authorization: Bearer <CRON_SECRET>；沒設 CRON_SECRET 就不給跑，避免任何人都能觸發。
+accountRoutes.get('/cron/cleanup-guests', async (c) => {
+  const secret = process.env.CRON_SECRET
+  if (!secret || c.req.header('Authorization') !== `Bearer ${secret}`) return c.json({ ok: false, error: '没有权限' }, 401)
+  return run(c, 'cleanup-guests', async () => c.json({ ok: true, data: await cleanupGuests(supabaseGuestCleanupDeps()) }))
 })

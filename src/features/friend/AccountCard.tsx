@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@components/ui/Button'
 import { Card, CardHead } from '@components/ui/Card'
 import { useDemoStore } from '@store/useDemoStore'
-import { accountStatus, setAccountPassword, type AccountStatus } from '@lib/api/account'
+import { GUEST_KEEP_DAYS, accountStatus, setAccountPassword, type AccountStatus } from '@lib/api/account'
 
 /**
  * 设置页「帐号」卡（http 模式）：
@@ -36,7 +36,7 @@ export function AccountCard() {
   const needsPassword = status.guest || !status.hasPassword
   const title = status.guest ? '游客帐号' : needsPassword ? '帐号还没设密码' : '帐号与密码'
   const sub = status.guest
-    ? '设一个名字和密码，就变成正式帐号，之前的记录都会保留'
+    ? `游客记录只保留 ${GUEST_KEEP_DAYS} 天。设一个名字和密码就变成正式帐号，之前的记录都会保留`
     : needsPassword
       ? '设一个密码，之后用名字＋密码登录（没设的话换浏览器就回不来）'
       : `用「${user?.nickname ?? ''}」＋密码登录`

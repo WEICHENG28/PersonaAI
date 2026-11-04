@@ -100,9 +100,20 @@ export async function loginAccount(input: { name?: string; password?: string }, 
   return { ok: true, displayName: name, ...token, created: false, guest: false }
 }
 
-/** 游客：隨機一個沒人用過的名字，建立游客帳號直接進入。 */
-export async function enterAsGuest(input: { name?: string }, deps: AccountDeps): Promise<LoginResult> {
-  return createAndEnter(await uniqueRandomName(input.name, deps), deps, { guest: true })
+/**
+ * 游客：不用密碼直接進入。random=true（沒改過的隨機名字）→ 保證挑一個沒人用的；
+ * 自己打的名字 → 有人用了就請他換一個（不會進到別人的帳號）。
+ */
+export async function enterAsGuest(input: { name?: string; random?: boolean }, deps: AccountDeps): Promise<LoginResult> {
+  if (input.random !== false || !input.name?.trim()) {
+    return createAndEnter(await uniqueRandomName(input.name, deps), deps, { guest: true })
+  }
+  const name = checkName(input.name)
+  if (!name) return fail('invalid', `名字要在 1–${NAME_MAX} 个字之间`)
+  if ((await deps.isReservedName(name)) || (await deps.findAccount(name))) {
+    return fail('exists', '这个名字已经有人用了，换一个，或按旁边的按钮随机一个')
+  }
+  return createAndEnter(name, deps, { guest: true })
 }
 
 /**
