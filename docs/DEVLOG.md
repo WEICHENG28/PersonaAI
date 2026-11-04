@@ -344,6 +344,12 @@
 - **改了哪些檔案**：`server/account/nameLogin.ts`、`server/account/supabaseDeps.ts`、`server/routes/account.ts`、`src/lib/api/account.ts`、`src/features/friend/LoginPage.tsx`、`src/features/friend/AccountCard.tsx`、`src/features/friend/SettingsPage.tsx`、`tests/social/name-login.test.ts`。
 - **驗證**：`tsc -b`、vitest 677/677、build。真實登入沒有在共用資料庫建測試帳號，請 Peter 在 Vercel 測：註冊、登出再登入、密碼錯、游客→設定頁保留帳號→用新名字登入。
 - **待辦**：登入次數限制（防猜密碼）放進下一步「防濫用」；游客帳號多久清除待決定。
+### 2026-11-01｜現場多人同時用：worker 同時推進多個任務、背景整理記憶不再被 Vercel 中斷｜Peter（AI 協助）
+- **worker 同時推進**：原本一個任務跑完一步（4 輪代聊，約 20～40 秒）才輪下一個，10 人交辦就要等好幾分鐘。新增 `server/social/workerPool.ts`：同時最多 `CONFIG.WORKER_CONCURRENCY`（5）個任務在跑，同一任務不重疊，任務比位置多時最久沒跑的先跑。`scripts/worker.ts` 改用它。上限不要開太大，會撞到模型平台每分鐘呼叫上限。
+- **背景工作**：阿澈回話後的記憶／檔案撷取原本是 `void` 丟背景，Vercel 送出回應後可能凍結函式，工作就沒做完（「記憶沒出現」可能是這個）。新增 `server/lib/background.ts` 的 `runInBackground`：交給 Vercel 的 `waitUntil`（和 `@vercel/functions` 同樣讀 `Symbol.for('@vercel/request-context')`，不用裝套件）；本機沒有就照常背景跑。
+- **跨線**（Peter 同意）：A 的 `server/friend/chat.ts` 兩處改用 `runInBackground`，邏輯不變。
+- **改了哪些檔案**：`server/social/workerPool.ts`、`scripts/worker.ts`、`server/lib/background.ts`、`server/lib/config.ts`、`server/friend/chat.ts`、`tests/social/worker-pool.test.ts`。
+- **驗證**：`tsc -b`、vitest 677/677、build。合併後要重開 worker；記憶是否出現請在 Vercel 上實測。
 
 ---
 
