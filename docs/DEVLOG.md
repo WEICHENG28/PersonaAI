@@ -335,6 +335,28 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-05｜帳號改成名字＋密碼、游客体验（可自選名字）、游客 3 天自動刪除｜Peter（AI 協助）
+- **為什麼**：原本輸入名字、按「是我」就能進同名帳號，有真實用戶後任何人都能進別人的帳號。
+- **登入頁三個分頁**：「游客体验」（預設，和原本一樣只要名字：隨機預填、可自己改、不用密碼；自己打的名字有人用了會請他換）、「登录」「注册」（名字＋密碼，至少 6 字）。這個瀏覽器用名字登入過就預設「登录」。
+- **設定頁帳號卡**：游客「保留帐号」設名字＋密碼變正式帳號，記錄保留；舊的只有名字的帳號「设置密码」；有密碼的可修改。舊帳號不能再只用名字進入，要在原本登入過的瀏覽器設密碼（沒有任何瀏覽器登入著的舊帳號就回不來，多半是測試帳號）。
+- **游客自動刪除**（Peter 同意）：建立超過 `CONFIG.GUEST_KEEP_DAYS`（3）天、沒設密碼的游客連記錄一起刪。`conversations`、`match_attempts`、`agent_tasks.target_user_id` 沒有 cascade，所以先刪游客參與的對話與嘗試、放掉別人任務裡的這場、清 target，再刪 auth 帳號（其餘 cascade）。和游客聊過的人，那段聊天也會消失。由 Vercel Cron 每天 03:00（北京時間）呼叫 `/api/cron/cleanup-guests`，**要在 Vercel 設環境變數 `CRON_SECRET`**（隨便一串長字），沒設就不會跑；worker 開著時也每 6 小時補跑。
+- **做法**：帳號狀態放 Supabase `app_metadata`（`has_password`、`guest`，用戶自己改不了），**不用 migration**。登入時後端用一次性 client 驗密碼，再沿用原本的一次性憑證（前端 verifyOtp）。密碼錯誤延遲 0.8 秒。`/api/account/enter` 拿掉，新增 `/api/account/register`、`/login`、`/guest`、`/password`、`/cron/cleanup-guests`。
+- **跨線**（Peter 同意）：A 的登入頁、設定頁（加帳號卡）；共用的 `vercel.json` 加 crons。
+- **改了哪些檔案**：`server/account/{nameLogin,supabaseDeps,guestCleanup}.ts`、`server/routes/account.ts`、`server/lib/config.ts`、`scripts/worker.ts`、`vercel.json`、`src/lib/api/account.ts`、`src/features/friend/{LoginPage,AccountCard,SettingsPage}.tsx`、`tests/social/{name-login,guest-cleanup}.test.ts`。
+- **驗證**：`tsc -b`、vitest 685/685、build。沒有在共用資料庫建測試帳號，請 Peter 在 Vercel 測：游客（隨機／自己取名）、註冊、登出再登入、密碼錯、游客→設定頁保留帳號→用新名字登入。
+- **待辦**：登入次數限制（防猜密碼）放進下一步「防濫用」。
+
+---
+
+### 2026-11-01｜現場多人同時用：worker 同時推進多個任務、背景整理記憶不再被 Vercel 中斷｜Peter（AI 協助）
+- **worker 同時推進**：原本一個任務跑完一步（4 輪代聊，約 20～40 秒）才輪下一個，10 人交辦就要等好幾分鐘。新增 `server/social/workerPool.ts`：同時最多 `CONFIG.WORKER_CONCURRENCY`（5）個任務在跑，同一任務不重疊，任務比位置多時最久沒跑的先跑。`scripts/worker.ts` 改用它。上限不要開太大，會撞到模型平台每分鐘呼叫上限。
+- **背景工作**：阿澈回話後的記憶／檔案撷取原本是 `void` 丟背景，Vercel 送出回應後可能凍結函式，工作就沒做完（「記憶沒出現」可能是這個）。新增 `server/lib/background.ts` 的 `runInBackground`：交給 Vercel 的 `waitUntil`（和 `@vercel/functions` 同樣讀 `Symbol.for('@vercel/request-context')`，不用裝套件）；本機沒有就照常背景跑。
+- **跨線**（Peter 同意）：A 的 `server/friend/chat.ts` 兩處改用 `runInBackground`，邏輯不變。
+- **改了哪些檔案**：`server/social/workerPool.ts`、`scripts/worker.ts`、`server/lib/background.ts`、`server/lib/config.ts`、`server/friend/chat.ts`、`tests/social/worker-pool.test.ts`。
+- **驗證**：`tsc -b`、vitest 677/677、build。合併後要重開 worker；記憶是否出現請在 Vercel 上實測。
+
+---
+
 ### 2026-10-31｜通知音效＋「我的聊天」排版｜Peter（AI 協助）
 - **通知音效**：`src/lib/notifySound.ts` 用 Web Audio 產生一聲「叮咚」（不用音檔、不用新套件）。鈴鐺未讀數變多、「我的聊天」的「等你接手」變多時響；剛載入不響（`shouldChime`）。瀏覽器要求先點過頁面才能出聲，所以第一次點擊／按鍵時解鎖，之前安靜略過。
 - **我的聊天**：名字放大（`--text-lg`），真人／示范用户標籤放在名字旁邊同一行，狀態放右邊；「你们在聊」改成「聊天室」。

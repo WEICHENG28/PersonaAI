@@ -5,6 +5,7 @@ import { Card, CardHead } from '@components/ui/Card'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
+import { AccountCard } from './AccountCard'
 import {
   isHttpMode,
   logout as authLogout,
@@ -199,6 +200,9 @@ export function SettingsPage() {
 
       {/* dev_mode 时显示日志 */}
       {devMode && <AgentLogPanel logs={s.taskLogs} />}
+
+      {/* 帐号：游客／没密码的帐号在这里设密码（http 模式） */}
+      {isHttpMode && <AccountCard />}
 
       {/* 账号：登出（最下面一整条） */}
       <Button block variant="danger" onClick={handleLogout} style={{ marginTop: 'var(--space-lg)' }}>
