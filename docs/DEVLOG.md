@@ -335,6 +335,18 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-04｜帳號改成名字＋密碼，保留「游客体验」｜Peter（AI 協助）
+- **為什麼**：原本輸入名字、按「是我」就能進同名帳號，有真實用戶後任何人都能進別人的帳號。
+- **現在**：登入頁分「登录／注册」（名字＋密碼，密碼至少 6 字），下方「游客体验（不用注册）」一鍵進入完整流程（評審用）。游客到設定頁「保留帐号」設名字＋密碼就變正式帳號，記錄都保留。
+- **舊帳號**（只有名字）：不能再只用名字進入；在原本登入過的瀏覽器到設定頁「设置密码」即可。沒有任何瀏覽器還登入著的舊帳號就回不來（多半是測試帳號）。
+- **做法**：帳號狀態放 Supabase `app_metadata`（`has_password`、`guest`，用戶自己改不了），**不用 migration**。登入時後端用一次性 client 驗密碼，再沿用原本的一次性憑證（前端 verifyOtp）。密碼錯誤延遲 0.8 秒。`/api/account/enter` 拿掉，新增 `/api/account/register`、`/login`、`/guest`、`/password`。
+- **跨線**（Peter 同意）：A 的登入頁、設定頁（加帳號卡）。
+- **改了哪些檔案**：`server/account/nameLogin.ts`、`server/account/supabaseDeps.ts`、`server/routes/account.ts`、`src/lib/api/account.ts`、`src/features/friend/LoginPage.tsx`、`src/features/friend/AccountCard.tsx`、`src/features/friend/SettingsPage.tsx`、`tests/social/name-login.test.ts`。
+- **驗證**：`tsc -b`、vitest 677/677、build。真實登入沒有在共用資料庫建測試帳號，請 Peter 在 Vercel 測：註冊、登出再登入、密碼錯、游客→設定頁保留帳號→用新名字登入。
+- **待辦**：登入次數限制（防猜密碼）放進下一步「防濫用」；游客帳號多久清除待決定。
+
+---
+
 ### 2026-10-31｜通知音效＋「我的聊天」排版｜Peter（AI 協助）
 - **通知音效**：`src/lib/notifySound.ts` 用 Web Audio 產生一聲「叮咚」（不用音檔、不用新套件）。鈴鐺未讀數變多、「我的聊天」的「等你接手」變多時響；剛載入不響（`shouldChime`）。瀏覽器要求先點過頁面才能出聲，所以第一次點擊／按鍵時解鎖，之前安靜略過。
 - **我的聊天**：名字放大（`--text-lg`），真人／示范用户標籤放在名字旁邊同一行，狀態放右邊；「你们在聊」改成「聊天室」。

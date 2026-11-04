@@ -1,21 +1,13 @@
-// 名字帳號登入（http 模式）：後端建立或找到帳號，回一次性憑證，這裡換成 Supabase 登入狀態。
+// 帳號（http 模式）：註冊、登入、游客、設定密碼。後端驗證後回一次性憑證，這裡換成 Supabase 登入狀態。
 // 擁有者：A（登入），由 B 的 AI 依 Peter 需求撰寫。
 import { supabase } from '../supabase'
 
-export type EnterMode = 'name' | 'random'
-
-/** 名字已有帳號時丟出，前端問用戶「是你嗎」。 */
-export class NameExistsError extends Error {
-  constructor(
-    message: string,
-    readonly displayName: string,
-  ) {
-    super(message)
-    this.name = 'NameExistsError'
-  }
-}
-
 const LAST_NAME_KEY = 'personaai:lastName'
+
+export interface AccountStatus {
+  guest: boolean
+  hasPassword: boolean
+}
 
 /** 這個瀏覽器上次登入用的名字（登入頁自動填入）。讀不到就回 null。 */
 export function lastUsedName(): string | null {
@@ -34,32 +26,64 @@ function rememberName(name: string): void {
   }
 }
 
-export async function enterWithName(mode: EnterMode, name: string, confirmExisting = false): Promise<{ displayName: string; created: boolean }> {
+type LoginData = { displayName: string; tokenHash: string; verificationType?: string; created: boolean; guest: boolean }
+type ApiJson<T> = { ok: true; data: T } | { ok: false; code?: string; error?: string } | null
+
+async function post<T>(path: string, body: unknown, token?: string): Promise<T> {
   let res: Response
   try {
-    res = await fetch('/api/account/enter', {
+    res = await fetch(path, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mode, name, confirmExisting }),
+      headers: { 'content-type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(body),
     })
   } catch {
     throw new Error('连不上服务器，请稍后再试')
   }
-  const json = (await res.json().catch(() => null)) as
-    | { ok: true; data: { displayName: string; tokenHash: string; verificationType?: string; created: boolean } }
-    | { ok: false; code?: string; error?: string; displayName?: string }
-    | null
-  if (!json?.ok) {
-    if (json?.code === 'exists') throw new NameExistsError(json.error ?? '这个名字已经有帐号了', json.displayName ?? name)
-    throw new Error(json?.error ?? '出了点问题，再试一次？')
-  }
+  const json = (await res.json().catch(() => null)) as ApiJson<T>
+  if (!json?.ok) throw new Error(json?.error ?? '出了点问题，再试一次？')
+  return json.data
+}
+
+async function signIn(data: LoginData): Promise<{ displayName: string; created: boolean; guest: boolean }> {
   // 憑證類型照後端回的（signup／magiclink），不然 Supabase 會拒絕
-  const type = json.data.verificationType === 'signup' ? 'signup' : 'magiclink'
-  const { error } = await supabase.auth.verifyOtp({ token_hash: json.data.tokenHash, type })
+  const type = data.verificationType === 'signup' ? 'signup' : 'magiclink'
+  const { error } = await supabase.auth.verifyOtp({ token_hash: data.tokenHash, type })
   if (error) {
     console.error('[account] verifyOtp failed', error.message)
     throw new Error('登录失败，请再试一次')
   }
-  rememberName(json.data.displayName)
-  return { displayName: json.data.displayName, created: json.data.created }
+  if (!data.guest) rememberName(data.displayName)
+  return { displayName: data.displayName, created: data.created, guest: data.guest }
+}
+
+export async function registerAccount(name: string, password: string) {
+  return signIn(await post<LoginData>('/api/account/register', { name, password }))
+}
+
+export async function loginAccount(name: string, password: string) {
+  return signIn(await post<LoginData>('/api/account/login', { name, password }))
+}
+
+/** 游客体验：不用名字密碼，一鍵進入。 */
+export async function enterAsGuest(suggestedName?: string) {
+  return signIn(await post<LoginData>('/api/account/guest', { name: suggestedName }))
+}
+
+/** 設定／修改密碼（游客可順便換名字）。成功後刷新登入狀態，畫面上的帳號狀態才會更新。 */
+export async function setAccountPassword(password: string, name?: string): Promise<{ displayName: string }> {
+  const token = (await supabase.auth.getSession()).data.session?.access_token
+  if (!token) throw new Error('请先登录')
+  const data = await post<{ displayName: string }>('/api/account/password', { password, ...(name !== undefined ? { name } : {}) }, token)
+  await supabase.auth.refreshSession().catch(() => {})
+  rememberName(data.displayName)
+  return data
+}
+
+/** 目前帳號是游客嗎、設過密碼了嗎（讀登入狀態裡的 app_metadata）。 */
+export async function accountStatus(): Promise<AccountStatus | null> {
+  const { data } = await supabase.auth.getUser()
+  const meta = data.user?.app_metadata
+  if (!data.user) return null
+  return { guest: meta?.guest === true, hasPassword: meta?.has_password === true }
 }
