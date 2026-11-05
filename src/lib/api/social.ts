@@ -210,6 +210,34 @@ export function acceptLobbyInvite(): Promise<LobbyInviteView> {
   return request('POST', '/api/lobby-invite/accept')
 }
 
+// ── 防濫用：屏蔽與檢舉（http 模式；後端 server/social/safety.ts） ──
+
+export const REPORT_REASON_LABEL = {
+  harass: '骚扰或辱骂',
+  sexual: '色情或低俗内容',
+  scam: '诈骗、要钱或引导转账',
+  ad: '广告或拉人',
+  privacy: '索要或散播个人信息',
+  other: '其他',
+} as const
+export type ReportReason = keyof typeof REPORT_REASON_LABEL
+
+export function blockUser(userId: string): Promise<{ name: string }> {
+  return request('POST', '/api/safety/block', { userId })
+}
+
+export function unblockUser(userId: string): Promise<{ userId: string }> {
+  return request('POST', '/api/safety/unblock', { userId })
+}
+
+export function reportUser(input: { userId: string; reason: ReportReason; note?: string; conversationId?: string }): Promise<{ name: string; hidden: boolean }> {
+  return request('POST', '/api/safety/report', input)
+}
+
+export function listBlocks(): Promise<{ userId: string; name: string }[]> {
+  return request('GET', '/api/safety/blocks')
+}
+
 async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
   const token = (await supabase.auth.getSession()).data.session?.access_token
   const headers: Record<string, string> = {}

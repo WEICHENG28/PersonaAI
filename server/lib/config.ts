@@ -8,6 +8,12 @@ export const CONFIG = {
   WORKER_INTERVAL_MS: 2000,
   WORKER_CONCURRENCY: 5,           // worker 同時推進幾個任務（現場多人時不用排隊；太大會撞到模型平台每分鐘上限）
   GUEST_KEEP_DAYS: 3,              // 游客帳號建立幾天後自動刪除（前端 src/lib/api/account.ts 的 GUEST_KEEP_DAYS 要一起改）
+  DAILY_FRIEND_MESSAGES: 300,      // 每人 24 小時內最多和阿澈說幾句（防濫用，AI 是花錢的）
+  DAILY_LIVE_MESSAGES: 500,        // 每人 24 小時內在聊天室最多發幾則
+  DAILY_TASKS: 20,                 // 每人 24 小時內最多交辦幾個找人任務
+  REPORT_HIDE_THRESHOLD: 3,        // 真人被幾個不同的人檢舉，先從大廳隱藏
+  LOGIN_MAX_FAILS: 5,              // 同一帳號連續打錯幾次密碼就暫時鎖住
+  LOGIN_LOCK_MINUTES: 15,          // 鎖幾分鐘
   LLM_MAX_RETRIES: 2,
   LLM_TIMEOUT_MS: 30000,
   TOOL_MAX_RETRIES: 1,

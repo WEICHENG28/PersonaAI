@@ -4,6 +4,8 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { isAuthFailure, requireAuth } from '../lib/auth.js'
 import { initUserProfile } from '../lib/profile.js'
+import { BlockedContentError, assertAllowed } from '../lib/moderation.js'
+import { UsageLimitError } from '../social/usage.js'
 import { friendChat, friendIntro, getFriendMessages, FriendChatError } from '../friend/chat.js'
 import { deliverPendingReports, nextMeet, NextMeetError } from '../friend/nextMeet.js'
 import { deleteMemory, editMemory, listMemories, markNotLikeMe, memoryIdSchema, memoryContentSchema, MemoryError } from '../friend/memory.js'
@@ -78,6 +80,10 @@ friendRoutes.post('/friend/chat', async (c) => {
   } catch (err) {
     if (err instanceof FriendChatError) {
       return c.json({ ok: false, error: err.message }, 500)
+    }
+    // 防濫用：敏感词（400）、每日上限（429）
+    if (err instanceof BlockedContentError || err instanceof UsageLimitError) {
+      return c.json({ ok: false, error: err.message }, err.status)
     }
     // zod: 文字长度
     if (err && typeof err === 'object' && 'issues' in err) {
@@ -195,9 +201,12 @@ friendRoutes.put('/profile/shareable', async (c) => {
     const userId = await appUserId(authed)
     const body = await c.req.json().catch(() => null)
     const input = shareableUpdateSchema.parse(body)
+    // 防濫用：对外档案别人会看到，有敏感词就不保存
+    assertAllowed(JSON.stringify(input))
     const data = await updateShareable(userId, input)
     return c.json({ ok: true, data })
   } catch (err) {
+    if (err instanceof BlockedContentError) return c.json({ ok: false, error: err.message }, 400)
     if (err instanceof z.ZodError) {
       return c.json({ ok: false, error: '档案字段格式不对：介绍 40 字内、兴趣 1–12 项、风格与想找各 60 字内' }, 400)
     }

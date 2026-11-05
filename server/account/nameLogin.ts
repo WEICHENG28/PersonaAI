@@ -4,6 +4,7 @@
 // 帳號狀態放在 Supabase 的 app_metadata（用戶自己改不了）：has_password、guest。
 // 擁有者：A（登入），由 B 的 AI 依 Peter 需求撰寫。
 import { randomName } from '../../src/features/friend/randomName.js'
+import { CONFIG } from '../lib/config.js'
 
 export const NAME_MAX = 20
 export const PASSWORD_MIN = 6
@@ -15,6 +16,9 @@ export interface AccountInfo {
   email: string | null
   hasPassword: boolean
   guest: boolean
+  /** 連續打錯密碼的次數、鎖到什麼時候（防猜密碼，存在 app_metadata）。 */
+  loginFails?: number
+  lockedUntil?: string | null
 }
 
 export interface AccountDeps {
@@ -30,6 +34,9 @@ export interface AccountDeps {
   verifyPassword(email: string, password: string): Promise<boolean>
   /** 設定密碼（＝變成正式帳號），可順便補 email、改名字。 */
   upgradeAccount(authId: string, patch: { password: string; email?: string; displayName?: string }): Promise<void>
+  /** 記錄登入失敗次數／鎖定時間（成功時歸零）。 */
+  setLoginFailures?(authId: string, fails: number, lockedUntil: string | null): Promise<void>
+  now?: () => Date
   /** 產生已存在帳號的一次性登入憑證（不寄信）。verificationType 給前端 verifyOtp 用。 */
   issueLogin(email: string): Promise<LoginToken>
   /** 建立 users 列（冪等），佔住這個名字。 */
@@ -42,7 +49,7 @@ export interface LoginToken {
   verificationType: string
 }
 
-export type AccountErrorCode = 'invalid' | 'reserved' | 'exists' | 'not_found' | 'no_password' | 'wrong_password'
+export type AccountErrorCode = 'invalid' | 'reserved' | 'exists' | 'not_found' | 'no_password' | 'wrong_password' | 'locked'
 
 export type LoginResult =
   | { ok: true; displayName: string; tokenHash: string; verificationType: string; created: boolean; guest: boolean }
@@ -95,7 +102,19 @@ export async function loginAccount(input: { name?: string; password?: string }, 
   if (!account.hasPassword || !account.email) {
     return fail('no_password', '这个帐号还没设密码。请在原来登录过的浏览器打开网站，到「设置」设一个密码后再登录')
   }
-  if (!(await deps.verifyPassword(account.email, input.password))) return fail('wrong_password', '名字或密码不对')
+  const now = deps.now?.() ?? new Date()
+  if (account.lockedUntil && new Date(account.lockedUntil) > now) {
+    const minutes = Math.ceil((new Date(account.lockedUntil).getTime() - now.getTime()) / 60_000)
+    return fail('locked', `密码错太多次了，请 ${minutes} 分钟后再试`)
+  }
+  if (!(await deps.verifyPassword(account.email, input.password))) {
+    // 連續打錯 LOGIN_MAX_FAILS 次就鎖 LOGIN_LOCK_MINUTES 分鐘（防有人一直猜別人的密碼）
+    const fails = (account.loginFails ?? 0) + 1
+    const lock = fails >= CONFIG.LOGIN_MAX_FAILS
+    await deps.setLoginFailures?.(account.authId, lock ? 0 : fails, lock ? new Date(now.getTime() + CONFIG.LOGIN_LOCK_MINUTES * 60_000).toISOString() : null)
+    return lock ? fail('locked', `密码错太多次了，请 ${CONFIG.LOGIN_LOCK_MINUTES} 分钟后再试`) : fail('wrong_password', '名字或密码不对')
+  }
+  if (account.loginFails || account.lockedUntil) await deps.setLoginFailures?.(account.authId, 0, null)
   const token = await deps.issueLogin(account.email)
   return { ok: true, displayName: name, ...token, created: false, guest: false }
 }

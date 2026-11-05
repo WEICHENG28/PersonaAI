@@ -12,6 +12,7 @@ import type {
 } from '../../shared/types.js'
 import { getShareableProfile, getStyleProfile } from '../contracts/friend.js'
 import { guardText } from './guard.js'
+import { maskBlocked } from '../lib/moderation.js'
 import { llmJson, type LlmJsonOptions } from '../lib/llm/index.js'
 import { writeLog } from '../lib/log.js'
 import { CONFIG } from '../lib/config.js'
@@ -196,7 +197,8 @@ export function createTwinReply(deps: TwinDeps): TwinReplyFn {
       sender_id: speakerUserId,
       is_ai: true,
       guard_rewritten: !guarded.ok,
-      content: guarded.text,
+      // 防濫用：AI 說出敏感詞就遮掉（server/lib/moderation.ts）
+      content: maskBlocked(guarded.text),
     })
 
     // 5～6. 工作日誌：只有要問本人時寫

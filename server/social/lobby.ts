@@ -6,6 +6,7 @@ import { SEED_USERS } from '../fixtures/seed-users.js'
 import { getAdminDb } from './db.js'
 import { CONFIG } from '../lib/config.js'
 import { PURPOSE_LABEL } from './task.js'
+import { blockedIdsFor } from './safety.js'
 
 const DEFAULT_LIMIT = 5
 const KEYWORD_BONUS = 0.1
@@ -67,7 +68,8 @@ function rankScore(c: { similarity: number; is_seed: boolean }): number {
 
 export async function searchLobby(userId: string, q: LobbyQuery): Promise<LobbyCandidate[]> {
   const conditions = q.conditions ?? []
-  const excluded = new Set([userId, ...(q.excludeIds ?? [])])
+  // 互相屏蔽的人不出現在大廳，社交 Agent 也不會去找（server/social/safety.ts）
+  const excluded = new Set([userId, ...(q.excludeIds ?? []), ...(await blockedIdsFor(userId))])
   const purpose = q.purpose ?? 'friend'
   const pool = (await (override ?? defaultSource)()).filter(
     (e) => !excluded.has(e.user_id) && (purpose === 'friend' || e.purposes.includes(purpose)),
