@@ -6,6 +6,7 @@ import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
 import { AccountCard } from './AccountCard'
+import { BlockListCard } from '@features/social/components/BlockListCard'
 import {
   isHttpMode,
   logout as authLogout,
@@ -203,6 +204,7 @@ export function SettingsPage() {
 
       {/* 帐号：游客／没密码的帐号在这里设密码（http 模式） */}
       {isHttpMode && <AccountCard />}
+      {isHttpMode && <BlockListCard />}
 
       {/* 账号：登出（最下面一整条） */}
       <Button block variant="danger" onClick={handleLogout} style={{ marginTop: 'var(--space-lg)' }}>

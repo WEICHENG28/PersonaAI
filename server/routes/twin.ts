@@ -28,6 +28,9 @@ import { createLobbyApi, lobbyQuerySchema, targetBodySchema, type LobbyApi } fro
 import { supabaseLobbyStore } from '../twin/lobbyStore.js'
 import { createSingleTargetTask, createTaskFromText, searchLobby } from '../contracts/social.js'
 import { QUESTION_MAX } from '../twin/lobbyAssistant.js'
+import { assertAllowed } from '../lib/moderation.js'
+import { assertWithinDailyLimit } from '../social/usage.js'
+import { isBlockedPair } from '../social/safety.js'
 
 /** 回 users.id；失敗回已寫好的 401／403 Response。 */
 export type ResolveUserId = (c: Context) => Promise<string | Response>
@@ -110,7 +113,12 @@ export function createTwinRoutes(deps: TwinRouteDeps): Hono {
   routes.post('/conversations/:id/messages', async (c) => {
     const body = messageBodySchema.safeParse(await c.req.json().catch(() => null))
     if (!body.success) return c.json({ ok: false, error: `消息要在 1–${MESSAGE_MAX} 字之间` }, 400)
-    return respond(c, deps, (id, userId) => deps.chatRoom().sendHumanMessage(id, userId, body.data.text))
+    return respond(c, deps, async (id, userId) => {
+      // 防濫用：敏感词不送出（400）、每日上限（429）；错误由 app.onError 转成对应状态
+      assertAllowed(body.data.text)
+      await assertWithinDailyLimit('live_message', userId)
+      return deps.chatRoom().sendHumanMessage(id, userId, body.data.text)
+    })
   })
 
   // C5 結果頁：我方視角的判定、雙向合適、為什麼你們合、大綱、完整紀錄（不回任何分數與對方視角）
@@ -165,7 +173,12 @@ export function createTwinRoutes(deps: TwinRouteDeps): Hono {
 
   // C9「我自己聊」：我本人 ↔ 對方分身，回 conversationId（前端導向聊天室）
   routes.post('/conversations', (c) =>
-    respondAsUser(c, deps, async (userId) => deps.lobby().startHumanChat(userId, await readTarget(c))),
+    respondAsUser(c, deps, async (userId) => {
+      const target = await readTarget(c)
+      // 互相屏蔽的人不能再開新對話（不透露被屏蔽，只說不在大廳）
+      if (await isBlockedPair(userId, target)) throw new ChatRoomError('这位用户目前不在大厅里', 404)
+      return deps.lobby().startHumanChat(userId, target)
+    }),
   )
 
   // C10 大廳 AI 助手：{ question }；像交辦任務就建任務（回 taskId），否則回答＋候選人小卡片（都沒有分數）
@@ -173,6 +186,7 @@ export function createTwinRoutes(deps: TwinRouteDeps): Hono {
     respondAsUser(c, deps, async (userId) => {
       const body = questionSchema.safeParse(await c.req.json().catch(() => null))
       if (!body.success) throw new ChatRoomError(`问题要在 1–${QUESTION_MAX} 字之间`, 400)
+      assertAllowed(body.data.question)
       return deps.lobby().ask(userId, body.data.question)
     }),
   )

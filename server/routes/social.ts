@@ -15,6 +15,7 @@ import { requireUserId } from '../social/user.js'
 import { listMyChats } from '../social/chats.js'
 import { acceptLobbyInvite, getLobbyInvite } from '../social/lobbyInvite.js'
 import { supabaseLobbyInviteDeps } from '../social/lobbyInviteDeps.js'
+import { REPORT_REASONS, blockUser, defaultSafetyStore, listMyBlocks, reportUser, unblockUser, type ReportReason } from '../social/safety.js'
 
 export const socialRoutes = new Hono()
 
@@ -126,3 +127,48 @@ async function respond<T>(c: Context, run: (userId: string) => Promise<T>) {
     throw err
   }
 }
+
+// ===== 防濫用：屏蔽與檢舉（server/social/safety.ts） =====
+const targetBody = z.object({ userId: z.uuid() })
+const reportBody = z.object({
+  userId: z.uuid(),
+  reason: z.enum(Object.keys(REPORT_REASONS) as [ReportReason, ...ReportReason[]]),
+  note: z.string().trim().max(200).optional(),
+  conversationId: z.uuid().optional(),
+})
+
+function safetyStore() {
+  const store = defaultSafetyStore()
+  if (!store) throw new TaskError('现在没有连接数据库，不能使用这个功能', 400)
+  return store
+}
+
+/** 屏蔽：雙方互相看不到、不能再開新對話；進行中的對話結束。 */
+socialRoutes.post('/safety/block', (c) =>
+  respond(c, async (userId) => {
+    const body = targetBody.safeParse(await c.req.json().catch(() => null))
+    if (!body.success) throw new TaskError('请选择要屏蔽的用户')
+    return blockUser(userId, body.data.userId, safetyStore())
+  }),
+)
+
+socialRoutes.post('/safety/unblock', (c) =>
+  respond(c, async (userId) => {
+    const body = targetBody.safeParse(await c.req.json().catch(() => null))
+    if (!body.success) throw new TaskError('请选择要取消屏蔽的用户')
+    await unblockUser(userId, body.data.userId, safetyStore())
+    return { userId: body.data.userId }
+  }),
+)
+
+/** 檢舉：記下理由並自動屏蔽；真人被多人檢舉先從大廳隱藏。 */
+socialRoutes.post('/safety/report', (c) =>
+  respond(c, async (userId) => {
+    const body = reportBody.safeParse(await c.req.json().catch(() => null))
+    if (!body.success) throw new TaskError('请选择检举原因（补充说明 200 字以内）')
+    return reportUser(userId, body.data.userId, body.data, safetyStore())
+  }),
+)
+
+/** 我屏蔽的人（設定頁）。 */
+socialRoutes.get('/safety/blocks', (c) => respond(c, (userId) => listMyBlocks(userId, safetyStore())))

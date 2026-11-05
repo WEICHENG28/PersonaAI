@@ -12,6 +12,8 @@ function toInfo(user: AuthUser): AccountInfo {
     email: user.email || null,
     hasPassword: user.app_metadata?.has_password === true,
     guest: user.app_metadata?.guest === true,
+    loginFails: typeof user.app_metadata?.login_fails === 'number' ? user.app_metadata.login_fails : 0,
+    lockedUntil: typeof user.app_metadata?.locked_until === 'string' ? user.app_metadata.locked_until : null,
   }
 }
 
@@ -76,6 +78,10 @@ export function supabaseAccountDeps(): AccountDeps {
         const { error: nameError } = await db.from('users').update({ display_name: patch.displayName }).eq('auth_id', authId)
         if (nameError) throw nameError
       }
+    },
+    async setLoginFailures(authId, fails, lockedUntil) {
+      const { error } = await db.auth.admin.updateUserById(authId, { app_metadata: { login_fails: fails, locked_until: lockedUntil } })
+      if (error) throw error
     },
     async issueLogin(email) {
       const { data, error } = await db.auth.admin.generateLink({ type: 'magiclink', email })

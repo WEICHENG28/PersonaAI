@@ -335,6 +335,19 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-06｜防濫用：頻率限制、每日上限、敏感詞、屏蔽／檢舉、登入鎖定、管理員停用帳號｜Peter（AI 協助）
+- **頻率限制**（`server/lib/rateLimit.ts`，在 `app.ts` 掛中介層）：登入每 IP 10 分鐘 10 次、建帳號／游客 8 次；和阿澈聊天每人每分鐘 20 句、聊天室 30 則；建任務／大廳助手／開聊等 AI 動作每分鐘 15 次；超過回 429。記在記憶體（Vercel 同一台機器共用），是「盡量擋」。
+- **每日上限**（`server/social/usage.ts`，用現有資料表算最近 24 小時，不用 migration）：和阿澈 300 句、聊天室 500 則、找人任務 20 個（`CONFIG.DAILY_*`）。
+- **敏感詞**（`server/lib/moderation.ts`＋可改的清單 `moderationWords.ts`）：用戶送出的阿澈聊天、聊天室訊息、任務、大廳助手問題、對外檔案有敏感詞就擋（400「内容里有不适合的词」）；阿澈和分身說出的就遮成＊＊。去掉空白符號再比對。不擋「想不开」之類求助。正式上線建議換成雲端內容安全服務。
+- **屏蔽／檢舉**（`server/social/safety.ts`，記在 `agent_logs`，agent='guard'，不用 migration）：聊天室上方「屏蔽」「检举」（示範用戶只有屏蔽）。屏蔽＝雙向在大廳和社交 Agent 找人裡互相看不到（`searchLobby` 排除）、不能開新對話、進行中的對話結束；設定頁「已屏蔽的人」可取消。檢舉選原因＋說明，自動屏蔽；真人被 3 個不同的人檢舉先從大廳隱藏（關社交 Agent）。API：`POST /api/safety/block|unblock|report`、`GET /api/safety/blocks`。
+- **登入鎖定**：同一帳號連續打錯 5 次密碼鎖 15 分鐘（存在 `app_metadata.login_fails／locked_until`）。
+- **管理員停用帳號**（`server/routes/admin.ts`）：`GET /api/admin/reports` 看檢舉、`POST /api/admin/ban {name|userId, banned}` 停用／恢復。要帶 `Authorization: Bearer <ADMIN_SECRET>`，**Peter 要在 Vercel 設 `ADMIN_SECRET`（至少 16 字）**，沒設就全部拒絕。停用＝Supabase 封鎖登入＋`app_metadata.banned`（`requireAuth` 回 403）＋從大廳隱藏。管理後台頁面之後做。
+- **跨線**（Peter 同意）：A 的 `server/lib/auth.ts`（停用檢查，沒停用時回傳內容不變）、`server/friend/chat.ts`、`server/routes/friend.ts`；C 的 `server/routes/twin.ts`、`server/twin/twin.ts`、`LiveChatRoom.tsx`（放 B 的 `SafetyActions`）；A 的設定頁放 B 的 `BlockListCard`。
+- **改了哪些檔案**：上面列的，加 `server/lib/{rateLimit,moderation,moderationWords}.ts`、`server/social/{safety,usage}.ts`、`server/routes/{admin,social,account}.ts`、`server/account/{nameLogin,supabaseDeps}.ts`、`server/social/{lobby,task}.ts`、`server/lib/config.ts`、`server/app.ts`、`src/lib/api/social.ts`、`src/features/social/components/{SafetyActions,BlockListCard}.tsx`、`tests/social/anti-abuse.test.ts`。
+- **驗證**：`tsc -b`、vitest 697/697、build。沒有在共用資料庫實測，請 Peter 在 Vercel 測（見 PR）。
+
+---
+
 ### 2026-11-05｜帳號改成名字＋密碼、游客体验（可自選名字）、游客 3 天自動刪除｜Peter（AI 協助）
 - **為什麼**：原本輸入名字、按「是我」就能進同名帳號，有真實用戶後任何人都能進別人的帳號。
 - **登入頁三個分頁**：「游客体验」（預設，和原本一樣只要名字：隨機預填、可自己改、不用密碼；自己打的名字有人用了會請他換）、「登录」「注册」（名字＋密碼，至少 6 字）。這個瀏覽器用名字登入過就預設「登录」。

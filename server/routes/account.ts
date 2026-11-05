@@ -13,13 +13,14 @@ const credentialsBody = z.object({ name: z.string().max(60), password: z.string(
 const guestBody = z.object({ name: z.string().max(60).optional(), random: z.boolean().optional() })
 const passwordBody = z.object({ password: z.string().max(200), name: z.string().max(60).optional() })
 
-const STATUS: Record<AccountErrorCode, 400 | 401 | 404 | 409> = {
+const STATUS: Record<AccountErrorCode, 400 | 401 | 404 | 409 | 429> = {
   invalid: 400,
   reserved: 409,
   exists: 409,
   not_found: 404,
   no_password: 409,
   wrong_password: 401,
+  locked: 429,
 }
 
 function reply(c: Context, result: LoginResult) {
