@@ -28,7 +28,7 @@ export const RATE_RULES: RateRule[] = [
   {
     name: 'ai-actions',
     method: 'POST',
-    path: /^\/(tasks|lobby\/assistant|lobby\/twin-chat|conversations|conversations\/[^/]+\/continue|profile\/extract|profile\/fun)$/,
+    path: /^\/(tasks|lobby\/assistant|lobby\/twin-chat|conversations|conversations\/[^/]+\/continue|profile\/extract|profile\/fun|onboarding\/(quick-profile|join-lobby|first-task))$/,
     limit: 15,
     windowMs: MINUTE,
     by: 'user',

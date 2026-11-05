@@ -11,6 +11,7 @@ import { t } from '@i18n/t'
 import { AgentLogPanel } from '@components/AgentLogPanel'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
 import { useLobbyInvite } from '@features/social/components/LobbyInvite'
+import { useOnboardingGuide } from '@features/social/components/OnboardingGuide'
 import {
   isHttpMode,
   callFriendIntro,
@@ -46,6 +47,8 @@ export function FriendPage() {
   const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
   // 聊夠了、對外檔案也夠完整 → 邀請一鍵加入大廳（B 的元件）
   const lobbyInvite = useLobbyInvite(httpMessages.filter((m) => m.role === 'user').length)
+  // 新手任务第 4 步建好任务后，用同一张任务确认卡确认
+  const guide = useOnboardingGuide(httpMessages.filter((m) => m.role === 'user').length, (taskId) => setPendingTaskId(taskId))
   const chatRef = useAutoScrollBottom<HTMLDivElement>(msgCount)
 
   // http 模式：挂载时拉消息 + 首次见面
@@ -183,8 +186,12 @@ export function FriendPage() {
             <span className="typing-label">{t('friend.typing')}</span>
           )}
           {s.reportReady && <Chip tone="pear">{t('friend.hasNews')}</Chip>}
-          {lobbyInvite.banner}
+          {/* 新手任务进行中就不另外显示进大厅进度（新手任务已经包含） */}
+          {!guide.active && lobbyInvite.banner}
         </div>
+
+        {/* 新手任务：聊天 → 档案 → 进大厅 → 第一个任务 → 第一份结果（B 的元件） */}
+        {guide.node}
 
         <div className="chat" ref={chatRef}>
           {isHttpMode ? (
