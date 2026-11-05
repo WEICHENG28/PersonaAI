@@ -210,6 +210,37 @@ export function acceptLobbyInvite(): Promise<LobbyInviteView> {
   return request('POST', '/api/lobby-invite/accept')
 }
 
+// ── 新手引導（http 模式；後端 server/social/onboarding.ts） ──
+
+export type OnboardingStep = 'chat' | 'profile' | 'lobby' | 'task' | 'result'
+
+export interface OnboardingView {
+  steps: { key: OnboardingStep; label: string; done: boolean }[]
+  current: OnboardingStep | null
+  doneCount: number
+  chatNeed: number
+  userMessages: number
+  shareable: LobbyShareable | null
+  latestTaskId: string | null
+  resultConversationId: string | null
+}
+
+export function getOnboarding(): Promise<OnboardingView> {
+  return request('GET', '/api/onboarding')
+}
+
+export function quickProfile(input: { intro: string; interests: string[]; looking_for: string }): Promise<OnboardingView> {
+  return request('POST', '/api/onboarding/quick-profile', input)
+}
+
+export function joinLobbyNow(): Promise<OnboardingView> {
+  return request('POST', '/api/onboarding/join-lobby')
+}
+
+export function startFirstTask(): Promise<{ id: string }> {
+  return request('POST', '/api/onboarding/first-task')
+}
+
 // ── 防濫用：屏蔽與檢舉（http 模式；後端 server/social/safety.ts） ──
 
 export const REPORT_REASON_LABEL = {

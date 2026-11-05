@@ -1,9 +1,10 @@
-// 管理員 API（防濫用）：看檢舉、停用／恢復帳號。完整的管理後台頁面之後再做，現在用工具（curl 等）呼叫。
+// 管理員 API：看檢舉、停用／恢復帳號（防濫用）、新手漏斗。完整的管理後台頁面之後再做，現在用工具（curl 等）呼叫。
 // 要帶 Authorization: Bearer <ADMIN_SECRET>（Vercel 環境變數）；沒設 ADMIN_SECRET 就全部拒絕。擁有者：B。
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { getServiceClient } from '../lib/supabase.js'
 import { REPORT_ACTION } from '../social/safety.js'
+import { buildFunnel, loadOnboardingState } from '../social/onboarding.js'
 
 export const adminRoutes = new Hono()
 
@@ -81,4 +82,21 @@ adminRoutes.post('/admin/ban', async (c) => {
     reason: body.data.reason ?? null,
   })
   return c.json({ ok: true, data: { userId: user.id, name: user.display_name, banned: body.data.banned } })
+})
+
+/**
+ * 新手漏斗：最近 days 天（預設 30）建立的真人帳號，每一步有多少人走到。
+ * 用和新手引導同一套判斷（server/social/onboarding.ts）；一次最多看 500 人。
+ */
+adminRoutes.get('/admin/funnel', async (c) => {
+  const days = Math.min(Math.max(Number(c.req.query('days') ?? 30) || 30, 1), 365)
+  const since = new Date(Date.now() - days * 86_400_000).toISOString()
+  const db = getServiceClient()
+  const { data, error } = await db.from('users').select('id').eq('is_seed', false).gte('created_at', since).order('created_at', { ascending: false }).limit(500)
+  if (error) throw error
+  const ids = (data ?? []).map((u) => u.id as string)
+  const states = []
+  // 10 人一批，避免一次打太多查詢
+  for (let i = 0; i < ids.length; i += 10) states.push(...(await Promise.all(ids.slice(i, i + 10).map((id) => loadOnboardingState(id)))))
+  return c.json({ ok: true, data: { days, funnel: buildFunnel(states) } })
 })

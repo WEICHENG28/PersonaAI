@@ -10,6 +10,7 @@ import { rateLimitMiddleware } from './lib/rateLimit.js'
 import { BlockedContentError } from './lib/moderation.js'
 import { UsageLimitError } from './social/usage.js'
 import { SafetyError } from './social/safety.js'
+import { OnboardingError } from './social/onboarding.js'
 
 export const app = new Hono().basePath('/api')
 
@@ -31,7 +32,7 @@ app.notFound((c) => c.json({ ok: false, error: '找不到这个接口' }, 404))
 
 app.onError((err, c) => {
   // 防濫用的錯誤是給用戶看的：敏感詞 400、每日上限 429、屏蔽／檢舉的輸入錯誤 400/404
-  if (err instanceof BlockedContentError || err instanceof UsageLimitError || err instanceof SafetyError) {
+  if (err instanceof BlockedContentError || err instanceof UsageLimitError || err instanceof SafetyError || err instanceof OnboardingError) {
     return c.json({ ok: false, error: err.message }, err.status)
   }
   console.error('[server]', c.req.method, c.req.path, err)

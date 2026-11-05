@@ -13,7 +13,9 @@ import { getTaskStore } from '../social/taskStore.js'
 import { defaultRunnerDeps } from '../social/runnerDeps.js'
 import { requireUserId } from '../social/user.js'
 import { listMyChats } from '../social/chats.js'
-import { acceptLobbyInvite, getLobbyInvite } from '../social/lobbyInvite.js'
+import { acceptLobbyInvite, getLobbyInvite, isProfileComplete } from '../social/lobbyInvite.js'
+import { firstTaskText, loadOnboardingState, normalizeQuickProfile, onboardingView } from '../social/onboarding.js'
+import { updateShareable } from '../friend/profile.js'
 import { supabaseLobbyInviteDeps } from '../social/lobbyInviteDeps.js'
 import { REPORT_REASONS, blockUser, defaultSafetyStore, listMyBlocks, reportUser, unblockUser, type ReportReason } from '../social/safety.js'
 
@@ -172,3 +174,41 @@ socialRoutes.post('/safety/report', (c) =>
 
 /** 我屏蔽的人（設定頁）。 */
 socialRoutes.get('/safety/blocks', (c) => respond(c, (userId) => listMyBlocks(userId, safetyStore())))
+
+// ===== 新手引導（server/social/onboarding.ts） =====
+const quickProfileBody = z.object({
+  intro: z.string().max(40),
+  interests: z.array(z.string().max(30)).max(12),
+  looking_for: z.string().max(60),
+})
+
+/** 引導進度（每一步完成沒有、現在該做哪一步）。 */
+socialRoutes.get('/onboarding', (c) => respond(c, async (userId) => onboardingView(await loadOnboardingState(userId))))
+
+/** 快速建檔：三個問題生成對外檔案（同時確認檔案）。 */
+socialRoutes.post('/onboarding/quick-profile', (c) =>
+  respond(c, async (userId) => {
+    const body = quickProfileBody.safeParse(await c.req.json().catch(() => null))
+    if (!body.success) throw new TaskError('介绍 40 字内、兴趣每个 30 字内、想找的人 60 字内')
+    await updateShareable(userId, normalizeQuickProfile(body.data))
+    return onboardingView(await loadOnboardingState(userId))
+  }),
+)
+
+/** 進大廳：檔案夠完整就確認檔案＋開社交 Agent（不用等聊滿 LOBBY_INVITE_MIN_MESSAGES 句）。 */
+socialRoutes.post('/onboarding/join-lobby', (c) =>
+  respond(c, async (userId) => {
+    const state = await loadOnboardingState(userId)
+    if (!isProfileComplete(state.shareable)) throw new TaskError('先生成你的档案（一句介绍＋至少 2 个兴趣）')
+    await supabaseLobbyInviteDeps().join(userId, state.shareable)
+    return onboardingView(await loadOnboardingState(userId))
+  }),
+)
+
+/** 第一個任務：用第一個興趣找 1 位（建立後是待確認，前端跳確認卡）。 */
+socialRoutes.post('/onboarding/first-task', (c) =>
+  respond(c, async (userId) => {
+    const state = await loadOnboardingState(userId)
+    return createTaskFromText(userId, firstTaskText(state.shareable))
+  }),
+)

@@ -335,6 +335,18 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-06｜新手引導 5 步＋漏斗統計｜Peter（AI 協助）
+- **為什麼**：建議指出新用戶第一次就要走完完整流程（至少到建檔、進大廳），中途被打斷就很難再回來。
+- **新手任务卡**（AI 朋友頁上方，`OnboardingGuide.tsx`）：① 和阿澈聊 3 句（`CONFIG.ONBOARDING_CHAT_MESSAGES`）② 生成檔案 ③ 進大廳 ④ 交辦第一個任務 ⑤ 看到第一份代聊結果。每步有直接的按鈕：「快速建档（1 分钟）」三個問題（一句介紹、至少 2 個興趣、想認識誰）直接生成並確認對外檔案；「加入大厅」不用等聊滿 8 句；「帮我找 1 位朋友」用第一個興趣建任務並跳出原本的任務確認卡；等結果時每 15 秒更新。可收起；全部完成按「知道了」就不再出現。引導進行中不另外顯示進大廳進度條。
+- **中斷後接著走**：進度全部從現有紀錄算（聊天句數、對外檔案、社交 Agent、確認過的任務、有判定的 match_attempts），不用 migration，換裝置也一樣。
+- **漏斗**：`GET /api/admin/funnel?days=30`（要 `ADMIN_SECRET`）回每一步走到的人數與比例（不含示範用戶，最多 500 人）。
+- **API**：`GET /api/onboarding`、`POST /api/onboarding/quick-profile|join-lobby|first-task`（後三個在頻率限制內）。
+- **跨線**（Peter 同意）：A 的 `FriendPage.tsx` 放 B 的引導卡；快速建檔用 A 的 `updateShareable`。
+- **改了哪些檔案**：`server/social/onboarding.ts`、`server/routes/{social,admin}.ts`、`server/app.ts`、`server/lib/{config,rateLimit}.ts`、`src/lib/api/social.ts`、`src/features/social/components/OnboardingGuide.tsx`、`src/features/friend/FriendPage.tsx`、`tests/social/onboarding.test.ts`。
+- **驗證**：`tsc -b`、vitest 707/707、build。畫面請 Peter 在 Vercel 用新的游客帳號走一次（第 5 步要開 worker）。
+
+---
+
 ### 2026-11-06｜防濫用：頻率限制、每日上限、敏感詞、屏蔽／檢舉、登入鎖定、管理員停用帳號｜Peter（AI 協助）
 - **頻率限制**（`server/lib/rateLimit.ts`，在 `app.ts` 掛中介層）：登入每 IP 10 分鐘 10 次、建帳號／游客 8 次；和阿澈聊天每人每分鐘 20 句、聊天室 30 則；建任務／大廳助手／開聊等 AI 動作每分鐘 15 次；超過回 429。記在記憶體（Vercel 同一台機器共用），是「盡量擋」。
 - **每日上限**（`server/social/usage.ts`，用現有資料表算最近 24 小時，不用 migration）：和阿澈 300 句、聊天室 500 則、找人任務 20 個（`CONFIG.DAILY_*`）。
