@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { getServiceClient } from '../lib/supabase.js'
 import { REPORT_ACTION } from '../social/safety.js'
 import { buildFunnel, loadOnboardingState } from '../social/onboarding.js'
+import { recentErrors } from '../lib/alerts.js'
+import { deepHealth } from '../health.js'
 
 export const adminRoutes = new Hono()
 
@@ -100,3 +102,79 @@ adminRoutes.get('/admin/funnel', async (c) => {
   for (let i = 0; i < ids.length; i += 10) states.push(...(await Promise.all(ids.slice(i, i + 10).map((id) => loadOnboardingState(id)))))
   return c.json({ ok: true, data: { days, funnel: buildFunnel(states) } })
 })
+
+const DAY = 86_400_000
+
+/** 概況：用戶數、24 小時內的使用量、7 天內的檢舉，加上服務健康檢查。 */
+adminRoutes.get('/admin/overview', async (c) => {
+  const db = getServiceClient()
+  const day = new Date(Date.now() - DAY).toISOString()
+  const week = new Date(Date.now() - 7 * DAY).toISOString()
+  const count = async (q: PromiseLike<{ count: number | null; error: { message: string } | null }>) => {
+    const r = await q
+    if (r.error) throw new Error(r.error.message)
+    return r.count ?? 0
+  }
+  const head = { count: 'exact' as const, head: true }
+  const [users, newUsers, inLobby, friendMsgs, liveMsgs, tasks, reports, activeRows, health] = await Promise.all([
+    count(db.from('users').select('id', head).eq('is_seed', false)),
+    count(db.from('users').select('id', head).eq('is_seed', false).gte('created_at', day)),
+    count(db.from('users').select('id', head).eq('is_seed', false).eq('social_agent_enabled', true)),
+    count(db.from('friend_messages').select('id', head).eq('role', 'user').gte('created_at', day)),
+    count(db.from('messages').select('id', head).eq('is_ai', false).gte('created_at', day)),
+    count(db.from('agent_tasks').select('id', head).gte('created_at', day)),
+    count(db.from('agent_logs').select('id', head).eq('agent', 'guard').eq('action', REPORT_ACTION).gte('created_at', week)),
+    db.from('friend_messages').select('user_id').eq('role', 'user').gte('created_at', day).limit(5000),
+    deepHealth(),
+  ])
+  if (activeRows.error) throw activeRows.error
+  return c.json({
+    ok: true,
+    data: {
+      users,
+      newUsers24h: newUsers,
+      activeUsers24h: new Set((activeRows.data ?? []).map((r) => r.user_id as string)).size,
+      inLobby,
+      friendMessages24h: friendMsgs,
+      liveMessages24h: liveMsgs,
+      tasks24h: tasks,
+      reports7d: reports,
+      health: { database: health.database, llm: health.llm, missingEnv: Object.entries(health.env).filter(([, v]) => !v).map(([k]) => k) },
+    },
+  })
+})
+
+/** 找用戶（名字包含 q，最多 20 位真人）：帳號狀態、在不在大廳、被檢舉幾次。 */
+adminRoutes.get('/admin/users', async (c) => {
+  const q = (c.req.query('q') ?? '').trim().slice(0, 40)
+  const db = getServiceClient()
+  let query = db.from('users').select('id, auth_id, display_name, social_agent_enabled, created_at').eq('is_seed', false).order('created_at', { ascending: false }).limit(20)
+  if (q) query = query.ilike('display_name', `%${q.replace(/[%_]/g, '')}%`)
+  const { data, error } = await query
+  if (error) throw error
+  const rows = await Promise.all(
+    (data ?? []).map(async (u) => {
+      const [auth, reported, msgs] = await Promise.all([
+        u.auth_id ? db.auth.admin.getUserById(u.auth_id as string) : Promise.resolve(null),
+        db.from('agent_logs').select('user_id').eq('agent', 'guard').eq('action', REPORT_ACTION).eq('detail->>target_user_id', u.id),
+        db.from('friend_messages').select('id', { count: 'exact', head: true }).eq('user_id', u.id).eq('role', 'user'),
+      ])
+      const meta = auth?.data.user?.app_metadata ?? {}
+      return {
+        id: u.id,
+        name: u.display_name,
+        createdAt: u.created_at,
+        inLobby: Boolean(u.social_agent_enabled),
+        guest: meta.guest === true,
+        hasPassword: meta.has_password === true,
+        banned: meta.banned === true,
+        reportedBy: new Set((reported.data ?? []).map((r) => r.user_id as string)).size,
+        friendMessages: msgs.count ?? 0,
+      }
+    }),
+  )
+  return c.json({ ok: true, data: rows })
+})
+
+/** 最近的錯誤（這台伺服器記得的，最多 50 筆；完整紀錄在 Vercel Logs）。 */
+adminRoutes.get('/admin/errors', (c) => c.json({ ok: true, data: recentErrors() }))

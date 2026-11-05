@@ -15,6 +15,7 @@ import { HistoryPage } from '@features/social/HistoryPage'
 import { TaskPage } from '@features/social/TaskPage'
 import { ProfilePage } from '@features/friend/ProfilePage'
 import { SettingsPage } from '@features/friend/SettingsPage'
+import { AdminPage } from '@features/admin/AdminPage'
 import { isHttpMode, currentUser } from '@lib/api/friend'
 
 /** http 模式下检查过 Supabase session 与否（全局一次性，避免每个守卫都打） */
@@ -83,6 +84,8 @@ export const routes = [
     children: [
       { index: true, element: <LandingPage /> },
       { path: 'login', element: <LoginPage /> },
+      // 管理後台：用管理密碼進入，不需要一般帳號登入
+      { path: 'admin', element: <AdminPage /> },
       {
         element: <RequireAuth />,
         children: [

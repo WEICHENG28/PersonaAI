@@ -11,6 +11,8 @@ import { BlockedContentError } from './lib/moderation.js'
 import { UsageLimitError } from './social/usage.js'
 import { SafetyError } from './social/safety.js'
 import { OnboardingError } from './social/onboarding.js'
+import { recordError } from './lib/alerts.js'
+import { z } from 'zod'
 
 export const app = new Hono().basePath('/api')
 
@@ -28,6 +30,14 @@ app.route('/', socialRoutes)
 app.route('/', twinRoutes)
 app.route('/', adminRoutes)
 
+// 網頁端的錯誤回報（src/lib/errorReport.ts）：不需要登入，有頻率限制
+const clientErrorBody = z.object({ message: z.string().max(500), where: z.string().max(200).optional() })
+app.post('/client-errors', async (c) => {
+  const body = clientErrorBody.safeParse(await c.req.json().catch(() => null))
+  if (body.success) recordError('web', body.data.where ?? '网页', body.data.message)
+  return c.json({ ok: true, data: null })
+})
+
 app.notFound((c) => c.json({ ok: false, error: '找不到这个接口' }, 404))
 
 app.onError((err, c) => {
@@ -36,5 +46,7 @@ app.onError((err, c) => {
     return c.json({ ok: false, error: err.message }, err.status)
   }
   console.error('[server]', c.req.method, c.req.path, err)
+  // 錯誤監測：記到管理後台「最近错误」，有設 ALERT_WEBHOOK_URL 就推到群組
+  recordError('server', `${c.req.method} ${c.req.path.replace(/[0-9a-f-]{36}/g, ':id')}`, err)
   return c.json({ ok: false, error: '服务器发生错误，请稍后再试' }, 500)
 })

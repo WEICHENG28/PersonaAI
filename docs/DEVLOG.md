@@ -335,6 +335,17 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-06｜管理後台頁面＋錯誤監測｜Peter（AI 協助）
+- **管理後台 `/admin`**（`src/features/admin/`）：輸入管理密碼（`ADMIN_SECRET`，只存在該分頁）進入，五個分頁：概況（真人用戶、24 小時新增／活躍、在大廳、訊息數、任務數、7 天檢舉＋資料庫／AI 平台狀態）、新手漏斗（7／30／90 天，長條＋比上一步少幾人）、檢舉（依被檢舉的人分組，可直接停用）、用戶（用名字找，看游客／正式／停用／被檢舉次數，停用或恢復前會再確認）、錯誤。
+- **新 API**（都要 `ADMIN_SECRET`）：`GET /api/admin/overview`、`/api/admin/users?q=`、`/api/admin/errors`；之前的 reports／ban／funnel 照用。
+- **錯誤監測**（`server/lib/alerts.ts`，不用裝套件）：後端 `app.onError`、worker 的失敗、網頁沒接住的錯誤（`src/lib/errorReport.ts` → `POST /api/client-errors`，有頻率限制）都記到「最近错误」（每台機器最多 50 種，完整紀錄看 Vercel Logs）。設 `ALERT_WEBHOOK_URL`＋`ALERT_WEBHOOK_KIND`（`feishu`／`wecom`／`discord`／`slack`）就推到群組機器人；同一錯誤 10 分鐘一次、每小時最多 20 則。
+- **網站掛掉提醒**：到 UptimeRobot（免費）新增 HTTP 監測 `https://<網域>/api/health`，每 5 分鐘一次，掛掉會寄信。
+- **跨線**（Peter 同意）：共用的 `src/routes.tsx`（加 `/admin`）、`src/main.tsx`（裝錯誤回報）。
+- **改了哪些檔案**：`server/lib/alerts.ts`、`server/routes/admin.ts`、`server/app.ts`、`server/lib/rateLimit.ts`、`scripts/worker.ts`、`src/lib/{errorReport.ts,api/admin.ts}`、`src/features/admin/{AdminPage,AdminPanels,adminData}.tsx`、`src/routes.tsx`、`src/main.tsx`、`tests/social/alerts.test.ts`。
+- **驗證**：`tsc -b`、vitest 711/711、build。畫面請 Peter 在 Vercel 打開 `/admin` 看。
+
+---
+
 ### 2026-11-06｜新手引導 5 步＋漏斗統計｜Peter（AI 協助）
 - **為什麼**：建議指出新用戶第一次就要走完完整流程（至少到建檔、進大廳），中途被打斷就很難再回來。
 - **新手任务卡**（AI 朋友頁上方，`OnboardingGuide.tsx`）：① 和阿澈聊 3 句（`CONFIG.ONBOARDING_CHAT_MESSAGES`）② 生成檔案 ③ 進大廳 ④ 交辦第一個任務 ⑤ 看到第一份代聊結果。每步有直接的按鈕：「快速建档（1 分钟）」三個問題（一句介紹、至少 2 個興趣、想認識誰）直接生成並確認對外檔案；「加入大厅」不用等聊滿 8 句；「帮我找 1 位朋友」用第一個興趣建任務並跳出原本的任務確認卡；等結果時每 15 秒更新。可收起；全部完成按「知道了」就不再出現。引導進行中不另外顯示進大廳進度條。
