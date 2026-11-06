@@ -34,6 +34,7 @@ export const RATE_RULES: RateRule[] = [
     by: 'user',
     message: '操作太频繁了，请稍后再试',
   },
+  { name: 'client-errors', method: 'POST', path: /^\/client-errors$/, limit: 20, windowMs: 10 * MINUTE, by: 'ip', message: '回报太频繁了' },
   { name: 'safety', method: 'POST', path: /^\/safety\/(report|block|unblock)$/, limit: 20, windowMs: 10 * MINUTE, by: 'user', message: '操作太频繁了，请稍后再试' },
 ]
 

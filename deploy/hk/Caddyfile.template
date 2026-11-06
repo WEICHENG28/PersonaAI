@@ -1,0 +1,24 @@
+# PersonaAI 香港主機的網站設定（Caddy 會自動申請、續約 HTTPS 憑證）。
+# setup.sh 會把 __DOMAIN__、__SUPABASE_URL__ 換成真的值，存到 /etc/caddy/Caddyfile。
+__DOMAIN__ {
+	encode gzip zstd
+
+	# 瀏覽器連 Supabase（登入、聊天即時更新）都走我們自己的網域，大陸用戶不用直接連國外
+	handle_path /sb/* {
+		reverse_proxy __SUPABASE_URL__ {
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	# 後端 API（npm run server，只聽 127.0.0.1:8787）
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	# 前端網頁（npm run build 產生的 dist），找不到的路徑都交給 index.html（單頁應用）
+	handle {
+		root * /srv/personaai/dist
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -1,5 +1,9 @@
 import { useEffect } from 'react'
-import { useRive, type UseRiveOptions } from '@rive-app/react-canvas'
+import { RuntimeLoader, useRive, type UseRiveOptions } from '@rive-app/react-canvas'
+// 中國大陸連 unpkg.com 很慢：Rive 的執行檔（wasm）改用網站自己打包的那份，不從國外 CDN 下載
+import riveWasmUrl from '@rive-app/canvas/rive.wasm?url'
+
+RuntimeLoader.setWasmUrl(riveWasmUrl)
 
 const SOURCES = {
   /** chromabot.riv（Rive 7.5，含 ViewModel + State Machine 1）——登录页 & AI 朋友 */

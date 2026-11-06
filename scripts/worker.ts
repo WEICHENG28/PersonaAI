@@ -8,6 +8,7 @@ import { runTaskStepSafely } from '../server/social/runner'
 import { defaultRunnerDeps } from '../server/social/runnerDeps'
 import { createWorkerPool } from '../server/social/workerPool'
 import { cleanupGuests, supabaseGuestCleanupDeps } from '../server/account/guestCleanup'
+import { recordError } from '../server/lib/alerts'
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
@@ -16,7 +17,10 @@ const pool = createWorkerPool({
   runStep: (id) => runTaskStepSafely(id, defaultRunnerDeps()),
   concurrency: CONFIG.WORKER_CONCURRENCY,
   log: (id, outcome) => console.log(`[worker] ${new Date().toLocaleTimeString()} ${id} → ${outcome}`),
-  onError: (id, err) => console.error(`[worker] ${id} 这一步失败，下一轮再试`, err),
+  onError: (id, err) => {
+    console.error(`[worker] ${id} 这一步失败，下一轮再试`, err)
+    recordError('worker', '推进任务', err)
+  },
 })
 
 // 游客帳號到期刪除：Vercel Cron 每天一次，worker 開著時再每 6 小時補跑
@@ -43,6 +47,7 @@ async function loop(): Promise<void> {
       void maybeCleanupGuests()
     } catch (err) {
       console.error('[worker] 读取任务失败，下一轮再试', err)
+      recordError('worker', '读取任务', err)
     }
     await new Promise((r) => setTimeout(r, CONFIG.WORKER_INTERVAL_MS))
   }
