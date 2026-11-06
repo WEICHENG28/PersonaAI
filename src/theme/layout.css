@@ -109,7 +109,7 @@
 .topbar__right { display: flex; align-items: center; gap: var(--space-sm); margin-left: auto; }
 .topbar__cta { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2xs); }
 
-/* Profile 钮（头像圆片 + 名字） */
+/* Profile 钮（头像圆片 + 名字；手机只显示头像圆片，见下方媒体查询） */
 .knob--profile .knob__avatar {
   display: inline-grid;
   place-items: center;
@@ -156,6 +156,10 @@
 /* 纯图标 knob（设置、铃铛、换一个等）：正方形，无文字内边距 */
 .knob--icon { padding: 0; width: 44px; justify-content: center; }
 .knob__meta { font-size: var(--text-sm); }
+/* 手机：Profile 钮只显示头像圆片（隐藏名字），顶栏更简洁 */
+@media (max-width: 64rem) {
+  .knob--profile .knob__meta { display: none; }
+}
 
 /* ── 手机底部 tab 拦 ── */
 .tabbar {

@@ -36,7 +36,6 @@ function DemoCandidates() {
 
   return (
     <>
-      <h2 className="section-title">{t('lobby.candidatesTitle')}</h2>
       {!candidates ? (
         <p className="empty">{t('common.loading')}</p>
       ) : (
