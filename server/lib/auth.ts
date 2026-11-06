@@ -8,6 +8,8 @@ export type AuthedUser = {
   authId: string
   email: string
   displayName: string
+  /** 被管理員停用（app_metadata.banned）。 */
+  banned?: boolean
 }
 
 /** 解析 Bearer token；格式不对回 null。 */
@@ -31,7 +33,7 @@ export async function resolveAuthUser(jwt: string): Promise<AuthedUser | null> {
     typeof metaName === 'string' && metaName.trim()
       ? metaName.trim()
       : email.split('@')[0] || '朋友'
-  return { authId: data.user.id, email, displayName }
+  return { authId: data.user.id, email, displayName, ...(data.user.app_metadata?.banned === true ? { banned: true } : {}) }
 }
 
 /**
@@ -47,6 +49,10 @@ export async function requireAuth(
   const user = await resolveAuthUser(jwt)
   if (!user) {
     return c.json({ ok: false, error: '登录已过期，请重新登录' }, 401)
+  }
+  // 防濫用：被停用的帳號什麼都不能做（管理員用 POST /api/admin/ban）
+  if (user.banned) {
+    return c.json({ ok: false, code: 'banned', error: '这个帐号已被停用。如有疑问请联系我们' }, 403)
   }
   return user
 }

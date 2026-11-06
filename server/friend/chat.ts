@@ -8,6 +8,9 @@ import { getServiceClient } from '../lib/supabase.js'
 import { llmJson } from '../lib/llm/index.js'
 import { CONFIG } from '../lib/config.js'
 import { writeLog } from '../lib/log.js'
+import { runInBackground } from '../lib/background.js'
+import { assertAllowed, maskBlocked } from '../lib/moderation.js'
+import { assertWithinDailyLimit } from '../social/usage.js'
 import { createTaskFromText } from '../../server/social/task.js'
 import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend.js'
 import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona.js'
@@ -110,6 +113,11 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   const body = isNudge
     ? { text: text || '（阿澈主动接话）' }
     : chatBodySchema.parse({ text })
+  // 防濫用：用户的话有敏感词就不送出；每日用量到上限就请他明天再来（nudge 是阿澈主动说的，不检查）
+  if (!isNudge) {
+    assertAllowed(body.text)
+    await assertWithinDailyLimit('friend_message', userId)
+  }
   const friend = await ensureFriendRow(userId)
 
   // 0. nudge 防重复：拉最近几则（含 meta），看最后一条 user 讯息之后有没有 nudge 讯息
@@ -180,7 +188,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
       user_id: userId,
       role: 'friend',
       kind: 'chat',
-      content: reply.reply,
+      content: maskBlocked(reply.reply),
       meta: {
         ...(isNudge ? { nudge: true } : {}),
         ...(reply.shared_event_id ? { event_id: reply.shared_event_id } : {}),
@@ -228,22 +236,27 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
 
   // 6. 背景（不等待）：A3 记忆撷取；A4 用户讯息数是 PROFILE_EXTRACT_EVERY 倍数时撷取档案。
   //    失败只记日志，不影响回复。
-  void extractMemories(userId, body.text).catch((err) => {
-    console.error('[friend] extractMemories failed', err)
-  })
+  //    用 runInBackground：在 Vercel 上回覆送出后也会等它做完（原本 void 可能被中途停掉，记忆就没存到）
+  runInBackground(
+    extractMemories(userId, body.text).catch((err) => {
+      console.error('[friend] extractMemories failed', err)
+    }),
+  )
   try {
     const userCount = recent.filter((m) => m.role === 'user').length
     if (shouldExtractProfile(userCount)) {
-      void extractProfile(userId).catch((err) => {
-        console.error('[friend] extractProfile failed', err)
-        writeLog({ user_id: userId, agent: 'friend', action: '撷取用户档案', reason: `背景撷取失败：${String(err)}` }).catch(() => {})
-      })
+      runInBackground(
+        extractProfile(userId).catch((err) => {
+          console.error('[friend] extractProfile failed', err)
+          return writeLog({ user_id: userId, agent: 'friend', action: '撷取用户档案', reason: `背景撷取失败：${String(err)}` }).catch(() => {})
+        }),
+      )
     }
   } catch {
     // 触发判断失败不影响主流程
   }
 
-  return { reply: reply.reply, taskId, sharedEventId: reply.shared_event_id }
+  return { reply: maskBlocked(reply.reply), taskId, sharedEventId: reply.shared_event_id }
 }
 
 /** 取聊天记录（前端拉一次用；Realtime 由前端订阅，A 线后续接）。 */

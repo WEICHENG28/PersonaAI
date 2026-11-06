@@ -342,6 +342,53 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-06｜新手引導 5 步＋漏斗統計｜Peter（AI 協助）
+- **為什麼**：建議指出新用戶第一次就要走完完整流程（至少到建檔、進大廳），中途被打斷就很難再回來。
+- **新手任务卡**（AI 朋友頁上方，`OnboardingGuide.tsx`）：① 和阿澈聊 3 句（`CONFIG.ONBOARDING_CHAT_MESSAGES`）② 生成檔案 ③ 進大廳 ④ 交辦第一個任務 ⑤ 看到第一份代聊結果。每步有直接的按鈕：「快速建档（1 分钟）」三個問題（一句介紹、至少 2 個興趣、想認識誰）直接生成並確認對外檔案；「加入大厅」不用等聊滿 8 句；「帮我找 1 位朋友」用第一個興趣建任務並跳出原本的任務確認卡；等結果時每 15 秒更新。可收起；全部完成按「知道了」就不再出現。引導進行中不另外顯示進大廳進度條。
+- **中斷後接著走**：進度全部從現有紀錄算（聊天句數、對外檔案、社交 Agent、確認過的任務、有判定的 match_attempts），不用 migration，換裝置也一樣。
+- **漏斗**：`GET /api/admin/funnel?days=30`（要 `ADMIN_SECRET`）回每一步走到的人數與比例（不含示範用戶，最多 500 人）。
+- **API**：`GET /api/onboarding`、`POST /api/onboarding/quick-profile|join-lobby|first-task`（後三個在頻率限制內）。
+- **跨線**（Peter 同意）：A 的 `FriendPage.tsx` 放 B 的引導卡；快速建檔用 A 的 `updateShareable`。
+- **改了哪些檔案**：`server/social/onboarding.ts`、`server/routes/{social,admin}.ts`、`server/app.ts`、`server/lib/{config,rateLimit}.ts`、`src/lib/api/social.ts`、`src/features/social/components/OnboardingGuide.tsx`、`src/features/friend/FriendPage.tsx`、`tests/social/onboarding.test.ts`。
+- **驗證**：`tsc -b`、vitest 707/707、build。畫面請 Peter 在 Vercel 用新的游客帳號走一次（第 5 步要開 worker）。
+
+---
+
+### 2026-11-06｜防濫用：頻率限制、每日上限、敏感詞、屏蔽／檢舉、登入鎖定、管理員停用帳號｜Peter（AI 協助）
+- **頻率限制**（`server/lib/rateLimit.ts`，在 `app.ts` 掛中介層）：登入每 IP 10 分鐘 10 次、建帳號／游客 8 次；和阿澈聊天每人每分鐘 20 句、聊天室 30 則；建任務／大廳助手／開聊等 AI 動作每分鐘 15 次；超過回 429。記在記憶體（Vercel 同一台機器共用），是「盡量擋」。
+- **每日上限**（`server/social/usage.ts`，用現有資料表算最近 24 小時，不用 migration）：和阿澈 300 句、聊天室 500 則、找人任務 20 個（`CONFIG.DAILY_*`）。
+- **敏感詞**（`server/lib/moderation.ts`＋可改的清單 `moderationWords.ts`）：用戶送出的阿澈聊天、聊天室訊息、任務、大廳助手問題、對外檔案有敏感詞就擋（400「内容里有不适合的词」）；阿澈和分身說出的就遮成＊＊。去掉空白符號再比對。不擋「想不开」之類求助。正式上線建議換成雲端內容安全服務。
+- **屏蔽／檢舉**（`server/social/safety.ts`，記在 `agent_logs`，agent='guard'，不用 migration）：聊天室上方「屏蔽」「检举」（示範用戶只有屏蔽）。屏蔽＝雙向在大廳和社交 Agent 找人裡互相看不到（`searchLobby` 排除）、不能開新對話、進行中的對話結束；設定頁「已屏蔽的人」可取消。檢舉選原因＋說明，自動屏蔽；真人被 3 個不同的人檢舉先從大廳隱藏（關社交 Agent）。API：`POST /api/safety/block|unblock|report`、`GET /api/safety/blocks`。
+- **登入鎖定**：同一帳號連續打錯 5 次密碼鎖 15 分鐘（存在 `app_metadata.login_fails／locked_until`）。
+- **管理員停用帳號**（`server/routes/admin.ts`）：`GET /api/admin/reports` 看檢舉、`POST /api/admin/ban {name|userId, banned}` 停用／恢復。要帶 `Authorization: Bearer <ADMIN_SECRET>`，**Peter 要在 Vercel 設 `ADMIN_SECRET`（至少 16 字）**，沒設就全部拒絕。停用＝Supabase 封鎖登入＋`app_metadata.banned`（`requireAuth` 回 403）＋從大廳隱藏。管理後台頁面之後做。
+- **跨線**（Peter 同意）：A 的 `server/lib/auth.ts`（停用檢查，沒停用時回傳內容不變）、`server/friend/chat.ts`、`server/routes/friend.ts`；C 的 `server/routes/twin.ts`、`server/twin/twin.ts`、`LiveChatRoom.tsx`（放 B 的 `SafetyActions`）；A 的設定頁放 B 的 `BlockListCard`。
+- **改了哪些檔案**：上面列的，加 `server/lib/{rateLimit,moderation,moderationWords}.ts`、`server/social/{safety,usage}.ts`、`server/routes/{admin,social,account}.ts`、`server/account/{nameLogin,supabaseDeps}.ts`、`server/social/{lobby,task}.ts`、`server/lib/config.ts`、`server/app.ts`、`src/lib/api/social.ts`、`src/features/social/components/{SafetyActions,BlockListCard}.tsx`、`tests/social/anti-abuse.test.ts`。
+- **驗證**：`tsc -b`、vitest 697/697、build。沒有在共用資料庫實測，請 Peter 在 Vercel 測（見 PR）。
+
+---
+
+### 2026-11-05｜帳號改成名字＋密碼、游客体验（可自選名字）、游客 3 天自動刪除｜Peter（AI 協助）
+- **為什麼**：原本輸入名字、按「是我」就能進同名帳號，有真實用戶後任何人都能進別人的帳號。
+- **登入頁三個分頁**：「游客体验」（預設，和原本一樣只要名字：隨機預填、可自己改、不用密碼；自己打的名字有人用了會請他換）、「登录」「注册」（名字＋密碼，至少 6 字）。這個瀏覽器用名字登入過就預設「登录」。
+- **設定頁帳號卡**：游客「保留帐号」設名字＋密碼變正式帳號，記錄保留；舊的只有名字的帳號「设置密码」；有密碼的可修改。舊帳號不能再只用名字進入，要在原本登入過的瀏覽器設密碼（沒有任何瀏覽器登入著的舊帳號就回不來，多半是測試帳號）。
+- **游客自動刪除**（Peter 同意）：建立超過 `CONFIG.GUEST_KEEP_DAYS`（3）天、沒設密碼的游客連記錄一起刪。`conversations`、`match_attempts`、`agent_tasks.target_user_id` 沒有 cascade，所以先刪游客參與的對話與嘗試、放掉別人任務裡的這場、清 target，再刪 auth 帳號（其餘 cascade）。和游客聊過的人，那段聊天也會消失。由 Vercel Cron 每天 03:00（北京時間）呼叫 `/api/cron/cleanup-guests`，**要在 Vercel 設環境變數 `CRON_SECRET`**（隨便一串長字），沒設就不會跑；worker 開著時也每 6 小時補跑。
+- **做法**：帳號狀態放 Supabase `app_metadata`（`has_password`、`guest`，用戶自己改不了），**不用 migration**。登入時後端用一次性 client 驗密碼，再沿用原本的一次性憑證（前端 verifyOtp）。密碼錯誤延遲 0.8 秒。`/api/account/enter` 拿掉，新增 `/api/account/register`、`/login`、`/guest`、`/password`、`/cron/cleanup-guests`。
+- **跨線**（Peter 同意）：A 的登入頁、設定頁（加帳號卡）；共用的 `vercel.json` 加 crons。
+- **改了哪些檔案**：`server/account/{nameLogin,supabaseDeps,guestCleanup}.ts`、`server/routes/account.ts`、`server/lib/config.ts`、`scripts/worker.ts`、`vercel.json`、`src/lib/api/account.ts`、`src/features/friend/{LoginPage,AccountCard,SettingsPage}.tsx`、`tests/social/{name-login,guest-cleanup}.test.ts`。
+- **驗證**：`tsc -b`、vitest 685/685、build。沒有在共用資料庫建測試帳號，請 Peter 在 Vercel 測：游客（隨機／自己取名）、註冊、登出再登入、密碼錯、游客→設定頁保留帳號→用新名字登入。
+- **待辦**：登入次數限制（防猜密碼）放進下一步「防濫用」。
+
+---
+
+### 2026-11-01｜現場多人同時用：worker 同時推進多個任務、背景整理記憶不再被 Vercel 中斷｜Peter（AI 協助）
+- **worker 同時推進**：原本一個任務跑完一步（4 輪代聊，約 20～40 秒）才輪下一個，10 人交辦就要等好幾分鐘。新增 `server/social/workerPool.ts`：同時最多 `CONFIG.WORKER_CONCURRENCY`（5）個任務在跑，同一任務不重疊，任務比位置多時最久沒跑的先跑。`scripts/worker.ts` 改用它。上限不要開太大，會撞到模型平台每分鐘呼叫上限。
+- **背景工作**：阿澈回話後的記憶／檔案撷取原本是 `void` 丟背景，Vercel 送出回應後可能凍結函式，工作就沒做完（「記憶沒出現」可能是這個）。新增 `server/lib/background.ts` 的 `runInBackground`：交給 Vercel 的 `waitUntil`（和 `@vercel/functions` 同樣讀 `Symbol.for('@vercel/request-context')`，不用裝套件）；本機沒有就照常背景跑。
+- **跨線**（Peter 同意）：A 的 `server/friend/chat.ts` 兩處改用 `runInBackground`，邏輯不變。
+- **改了哪些檔案**：`server/social/workerPool.ts`、`scripts/worker.ts`、`server/lib/background.ts`、`server/lib/config.ts`、`server/friend/chat.ts`、`tests/social/worker-pool.test.ts`。
+- **驗證**：`tsc -b`、vitest 677/677、build。合併後要重開 worker；記憶是否出現請在 Vercel 上實測。
+
+---
+
 ### 2026-10-31｜通知音效＋「我的聊天」排版｜Peter（AI 協助）
 - **通知音效**：`src/lib/notifySound.ts` 用 Web Audio 產生一聲「叮咚」（不用音檔、不用新套件）。鈴鐺未讀數變多、「我的聊天」的「等你接手」變多時響；剛載入不響（`shouldChime`）。瀏覽器要求先點過頁面才能出聲，所以第一次點擊／按鍵時解鎖，之前安靜略過。
 - **我的聊天**：名字放大（`--text-lg`），真人／示范用户標籤放在名字旁邊同一行，狀態放右邊；「你们在聊」改成「聊天室」。

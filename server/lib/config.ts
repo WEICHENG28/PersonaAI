@@ -6,6 +6,14 @@ export const CONFIG = {
   MIN_ROUNDS_BEFORE_JUDGE: 8,      // 至少聊幾輪才開始判定
   MAX_ROUNDS: 16,                  // 最多聊幾輪
   WORKER_INTERVAL_MS: 2000,
+  WORKER_CONCURRENCY: 5,           // worker 同時推進幾個任務（現場多人時不用排隊；太大會撞到模型平台每分鐘上限）
+  GUEST_KEEP_DAYS: 3,              // 游客帳號建立幾天後自動刪除（前端 src/lib/api/account.ts 的 GUEST_KEEP_DAYS 要一起改）
+  DAILY_FRIEND_MESSAGES: 300,      // 每人 24 小時內最多和阿澈說幾句（防濫用，AI 是花錢的）
+  DAILY_LIVE_MESSAGES: 500,        // 每人 24 小時內在聊天室最多發幾則
+  DAILY_TASKS: 20,                 // 每人 24 小時內最多交辦幾個找人任務
+  REPORT_HIDE_THRESHOLD: 3,        // 真人被幾個不同的人檢舉，先從大廳隱藏
+  LOGIN_MAX_FAILS: 5,              // 同一帳號連續打錯幾次密碼就暫時鎖住
+  LOGIN_LOCK_MINUTES: 15,          // 鎖幾分鐘
   LLM_MAX_RETRIES: 2,
   LLM_TIMEOUT_MS: 30000,
   TOOL_MAX_RETRIES: 1,
@@ -14,6 +22,7 @@ export const CONFIG = {
   MEMORY_LIMIT: 50,               // 「它記得的事」最多列幾筆（A3）
   PROFILE_EXTRACT_EVERY: 6,        // 用戶每說幾則話更新一次檔案
   REAL_USER_BONUS: 0.05,           // 挑人時真人略加分（現場 Demo 讓大家容易配對到彼此；不改顯示的相似度）
+  ONBOARDING_CHAT_MESSAGES: 3,     // 新手引導第一步：和阿澈說幾句就算完成
   LOBBY_INVITE_MIN_MESSAGES: 8,    // 和阿澈說滿幾句、對外檔案也夠完整，才邀請真人進大廳
   ANOMALY_MIN_MESSAGES: 15,
   ANOMALY_CHECK_EVERY: 5,

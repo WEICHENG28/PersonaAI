@@ -5,6 +5,9 @@ import { writeLog } from '../lib/log.js'
 import { TASK_PROMPT_SYSTEM, parsedTaskSchema, taskPromptUser, type RawParsedTask } from '../prompts/14_task.js'
 import { getTaskStore } from './taskStore.js'
 import { notReadyMessage } from './readiness.js'
+import { assertAllowed } from '../lib/moderation.js'
+import { assertWithinDailyLimit } from './usage.js'
+import { isBlockedPair } from './safety.js'
 
 const MAX_COUNT = 10
 const DEFAULT_COUNT = 3
@@ -57,6 +60,8 @@ export async function parseTask(text: string): Promise<ParsedTask> {
 export async function createTaskFromText(userId: string, text: string): Promise<AgentTask> {
   const instruction = text.trim()
   if (!instruction) throw new TaskError('请先说说想找什么样的人')
+  assertAllowed(instruction)
+  await assertWithinDailyLimit('task', userId)
   const parsed = await parseTask(instruction)
   const task = await getTaskStore().insert({
     user_id: userId,
@@ -87,6 +92,8 @@ export async function createTaskFromText(userId: string, text: string): Promise<
 export async function createSingleTargetTask(userId: string, targetUserId: string, targetName = '对方'): Promise<AgentTask> {
   const notReady = notReadyMessage(await getTaskStore().readiness(userId), '，分身才能替你去聊')
   if (notReady) throw new TaskError(notReady, 403)
+  if (await isBlockedPair(userId, targetUserId)) throw new TaskError('这位用户目前不在大厅里', 404)
+  await assertWithinDailyLimit('task', userId)
   const restatement = `让分身和${targetName}聊一聊`
   const task = await getTaskStore().insert({
     user_id: userId,
