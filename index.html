@@ -5,15 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f5f1e6" />
     <title>PersonaAI</title>
+    <!-- 字型不擋畫面：中國大陸連不上 Google Fonts，原本會白屏好幾秒。改成先用系統字型顯示，字型載到了再換上；載不到就一直用系統字型 -->
     <link
-      rel="stylesheet"
+      rel="preload"
+      as="style"
       href="https://api.fontshare.com/v2/css?f[]=chillax@500,600&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600&display=swap"
-      rel="stylesheet"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
   </head>
   <body>

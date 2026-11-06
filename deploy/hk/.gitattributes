@@ -1,0 +1,3 @@
+# 部署腳本在 Linux 主機上跑，一律用 LF 換行
+*.sh text eol=lf
+Caddyfile.template text eol=lf
