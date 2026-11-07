@@ -48,6 +48,7 @@ export function FriendPage() {
   const [messagesLoaded, setMessagesLoaded] = useState(false)
   const sendSeq = useRef(0)
   const sendInFlight = useRef(false)
+  const unconfirmedSend = useRef(false)
 
   // 消息数量用于自动滚动（mock 或 http 模式均适用）
   const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
@@ -68,6 +69,7 @@ export function FriendPage() {
       callFriendIntro, deliverReports, getFriendMessages, fetchSettings,
       readSendSeq: () => sendSeq.current,
       isSending: () => sendInFlight.current,
+      hasUnconfirmedSend: () => unconfirmedSend.current,
       isActive: () => active,
       onMessages: (msgs) => { setHttpMessages(msgs); setMessagesLoaded(true) },
       onSettings: (settings) => setHttpDevMode(settings?.dev_mode ?? false),
@@ -89,6 +91,7 @@ export function FriendPage() {
 
     // http 模式：乐观添加用户消息，再打 API
     sendInFlight.current = true
+    unconfirmedSend.current = true
     const tempId = `tmp-${Date.now()}`
     setHttpMessages((prev) => [
       ...prev,
@@ -108,6 +111,7 @@ export function FriendPage() {
       const result = await callFriendChat(text)
       // 拉最新消息（包含 AI 回复）
       const msgs = await getFriendMessages()
+      unconfirmedSend.current = false
       setHttpMessages(msgs)
       setMessagesLoaded(true)
       // task_intent：后端已建真任务（pending_confirm），显示 B 的确认卡
@@ -123,7 +127,10 @@ export function FriendPage() {
         serverMessages = await getFriendMessages()
       } catch { /* 无法确认保存状态，保留乐观消息 */ }
       setHttpMessages((prev) => reconcileChatFailure(prev, tempId, serverMessages))
-      if (serverMessages !== null) setMessagesLoaded(true)
+      if (serverMessages !== null) {
+        unconfirmedSend.current = false
+        setMessagesLoaded(true)
+      }
     } finally {
       sendInFlight.current = false
       setHttpTyping(false)

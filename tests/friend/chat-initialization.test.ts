@@ -20,11 +20,12 @@ function harness() {
   const reports = deferred<number>()
   const messages = deferred<FriendMessage[]>()
   const settings = deferred<null>()
-  const state = { seq: 0, active: true, sending: false, list: [] as FriendMessage[] }
+  const state = { seq: 0, active: true, sending: false, unconfirmed: false, list: [] as FriendMessage[] }
   const deps = {
     callFriendIntro: vi.fn(() => intro.promise), deliverReports: vi.fn(() => reports.promise),
     getFriendMessages: vi.fn(() => messages.promise), fetchSettings: vi.fn(() => settings.promise),
     readSendSeq: () => state.seq, isActive: () => state.active, isSending: () => state.sending,
+    hasUnconfirmedSend: () => state.unconfirmed,
     onMessages: vi.fn((rows: FriendMessage[]) => { state.list = rows }),
     onSettings: vi.fn(), onMessagesError: vi.fn(),
   }
@@ -97,6 +98,7 @@ describe('friend initialization ordering', () => {
     const h = harness()
     const done = initializeFriendPage(h.deps)
     h.state.seq++
+    h.state.sending = true
     h.state.list = [message('tmp-1', 'user')]
     h.intro.resolve(); h.reports.resolve(0); h.settings.resolve(null)
     h.messages.resolve([])
@@ -113,6 +115,35 @@ describe('friend initialization ordering', () => {
     await done
     expect(h.deps.onMessages).not.toHaveBeenCalled()
     expect(h.deps.onSettings).not.toHaveBeenCalled()
+  })
+
+  it('accepts a newer report snapshot read after a successful send and its history refresh finish', async () => {
+    const h = harness()
+    const done = initializeFriendPage(h.deps)
+    h.intro.resolve(); h.settings.resolve(null)
+    h.state.seq++
+    h.state.list = [message('old', 'friend'), message('saved-user', 'user'), message('reply', 'friend')]
+    h.state.sending = false
+    h.state.unconfirmed = false
+    const server = [...h.state.list, { ...message('report', 'friend'), kind: 'report' }]
+    h.reports.resolve(1)
+    await flush()
+    expect(h.deps.getFriendMessages).toHaveBeenCalledOnce()
+    h.messages.resolve(server)
+    await done
+    expect(h.state.list).toEqual(server)
+  })
+
+  it('keeps failed local text if a send is over but its server history was never confirmed', async () => {
+    const h = harness()
+    h.state.seq = 1
+    h.state.unconfirmed = true
+    h.state.list = [{ ...message('tmp-1', 'user'), meta: { failed: true } }]
+    const done = initializeFriendPage(h.deps)
+    h.intro.resolve(); h.reports.resolve(0); h.settings.resolve(null); h.messages.resolve([])
+    await done
+    expect(h.state.list).toEqual([{ ...message('tmp-1', 'user'), meta: { failed: true } }])
+    expect(h.deps.onMessages).not.toHaveBeenCalled()
   })
 
   it('does not overwrite a send already in flight when a new initialization starts', async () => {
@@ -134,6 +165,6 @@ describe('friend initialization ordering', () => {
   it('accepts unchanged send sequences and rejects changed ones', () => {
     expect(shouldApplyInitMessages(0, 0)).toBe(true)
     expect(shouldApplyInitMessages(0, 1)).toBe(false)
-    expect(shouldApplyInitMessages(1, 1, 0)).toBe(false)
+    expect(shouldApplyInitMessages(1, 1, true)).toBe(false)
   })
 })
