@@ -22,8 +22,18 @@ export function normalizeChatResult(value: string | LlmChatResult): LlmChatResul
   return typeof value === 'string' ? { content: value } : value
 }
 
+export interface ChatRequest {
+  model: string
+  messages: ChatMessage[]
+  temperature?: number
+  jsonMode: boolean
+  maxTokens?: number
+  extraBody?: Record<string, unknown>
+  timeoutMs?: number
+}
+
 export interface LlmClient {
-  chat(req: { model: string; messages: ChatMessage[]; temperature?: number; jsonMode: boolean }): Promise<string | LlmChatResult>
+  chat(req: ChatRequest): Promise<string | LlmChatResult>
   embed(req: { model: string; input: string; dimensions: number }): Promise<number[] | LlmEmbedResult>
 }
 
@@ -52,28 +62,39 @@ function createOpenAiClient(): LlmClient {
   })
   let jsonModeSupported = true
 
-  async function complete(model: string, messages: ChatMessage[], temperature: number | undefined, json: boolean) {
+  async function complete(model: string, messages: ChatMessage[], temperature: number | undefined, json: boolean, req: ChatRequest) {
     const res = await sdk.chat.completions.create({
+      ...req.extraBody,
       model,
       messages,
       temperature,
+      ...(req.maxTokens !== undefined ? { max_tokens: req.maxTokens } : {}),
       ...(json ? { response_format: { type: 'json_object' as const } } : {}),
-    })
+    }, { timeout: req.timeoutMs })
     return { content: res.choices[0]?.message?.content ?? '',
       ...(res.usage ? { usage: { promptTokens: res.usage.prompt_tokens ?? null,
         completionTokens: res.usage.completion_tokens ?? null } } : {}) }
   }
 
   return {
-    async chat({ model, messages, temperature, jsonMode }) {
+    async chat(req) {
+      const { model, messages, temperature, jsonMode } = req
+      const started = performance.now()
+      const budget = req.timeoutMs ?? CONFIG.LLM_TIMEOUT_MS
       const useJson = jsonMode && jsonModeSupported
       try {
-        return await complete(model, messages, temperature, useJson)
+        return await complete(model, messages, temperature, useJson, req)
       } catch (err) {
         // 平台不支援 json_object 時會回 400：記住後改成一般模式，由上層擷取 JSON
         if (useJson && err instanceof OpenAI.APIError && err.status === 400) {
           jsonModeSupported = false
-          return complete(model, messages, temperature, false)
+          const remaining = Math.floor(budget - (performance.now() - started))
+          if (remaining <= 0) {
+            const timeout = new Error('模型调用超时')
+            timeout.name = 'TimeoutError'
+            throw timeout
+          }
+          return complete(model, messages, temperature, false, { ...req, timeoutMs: remaining })
         }
         throw err
       }

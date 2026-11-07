@@ -4,8 +4,8 @@ import type { z } from 'zod'
 import type { ModelRole } from '../../../shared/types.js'
 import { CONFIG } from '../config.js'
 import { getLlmClient, normalizeChatResult, type ChatMessage } from './client.js'
-import { withLlmMetric, type LlmMetric, type LlmMetricState } from './metrics.js'
-import { llmEnv, modelFor } from './env.js'
+import { withLlmMetric, classifyFailure, type LlmMetric, type LlmMetricState } from './metrics.js'
+import { llmEnv, modelFor, modelParamsFor } from './env.js'
 import { extractJson } from './json.js'
 
 export { extractJson } from './json.js'
@@ -18,6 +18,9 @@ export interface LlmTextOptions {
   role: ModelRole
   system: string
   messages: LlmMessage[]
+  maxTokens?: number
+  timeoutMs?: number
+  maxAttempts?: number
   temperature?: number
   tag?: string
   onMetric?: (metric: LlmMetric) => void
@@ -65,8 +68,8 @@ async function limited<T>(run: () => Promise<T>, metric: LlmMetricState): Promis
   }
 }
 
-function backoff(attempt: number): Promise<void> {
-  return attempt < MAX_ATTEMPTS && llmTuning.backoffMs > 0
+function backoff(attempt: number, maxAttempts = MAX_ATTEMPTS): Promise<void> {
+  return attempt < maxAttempts && llmTuning.backoffMs > 0
     ? new Promise((r) => setTimeout(r, attempt * llmTuning.backoffMs))
     : Promise.resolve()
 }
@@ -75,18 +78,21 @@ export async function llmText(opts: LlmTextOptions): Promise<string> {
   return withLlmMetric({ ...opts, tag: opts.tag ?? 'llm.text' }, async metric => {
     const model = metric.model = modelFor(opts.role)
     let reason = ''
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       metric.attempts = attempt
       try {
         const out = await chat(model, opts, opts.messages, false, metric)
         if (out.trim()) return out
         reason = '模型回傳空字串'
+        metric.error = 'empty'
       } catch (err) {
         reason = describe(err)
-        await backoff(attempt)
+        metric.error = classifyFailure(err)
+        await backoff(attempt, maxAttempts)
       }
     }
-    throw new LlmError(opts.role, reason, MAX_ATTEMPTS)
+    throw new LlmError(opts.role, reason, maxAttempts)
   })
 }
 
@@ -95,26 +101,29 @@ export async function llmJson<T>(opts: LlmJsonOptions<T>): Promise<T> {
     const model = metric.model = modelFor(opts.role)
     let messages = opts.messages
     let reason = ''
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       metric.attempts = attempt
       let raw: string
       try {
         raw = await chat(model, opts, messages, true, metric)
       } catch (err) {
         reason = describe(err)
-        await backoff(attempt)
+        metric.error = classifyFailure(err)
+        await backoff(attempt, maxAttempts)
         continue
       }
       const parsed = parseWith(raw, opts.schema)
       if (parsed.ok) return parsed.data
       reason = parsed.reason
+      metric.error = raw.trim() ? 'schema' : 'empty'
       messages = [
         ...opts.messages,
         { role: 'assistant', content: raw },
         { role: 'user', content: `上次输出格式错误：${reason}，请只输出符合格式的 JSON` },
       ]
     }
-    throw new LlmError(opts.role, reason, MAX_ATTEMPTS)
+    throw new LlmError(opts.role, reason, maxAttempts)
   })
 }
 
@@ -130,11 +139,13 @@ export async function embed(text: string): Promise<number[]> {
         const { vector: vec, usage } = Array.isArray(result) ? { vector: result } : result
         if (usage?.promptTokens != null) metric.promptTokens = (metric.promptTokens ?? 0) + usage.promptTokens
         if (vec.length === env.EMBEDDING_DIM) return vec
+        metric.error = 'dimension'
         // 長度不符是設定錯誤，重試也不會好
         throw new LlmError('embed', `向量長度 ${vec.length}，預期 ${env.EMBEDDING_DIM}`, attempt)
       } catch (err) {
         if (err instanceof LlmError) throw err
         reason = describe(err)
+        metric.error = classifyFailure(err)
         await backoff(attempt)
       }
     }
@@ -145,7 +156,9 @@ export async function embed(text: string): Promise<number[]> {
 async function chat(model: string, opts: LlmTextOptions, messages: LlmMessage[], jsonMode: boolean, metric: LlmMetricState): Promise<string> {
   const all: ChatMessage[] = [{ role: 'system', content: opts.system }, ...messages]
   const result = normalizeChatResult(await limited(
-    () => getLlmClient().chat({ model, messages: all, temperature: opts.temperature, jsonMode }), metric,
+    () => getLlmClient().chat({ model, messages: all, temperature: opts.temperature, jsonMode,
+      maxTokens: opts.maxTokens ?? CONFIG.LLM_MAX_TOKENS[opts.role],
+      timeoutMs: opts.timeoutMs ?? CONFIG.LLM_FG_TIMEOUT_MS, extraBody: modelParamsFor(model) }), metric,
   ))
   if (result.usage?.promptTokens != null) metric.promptTokens = (metric.promptTokens ?? 0) + result.usage.promptTokens
   if (result.usage?.completionTokens != null) metric.completionTokens = (metric.completionTokens ?? 0) + result.usage.completionTokens
@@ -169,4 +182,11 @@ function parseWith<T>(raw: string, schema: z.ZodType<T>): { ok: true; data: T } 
 
 function describe(err: unknown): string {
   return err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+}
+
+/** 单次逻辑调用的执行预算，不包含排队和业务 DB 时间。 */
+export function worstCaseMs({ timeoutMs, maxAttempts, backoffMs }: {
+  timeoutMs: number; maxAttempts: number; backoffMs: number
+}): number {
+  return timeoutMs * maxAttempts + maxAttempts * (maxAttempts - 1) / 2 * backoffMs
 }

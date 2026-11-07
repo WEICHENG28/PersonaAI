@@ -103,6 +103,8 @@ export async function extractProfile(userId: string): Promise<ShareableView> {
 
   // 2. Prompt 3（MODEL_REASON）
   const out = await llmJson({
+    timeoutMs: CONFIG.LLM_BG_TIMEOUT_MS,
+    maxAttempts: 2,
     role: 'reason',
     system: renderProfileSystem({
       userLines: userLines.length ? userLines.map((l, i) => `${i + 1}. ${l}`).join('\n') : '（用户还没说过话）',

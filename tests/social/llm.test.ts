@@ -167,3 +167,22 @@ describe('writeLog', () => {
     error.mockRestore()
   })
 })
+
+it('sends SDK extra parameters, token cap and timeout without overriding core fields', async () => {
+  sdkMock.complete.mockResolvedValueOnce({ choices: [{ message: { content: 'ok' } }] })
+  await getLlmClient().chat({ model: 'chat-model', messages: [], jsonMode: false,
+    maxTokens: 500, timeoutMs: 20000, extraBody: { thinking: { type: 'disabled' }, model: 'wrong' } })
+  expect(sdkMock.complete).toHaveBeenLastCalledWith(expect.objectContaining({ model: 'chat-model',
+    max_tokens: 500, thinking: { type: 'disabled' } }), { timeout: 20000 })
+})
+
+it('shares timeout budget with the SDK JSON fallback', async () => {
+  let clock = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => clock)
+  const OpenAI = (await import('openai')).default
+  sdkMock.complete.mockImplementationOnce(async () => { clock = 700; throw new OpenAI.APIError(400, undefined, '', undefined) })
+    .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+  await getLlmClient().chat({ model: 'chat-model', messages: [], jsonMode: true, timeoutMs: 20000 })
+  expect(sdkMock.complete).toHaveBeenLastCalledWith(expect.anything(), { timeout: 19300 })
+  vi.restoreAllMocks()
+})

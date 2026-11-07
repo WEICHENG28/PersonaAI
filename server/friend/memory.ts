@@ -69,6 +69,8 @@ export async function extractMemories(userId: string, userText: string): Promise
     .join('\n')
 
   const out = await llmJson({
+    timeoutMs: CONFIG.LLM_BG_TIMEOUT_MS,
+    maxAttempts: 2,
     role: 'fast',
     system: renderMemorySystem({ text: userText, recent, existing: existingText }),
     messages: [{ role: 'user', content: userText }],

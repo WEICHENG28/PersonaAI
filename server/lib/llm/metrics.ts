@@ -1,4 +1,21 @@
+import OpenAI from 'openai'
 import type { ModelRole } from '../../../shared/types.js'
+
+export type LlmFailure = 'http_401' | 'http_403' | 'http_429' | 'http_4xx' | 'http_5xx' | 'timeout' | 'network' | 'empty' | 'schema' | 'dimension' | 'unknown'
+
+export function classifyFailure(error: unknown): LlmFailure {
+  if (OpenAI.APIConnectionTimeoutError && error instanceof OpenAI.APIConnectionTimeoutError) return 'timeout'
+  if (OpenAI.APIConnectionError && error instanceof OpenAI.APIConnectionError) return 'network'
+  const e = error as { status?: number; name?: string; code?: string } | null
+  if (e?.status === 401) return 'http_401'
+  if (e?.status === 403) return 'http_403'
+  if (e?.status === 429) return 'http_429'
+  if (e?.status && e.status >= 400 && e.status < 500) return 'http_4xx'
+  if (e?.status && e.status >= 500 && e.status < 600) return 'http_5xx'
+  if (['APIConnectionTimeoutError', 'AbortError', 'TimeoutError'].includes(e?.name ?? '') || e?.code === 'ETIMEDOUT') return 'timeout'
+  if (e?.name === 'APIConnectionError' || ['ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND'].includes(e?.code ?? '')) return 'network'
+  return 'unknown'
+}
 
 export interface LlmMetric {
   tag: string
@@ -13,11 +30,11 @@ export interface LlmMetric {
   totalMs: number
   promptTokens: number | null
   completionTokens: number | null
-  error?: string
+  error?: LlmFailure
 }
 
 type MetricSink = (metric: LlmMetric) => void
-export type LlmMetricState = Pick<LlmMetric, 'model' | 'attempts' | 'queueMs' | 'promptTokens' | 'completionTokens'>
+export type LlmMetricState = Pick<LlmMetric, 'model' | 'attempts' | 'queueMs' | 'promptTokens' | 'completionTokens'> & { error?: LlmFailure }
 let sink: MetricSink | null = null
 
 /** null 恢复默认 console 输出；显式收集器不受 console 日志开关影响。 */
@@ -55,9 +72,10 @@ export async function withLlmMetric<T>(
     ok = true
     return value
   } finally {
-    const metric: LlmMetric = { ...state, role: opts.role, tag: opts.tag,
-      lane: 'fg', stream: false, ok, ttftMs: null, totalMs: performance.now() - started,
-      ...(!ok ? { error: 'LLM 调用失败' } : {}) }
+    const { error, ...values } = state
+    const metric: LlmMetric = { ...values, queueMs: Math.round(state.queueMs), role: opts.role, tag: opts.tag,
+      lane: 'fg', stream: false, ok, ttftMs: null, totalMs: Math.round(performance.now() - started),
+      ...(!ok ? { error: error ?? 'unknown' } : {}) }
     emitLlmMetric(metric)
     if (opts.onMetric) deliver(opts.onMetric, metric)
   }

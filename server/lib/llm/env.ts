@@ -32,3 +32,21 @@ export function modelFor(role: ModelRole): string {
   const env = llmEnv()
   return { chat: env.MODEL_CHAT, reason: env.MODEL_REASON, fast: env.MODEL_FAST }[role]
 }
+
+/** 精确名称优先，其次采用最长的前缀；空配置保持原有请求参数。 */
+export function modelParamsFor(model: string): Record<string, unknown> {
+  const raw = process.env.LLM_MODEL_PARAMS
+  if (!raw) return {}
+  try {
+    const params: unknown = JSON.parse(raw)
+    const object = (value: unknown): value is Record<string, unknown> =>
+      value !== null && typeof value === 'object' && !Array.isArray(value)
+    if (!object(params) || !Object.values(params).every(object)) throw new Error()
+    if (Object.hasOwn(params, model)) return params[model] as Record<string, unknown>
+    const key = Object.keys(params).filter(k => k.endsWith('*') && model.startsWith(k.slice(0, -1)))
+      .sort((a, b) => b.length - a.length)[0]
+    return key ? params[key] as Record<string, unknown> : {}
+  } catch {
+    throw new Error('LLM_MODEL_PARAMS 不是有效的 JSON 对象')
+  }
+}

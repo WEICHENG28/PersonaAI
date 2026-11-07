@@ -9,7 +9,7 @@ export function startTimer(): { mark(label: string): void; spans(): Record<strin
       elapsed[label] = (elapsed[label] ?? 0) + now - previous
       previous = now
     },
-    spans: () => ({ ...elapsed }),
-    totalMs: () => performance.now() - started,
+    spans: () => Object.fromEntries(Object.entries(elapsed).map(([key, value]) => [key, Math.round(value)])),
+    totalMs: () => Math.round(performance.now() - started),
   }
 }
