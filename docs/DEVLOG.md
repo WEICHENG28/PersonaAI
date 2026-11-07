@@ -26,6 +26,15 @@
 
 ## 共用與決策
 
+### 2026-11-07｜X-3 巴黎部署、聊天載入並行與 X-1 初始化競態修正｜AI 協助｜分支 opt/X-3-paris-chat-load
+- **做了什麼**：依使用者已確認的 Supabase 巴黎位置，`vercel.json` 設定 `regions: ["cdg1"]`。設定讀取獨立並行；intro 與任務回報用 `Promise.allSettled` 並行，兩者結束後再讀聊天記錄。聊天尚未載入時，兩個社交 hook 接收 null，不向後端查詢；成功載入（含送出流程的恢復 GET）後才傳真實計數。
+- **為什麼這樣做**：減少載入時的串行等待與先查 0、再查 N 的重複請求。通知重複請求的根因是掛載立即 GET，加上 Realtime 首次 system status ok 又觸發 GET；改由首次訂閱就緒負責初始讀取，後續事件／重連照常刷新，連線失敗立即讀取並啟用原本 15 秒輪詢；訂閱 2 秒未就緒也會備援讀取。遲到的連線事件仍會補讀，避免漏掉連線空窗期的通知。
+- **X-1 HIGH**：用 `sendSeq` 同時檢查初始化開始與 GET 發出時的送出版本；手動送出後不採用舊 init 回應。新一輪 init 若開始時已有送出中的請求，也不覆蓋該次送出或失敗恢復結果。effect 清理後不再套用 init 結果，保留 X-1 的錯誤文案與失敗標記。
+- **改了哪些檔案**：`vercel.json`、`src/features/friend/{FriendPage.tsx,chatInitialization.ts}`、`src/features/social/components/{LobbyInvite.tsx,OnboardingGuide.tsx}`、`src/features/social/messageLoaders.ts`、`src/features/twin/components/{useNotifications.ts,notificationFeed.ts}`、`tests/friend/chat-initialization.test.ts`、`tests/social/message-loaders.test.ts`、`tests/twin/notification-feed.test.ts`、本紀錄。未新增套件或修改契約／資料表。
+- **驗證**：先觀察三組缺少模組的失敗，再實作；另以 RED→GREEN 修正「init 開始時送出已在進行」的覆蓋案例。17 項新增測試覆蓋載入順序、錯誤處理、序號保護與清理、null／0／N 請求閘門、通知首次讀取、斷線／逾時備援、後續事件及 effect 重播。完整測試、型別與建置結果見 PR。
+- **踩到的坑／注意事項**：只在 GET 發出前記下 sendSeq 不足以涵蓋等待 intro 期間已開始的送出，所以也記錄 init 開始序號與是否已有送出。通知的首次讀取改為訂閱就緒後執行；連線失敗會立即讀取，無任何訂閱狀態則最多等 2 秒後啟動 GET。請求數下降只指正常載入，真實通知變更／重連仍會重讀。
+- **還沒做完／待辦**：預期 `/friend` 的 API 請求從 10～11 支降至約 7 支，訊息出現少一次串行往返；尚未部署或實測，需合併後確認 Vercel 重新部署，`X-Vercel-Id` 的函式區域由 iad1 變為 cdg1，再由黑箱測試驗證數字。開始時實際遠端 main 為 b124407，PR #124 仍為 Open；未自行合併 X-2。未呼叫真實模型、不寫 Supabase、不改 PR #122。
+
 ### 2026-10-31｜通知面板動畫修復 + nudge 無限發修復｜Vincent（AI 協助）｜PR a/friend-quality
 - **做了什麼**：
   1. **通知鈴鐺面板動畫 bug**：打開面板時先出現在錯誤位置再跳到正確位置（flicker）。原因是 `pages.css` 新增的 `@keyframes toast-in`（app-toast 用，帶 `translate: -50%`）覆蓋了 `layout.css` 同名的通知面板 keyframes（帶 `translate: 0 12px`），CSS 同名 keyframes 後者覆蓋前者。修法：app-toast 改名為 `app-toast-in`，不再撞名。

@@ -4,8 +4,9 @@ import { Modal } from '@components/ui/Modal'
 import { Button, Chip } from '@components/ui/Button'
 import { useDemoStore } from '@store/useDemoStore'
 import { isHttpMode } from '@lib/api/friend'
-import { acceptLobbyInvite, getLobbyInvite, type LobbyInviteView, type LobbyShareable } from '@lib/api/social'
+import { acceptLobbyInvite, type LobbyInviteView, type LobbyShareable } from '@lib/api/social'
 import { lobbyProgress } from '../lobbyProgress'
+import { loadLobbyInviteAfterMessages } from '../messageLoaders'
 
 
 function dismissKey(userId: string) {
@@ -26,7 +27,7 @@ function readDismissed(userId: string): boolean {
  * 還沒達到條件時給一條進度（banner），告訴用戶還差什麼。
  * 用法：const lobby = useLobbyInvite(用戶說了幾句)；畫面放 {lobby.dialog}、{lobby.banner}。
  */
-export function useLobbyInvite(userMessageCount: number): { dialog: ReactNode; banner: ReactNode } {
+export function useLobbyInvite(userMessageCount: number | null): { dialog: ReactNode; banner: ReactNode } {
   const user = useDemoStore((s) => s.user)
   const pushNotification = useDemoStore((s) => s.pushNotification)
   const navigate = useNavigate()
@@ -40,8 +41,10 @@ export function useLobbyInvite(userMessageCount: number): { dialog: ReactNode; b
   useEffect(() => {
     if (!isHttpMode || !user || done || shareable) return
     if (readDismissed(user.id)) return
+    const request = loadLobbyInviteAfterMessages(userMessageCount)
+    if (!request) return
     let alive = true
-    getLobbyInvite()
+    request
       .then((view) => {
         if (!alive) return
         setNotYet(view.status === 'not_yet' ? view : null)
