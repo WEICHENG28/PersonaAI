@@ -69,6 +69,7 @@ export async function extractMemories(userId: string, userText: string): Promise
     .join('\n')
 
   const out = await llmJson({
+    lane: 'bg',
     timeoutMs: CONFIG.LLM_BG_TIMEOUT_MS,
     maxAttempts: 2,
     role: 'fast',

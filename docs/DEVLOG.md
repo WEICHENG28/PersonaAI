@@ -26,10 +26,19 @@
 
 ## 共用與決策
 
+### 2026-11-07｜P0-4 前景／背景並行道與 JSON 重試瘦身｜AI 協助｜分支 opt/P0-4-llm-lanes
+- **做了什麼**：LLM 排程使用 fg／bg 兩個等待佇列，總上限 3、背景上限 1，有空位優先前景；喚醒前先預留名額，成功或失敗均釋放。記憶、檔案及言行異常呼叫標 bg；metric 使用 `opts.lane ?? 'fg'`，成功／失敗均反映實際道別。
+- **為什麼這樣做**：避免背景工作佔滿名額；JSON 重試僅附前 400 字加省略號，每次從原始訊息重建，避免錯誤輸出累積。
+- **改了哪些檔案**：server/lib/llm/{index,metrics}.ts、server/friend/{memory,profile}.ts、server/twin/anomaly.ts、tests/social/{llm,llm-lanes}.test.ts、本紀錄。另補註 P0-3 起預設單次逾時 30s → 20s。
+- **驗證**：先觀察 4 項新測試失敗再實作；測試涵蓋背景序列、空位前景通行、前景排隊優先、失敗釋放、metric 道別與 JSON 重試截短／不累積。完整測試與型別檢查結果見 PR。
+- **踩到的坑／注意事項**：這是非搶佔式排程；已在執行的背景不會中止，持續前景流量可能延後背景。維持 P0-3 的 timeout／retry 設定，分道不代表整個 API 含 DB／排隊／多項工作一定低於 60s。
+- **還沒做完／待辦**：阿澈 queueMs p95 < 300ms 須部署後量真實流量，本次僅 mock 測試，未呼叫真實模型、不讀 .env.local、不寫 Supabase、不安裝套件。保留 Draft PR，等待人工審查。
+
 ### 2026-11-07｜P0-3 模型參數、token 與逾時預算｜AI 協助｜分支 opt/P0-3-model-params
 - **做了什麼**：新增 LLM_MODEL_PARAMS 精確名稱／最長前綴選擇與無效設定拒絕；chat／fast／reason token 上限 500／600／2000。阿澈主回覆 20s × 2，加退避最壞 40.8s；記憶與檔案擷取 25s × 2，最壞 50.8s。SDK JSON fallback 共用單次 timeout 預算。
 - **為什麼這樣做**：依 P0-1 探測，Qwen 使用 `thinking: {type: 'disabled'}`；不自動換模型或環境變數。未設 LLM_MODEL_PARAMS 時不新增平台特有參數。
 - **改了哪些檔案**：server/lib/llm/{env,client,index,metrics}.ts、server/lib/{config,timing}.ts、server/friend/{chat,memory,profile}.ts、tests/social/llm*.test.ts 與本紀錄。
+- **預設逾時補註**：P0-3 起，沒指定逾時的呼叫，每次的逾時從 30s 變成 20s（`LLM_FG_TIMEOUT_MS`）。
 - **指標**：error 僅固定類別，保留最後一次失敗；成功重試不輸出 error。queueMs／totalMs 與 timer 各值在輸出時四捨五入，累積時保留精度。
 - **踩到的坑／注意事項**：worstCaseMs 僅計 LLM 執行與退避，不含現有共用佇列、DB／任務建立／多項背景工作的總時間；真正分道與更完整請求預算屬 P0-4。既有其他呼叫仍保留原重試次數。未呼叫真實模型、不讀 .env.local、不寫 Supabase、不安裝套件。
 - **還沒做完／待辦**：使用者依 P0-1 設定 LLM_MODEL_PARAMS（Qwen3.8-Max／Qwen3.8-Flash 的 thinking.type=disabled）；真實平台及部署驗證由使用者執行。保留 Draft PR，等待人工審查；測試結果見 PR。

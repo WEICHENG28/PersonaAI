@@ -60,7 +60,7 @@ export function emitLlmMetric(metric: LlmMetric): void {
 
 /** 一次逻辑调用一笔，包含所有上层重试、排队及退避时间；不记录模型原文或平台错误。 */
 export async function withLlmMetric<T>(
-  opts: { role: LlmMetric['role']; tag: string; onMetric?: MetricSink },
+  opts: { role: LlmMetric['role']; tag: string; lane?: 'fg' | 'bg'; onMetric?: MetricSink },
   run: (state: LlmMetricState) => Promise<T>,
 ): Promise<T> {
   const started = performance.now()
@@ -74,7 +74,7 @@ export async function withLlmMetric<T>(
   } finally {
     const { error, ...values } = state
     const metric: LlmMetric = { ...values, queueMs: Math.round(state.queueMs), role: opts.role, tag: opts.tag,
-      lane: 'fg', stream: false, ok, ttftMs: null, totalMs: Math.round(performance.now() - started),
+      lane: opts.lane ?? 'fg', stream: false, ok, ttftMs: null, totalMs: Math.round(performance.now() - started),
       ...(!ok ? { error: error ?? 'unknown' } : {}) }
     emitLlmMetric(metric)
     if (opts.onMetric) deliver(opts.onMetric, metric)

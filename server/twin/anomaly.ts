@@ -136,6 +136,7 @@ async function check(deps: AnomalyDeps, conversationId: string, userId: string):
   if (!shareable) return 'skipped'
 
   const result = await deps.llmJson({
+    lane: 'bg',
     role: 'reason',
     system: renderAnomalySystem(shareable, style),
     messages: [{ role: 'user', content: anomalyUserMessage(messages.slice(-ANOMALY_MESSAGES_LIMIT)) }],

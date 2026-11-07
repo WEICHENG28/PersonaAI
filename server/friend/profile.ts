@@ -103,6 +103,7 @@ export async function extractProfile(userId: string): Promise<ShareableView> {
 
   // 2. Prompt 3（MODEL_REASON）
   const out = await llmJson({
+    lane: 'bg',
     timeoutMs: CONFIG.LLM_BG_TIMEOUT_MS,
     maxAttempts: 2,
     role: 'reason',

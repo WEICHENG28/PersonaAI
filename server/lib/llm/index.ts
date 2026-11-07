@@ -18,6 +18,7 @@ export interface LlmTextOptions {
   role: ModelRole
   system: string
   messages: LlmMessage[]
+  lane?: 'fg' | 'bg'
   maxTokens?: number
   timeoutMs?: number
   maxAttempts?: number
@@ -48,23 +49,42 @@ const MAX_ATTEMPTS = CONFIG.LLM_MAX_RETRIES + 1
  * - 同時最多 MAX_CONCURRENT 個請求，其他排隊；
  * - 呼叫失敗後等一下再重試（第 n 次等 n × backoffMs）。測試時不等待。
  */
-export const llmTuning = { maxConcurrent: 3, backoffMs: process.env.VITEST ? 0 : 800 }
+export const llmTuning = { maxConcurrent: 3, maxBackground: 1, backoffMs: process.env.VITEST ? 0 : 800 }
 
 let running = 0
-const waiting: (() => void)[] = []
+let background = 0
+type Lane = 'fg' | 'bg'
+const waiting: Record<Lane, (() => void)[]> = { fg: [], bg: [] }
 
-async function limited<T>(run: () => Promise<T>, metric: LlmMetricState): Promise<T> {
-  if (running >= llmTuning.maxConcurrent) {
+/** 在唤醒等待者前预留名额，避免新请求抢走刚释放的空位。 */
+function drain(): void {
+  while (running < llmTuning.maxConcurrent) {
+    const lane: Lane = waiting.fg.length ? 'fg' : 'bg'
+    if (lane === 'bg' && background >= llmTuning.maxBackground) break
+    const next = waiting[lane].shift()
+    if (!next) break
+    running++
+    if (lane === 'bg') background++
+    next()
+  }
+}
+
+async function limited<T>(run: () => Promise<T>, metric: LlmMetricState, lane: Lane = 'fg'): Promise<T> {
+  if (running < llmTuning.maxConcurrent && !waiting.fg.length && !waiting.bg.length
+      && (lane === 'fg' || background < llmTuning.maxBackground)) {
+    running++
+    if (lane === 'bg') background++
+  } else {
     const queued = performance.now()
-    await new Promise<void>((resolve) => waiting.push(resolve))
+    await new Promise<void>(resolve => { waiting[lane].push(resolve); drain() })
     metric.queueMs += performance.now() - queued
   }
-  running++
   try {
     return await run()
   } finally {
     running--
-    waiting.shift()?.()
+    if (lane === 'bg') background--
+    drain()
   }
 }
 
@@ -117,11 +137,7 @@ export async function llmJson<T>(opts: LlmJsonOptions<T>): Promise<T> {
       if (parsed.ok) return parsed.data
       reason = parsed.reason
       metric.error = raw.trim() ? 'schema' : 'empty'
-      messages = [
-        ...opts.messages,
-        { role: 'assistant', content: raw },
-        { role: 'user', content: `上次输出格式错误：${reason}，请只输出符合格式的 JSON` },
-      ]
+      messages = buildJsonRetryMessages(opts.messages, raw, reason)
     }
     throw new LlmError(opts.role, reason, maxAttempts)
   })
@@ -158,7 +174,7 @@ async function chat(model: string, opts: LlmTextOptions, messages: LlmMessage[],
   const result = normalizeChatResult(await limited(
     () => getLlmClient().chat({ model, messages: all, temperature: opts.temperature, jsonMode,
       maxTokens: opts.maxTokens ?? CONFIG.LLM_MAX_TOKENS[opts.role],
-      timeoutMs: opts.timeoutMs ?? CONFIG.LLM_FG_TIMEOUT_MS, extraBody: modelParamsFor(model) }), metric,
+      timeoutMs: opts.timeoutMs ?? CONFIG.LLM_FG_TIMEOUT_MS, extraBody: modelParamsFor(model) }), metric, opts.lane,
   ))
   if (result.usage?.promptTokens != null) metric.promptTokens = (metric.promptTokens ?? 0) + result.usage.promptTokens
   if (result.usage?.completionTokens != null) metric.completionTokens = (metric.completionTokens ?? 0) + result.usage.completionTokens
@@ -189,4 +205,13 @@ export function worstCaseMs({ timeoutMs, maxAttempts, backoffMs }: {
   timeoutMs: number; maxAttempts: number; backoffMs: number
 }): number {
   return timeoutMs * maxAttempts + maxAttempts * (maxAttempts - 1) / 2 * backoffMs
+}
+
+/** 每次重试都从原始消息重建，避免历史错误回复不断累积。 */
+export function buildJsonRetryMessages(original: LlmMessage[], raw: string, reason: string): LlmMessage[] {
+  return [
+    ...original,
+    { role: 'assistant', content: raw.length > 400 ? raw.slice(0, 400) + '…' : raw },
+    { role: 'user', content: `上次输出格式错误：${reason}，请只输出符合格式的 JSON` },
+  ]
 }
