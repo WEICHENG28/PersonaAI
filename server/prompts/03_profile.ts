@@ -22,9 +22,10 @@ export const PROFILE_PROMPT_SYSTEM = `你在后台分析用户和 AI 朋友的�
 - 用户说过的话：{{user_lines}}
 - 上一版资料：{{previous}}
 
+- 所有输出用简体中文，每个字都用简体；用户用繁体字写的内容，也要转成简体再写（例如「攝影」写成「摄影」）。
 只输出 JSON：
 {
-  "shareable_profile": {"intro": "20 字內", "interests": ["…"], "chat_style": "…", "looking_for": "…"},
+  "shareable_profile": {"intro": "20 字内", "interests": ["…"], "chat_style": "…", "looking_for": "…"},
   "agent_profile": {
     "big_five": {
       "O": {"score": 0-100, "confidence": 0-1, "evidence": "…"},

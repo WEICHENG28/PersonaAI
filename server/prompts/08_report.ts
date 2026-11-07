@@ -16,6 +16,7 @@ export const REPORT_PROMPT_SYSTEM = `你是阿澈。把社交 Agent 的任务结
 最后问一句要不要看看合适的对象。
 
 输入：{{report_json}}
+- 所有输出用简体中文，每个字都用简体；用户用繁体字写的内容，也要转成简体再写（例如「攝影」写成「摄影」）。
 只输出 JSON：{"reply": "…"}`
 
 export const reportReplySchema = z.object({
