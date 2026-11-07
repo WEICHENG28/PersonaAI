@@ -1,5 +1,5 @@
 {
-  "regions": ["cdg1"],
+  "regions": ["hkg1"],
   "rewrites": [
     {
       "source": "/api/(.*)",

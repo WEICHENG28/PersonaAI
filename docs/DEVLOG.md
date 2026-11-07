@@ -26,6 +26,12 @@
 
 ## 共用與決策
 
+### 2026-11-07｜X-4 Vercel 改香港區域｜Jerry 決定（AI 協助）｜分支 opt/X-4-hkg-region
+- **做了什麼／為什麼**：依 Jerry 回報，學校平台在北京（火山引擎），巴黎連北京常逾時，阿澈和記憶擷取大量失敗；將 vercel.json 的 regions 從 ["cdg1"] 改成 ["hkg1"]。
+- **代價與後續**：每次資料庫查詢約多 0.18s，靠 L-1 並行化補回。
+- **改了哪些檔案**：僅 vercel.json 區域設定與本紀錄，其餘設定不動。
+- **還沒做完／待辦**：部署後確認香港區域與實際延遲、逾時改善；本次未部署或呼叫真實平台，保留 Draft PR 等待人工審查。
+
 ### 2026-11-07｜P0-5 平台設定範例、向量重算工具與 health 保護｜AI 協助｜分支 opt/P0-5-platform-switch
 - **做了什麼**：.env.example 依 P0-1 暫定 Kimi-K2.6／Qwen3.8-Max／Qwen3.8-Flash／GLM-Embedding-3（1024 維），Qwen thinking.type=disabled，待 E-3 定案；網址與金鑰留空。重算工具提供分頁讀取、可控並行、維度／有限數字檢查與逐筆失敗續跑；預設 dry-run 只讀清單，不呼叫模型、不寫入，--apply 才重算並以 pgvector 字串保存。
 - **為什麼這樣做**：新平台 embedding 與既有向量不相容，提供人工維護工具；本 PR 只交付工具與範例，不切換實際環境。抽出既有 admin 驗證，公開 deepHealth 僅回 env/suspicious，完整檢查須 admin token，結果／進行中的 Promise 快取 60 秒，避免重複探測。
