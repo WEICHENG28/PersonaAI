@@ -26,6 +26,14 @@
 
 ## 共用與決策
 
+### 2026-11-07｜L-4 登入驗證與用戶 id 記憶體快取｜AI 協助｜分支 opt/L-4-auth-cache
+- **做了什麼**：新增無套件的 Map TTL 快取，各最多 500 筆並按插入順序淘汰，時鐘可注入。JWT 僅以 SHA-256 作 key；只有 getUser 驗證成功且非 banned 才快取，期限為 60 秒與 exp 剩餘時間的較短者。authId → users.id 僅成功查到才快取 5 分鐘，空值與錯誤不快取。
+- **為什麼這樣做**：三條線共用用戶 id 查詢，減少香港／台灣到巴黎的重複等待；同一登入者使用相同 JWT 且兩種快取皆命中時，60 秒內第二支以後的 API 預期少兩次資料庫／Auth 來回。冷啟動、換 token、到期或容量淘汰仍需查詢；實際效果由 Claude 在本機量測。
+- **保留行為**：friend 找不到用戶仍 throw，由原路由處理；twin、social 仍回 403「找不到你的用户资料，请重新进入一次」；social 無 DB 仍回 DEV_USER_ID。requireAuth 的簽名、401／403 文案與所有回應格式不變。
+- **改了哪些檔案**：server/lib/{authCache,appUser,auth}.ts、server/routes/friend.ts（A）；server/social/user.ts、server/routes/admin.ts、server/account/guestCleanup.ts、tests/social/user.test.ts（B）；server/routes/twin.ts（C）；tests/friend/auth-cache.test.ts 與本紀錄（跨線共用決策，三線已同意）。不改 shared/types.ts、前端、套件或環境檔。
+- **踩到的坑／限制**：管理員停用／恢復與游客 Auth 刪除成功後，清掉同 authId 的兩種快取；失效前已開始的查詢不會再填回舊資料。目前 repo 沒有另外的自行刪帳 API，刪除入口是 guestCleanup 的 deleteUser（users cascade）。失效僅作用於同一 Vercel 實例；其他實例最多 60 秒後才重新驗證被停用帳號，登出後 token 在其他實例最多 60 秒內仍可能命中快取（此處的 60 秒是快取額外保留期，登出是否撤銷 access token 仍依 Supabase 行為）。
+- **驗收／待辦**：先觀察同 JWT 重複驗證測試失敗（getUser 2 次，預期 1 次），再實作；新增 37 個測試涵蓋 TTL／exp、錯誤／banned、500 筆上限、雜湊 key、雙快取失效與三條線相容，共用快取的路由測試確認 Auth／users 查詢各一次。同步 main 後 npm test 903/903、前後端 tsc 與 npm run build 通過（仍有大型 bundle 警告），獨立程式碼及 TypeScript 審查無待修問題。LLM／Supabase 全 mock；實際延遲交 Claude 本機量測。回滾用 revert；本任務完成後停在 Draft PR，不接續下一任務。
+
 ### 2026-11-07｜X-4 Vercel 改香港區域｜Jerry 決定（AI 協助）｜分支 opt/X-4-hkg-region
 - **做了什麼／為什麼**：依 Jerry 回報，學校平台在北京（火山引擎），巴黎連北京常逾時，阿澈和記憶擷取大量失敗；將 vercel.json 的 regions 從 ["cdg1"] 改成 ["hkg1"]。
 - **代價與後續**：每次資料庫查詢約多 0.18s，靠 L-1 並行化補回。

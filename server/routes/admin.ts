@@ -3,6 +3,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { getServiceClient } from '../lib/supabase.js'
+import { invalidateAuthUser } from '../lib/authCache.js'
 import { REPORT_ACTION } from '../social/safety.js'
 import { buildFunnel, loadOnboardingState } from '../social/onboarding.js'
 import { recentErrors } from '../lib/alerts.js'
@@ -73,6 +74,7 @@ adminRoutes.post('/admin/ban', async (c) => {
     app_metadata: { banned: body.data.banned },
   })
   if (authError) throw authError
+  invalidateAuthUser(user.auth_id as string)
   if (body.data.banned) await db.from('users').update({ social_agent_enabled: false }).eq('id', user.id)
   await db.from('agent_logs').insert({
     user_id: user.id,
