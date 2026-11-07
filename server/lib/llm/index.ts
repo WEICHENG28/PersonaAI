@@ -3,12 +3,14 @@
 import type { z } from 'zod'
 import type { ModelRole } from '../../../shared/types.js'
 import { CONFIG } from '../config.js'
-import { getLlmClient, type ChatMessage } from './client.js'
+import { getLlmClient, normalizeChatResult, type ChatMessage } from './client.js'
+import { withLlmMetric, type LlmMetric, type LlmMetricState } from './metrics.js'
 import { llmEnv, modelFor } from './env.js'
 import { extractJson } from './json.js'
 
 export { extractJson } from './json.js'
-export { setLlmClient, type LlmClient } from './client.js'
+export { setLlmClient, normalizeChatResult, type LlmClient, type LlmChatResult } from './client.js'
+export { setLlmMetricSink, type LlmMetric } from './metrics.js'
 
 export type LlmMessage = { role: 'user' | 'assistant'; content: string }
 
@@ -17,6 +19,8 @@ export interface LlmTextOptions {
   system: string
   messages: LlmMessage[]
   temperature?: number
+  tag?: string
+  onMetric?: (metric: LlmMetric) => void
 }
 
 export interface LlmJsonOptions<T> extends LlmTextOptions {
@@ -46,8 +50,12 @@ export const llmTuning = { maxConcurrent: 3, backoffMs: process.env.VITEST ? 0 :
 let running = 0
 const waiting: (() => void)[] = []
 
-async function limited<T>(run: () => Promise<T>): Promise<T> {
-  if (running >= llmTuning.maxConcurrent) await new Promise<void>((resolve) => waiting.push(resolve))
+async function limited<T>(run: () => Promise<T>, metric: LlmMetricState): Promise<T> {
+  if (running >= llmTuning.maxConcurrent) {
+    const queued = performance.now()
+    await new Promise<void>((resolve) => waiting.push(resolve))
+    metric.queueMs += performance.now() - queued
+  }
   running++
   try {
     return await run()
@@ -64,67 +72,82 @@ function backoff(attempt: number): Promise<void> {
 }
 
 export async function llmText(opts: LlmTextOptions): Promise<string> {
-  const model = modelFor(opts.role)
-  let reason = ''
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      const out = await chat(model, opts, opts.messages, false)
-      if (out.trim()) return out
-      reason = '模型回傳空字串'
-    } catch (err) {
-      reason = describe(err)
-      await backoff(attempt)
+  return withLlmMetric({ ...opts, tag: opts.tag ?? 'llm.text' }, async metric => {
+    const model = metric.model = modelFor(opts.role)
+    let reason = ''
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      metric.attempts = attempt
+      try {
+        const out = await chat(model, opts, opts.messages, false, metric)
+        if (out.trim()) return out
+        reason = '模型回傳空字串'
+      } catch (err) {
+        reason = describe(err)
+        await backoff(attempt)
+      }
     }
-  }
-  throw new LlmError(opts.role, reason, MAX_ATTEMPTS)
+    throw new LlmError(opts.role, reason, MAX_ATTEMPTS)
+  })
 }
 
 export async function llmJson<T>(opts: LlmJsonOptions<T>): Promise<T> {
-  const model = modelFor(opts.role)
-  let messages = opts.messages
-  let reason = ''
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    let raw: string
-    try {
-      raw = await chat(model, opts, messages, true)
-    } catch (err) {
-      reason = describe(err)
-      await backoff(attempt)
-      continue
+  return withLlmMetric({ ...opts, tag: opts.tag ?? 'llm.json' }, async metric => {
+    const model = metric.model = modelFor(opts.role)
+    let messages = opts.messages
+    let reason = ''
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      metric.attempts = attempt
+      let raw: string
+      try {
+        raw = await chat(model, opts, messages, true, metric)
+      } catch (err) {
+        reason = describe(err)
+        await backoff(attempt)
+        continue
+      }
+      const parsed = parseWith(raw, opts.schema)
+      if (parsed.ok) return parsed.data
+      reason = parsed.reason
+      messages = [
+        ...opts.messages,
+        { role: 'assistant', content: raw },
+        { role: 'user', content: `上次输出格式错误：${reason}，请只输出符合格式的 JSON` },
+      ]
     }
-    const parsed = parseWith(raw, opts.schema)
-    if (parsed.ok) return parsed.data
-    reason = parsed.reason
-    messages = [
-      ...opts.messages,
-      { role: 'assistant', content: raw },
-      { role: 'user', content: `上次输出格式错误：${reason}，请只输出符合格式的 JSON` },
-    ]
-  }
-  throw new LlmError(opts.role, reason, MAX_ATTEMPTS)
+    throw new LlmError(opts.role, reason, MAX_ATTEMPTS)
+  })
 }
 
 export async function embed(text: string): Promise<number[]> {
-  const env = llmEnv()
-  let reason = ''
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      const vec = await limited(() => getLlmClient().embed({ model: env.MODEL_EMBED, input: text, dimensions: env.EMBEDDING_DIM }))
-      if (vec.length === env.EMBEDDING_DIM) return vec
-      // 長度不符是設定錯誤，重試也不會好
-      throw new LlmError('embed', `向量長度 ${vec.length}，預期 ${env.EMBEDDING_DIM}`, attempt)
-    } catch (err) {
-      if (err instanceof LlmError) throw err
-      reason = describe(err)
-      await backoff(attempt)
+  return withLlmMetric({ role: 'embed', tag: 'llm.embed' }, async metric => {
+    const env = llmEnv()
+    metric.model = env.MODEL_EMBED
+    let reason = ''
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      metric.attempts = attempt
+      try {
+        const vec = await limited(() => getLlmClient().embed({ model: env.MODEL_EMBED, input: text, dimensions: env.EMBEDDING_DIM }), metric)
+        if (vec.length === env.EMBEDDING_DIM) return vec
+        // 長度不符是設定錯誤，重試也不會好
+        throw new LlmError('embed', `向量長度 ${vec.length}，預期 ${env.EMBEDDING_DIM}`, attempt)
+      } catch (err) {
+        if (err instanceof LlmError) throw err
+        reason = describe(err)
+        await backoff(attempt)
+      }
     }
-  }
-  throw new LlmError('embed', reason, MAX_ATTEMPTS)
+    throw new LlmError('embed', reason, MAX_ATTEMPTS)
+  })
 }
 
-function chat(model: string, opts: LlmTextOptions, messages: LlmMessage[], jsonMode: boolean): Promise<string> {
+async function chat(model: string, opts: LlmTextOptions, messages: LlmMessage[], jsonMode: boolean, metric: LlmMetricState): Promise<string> {
   const all: ChatMessage[] = [{ role: 'system', content: opts.system }, ...messages]
-  return limited(() => getLlmClient().chat({ model, messages: all, temperature: opts.temperature, jsonMode }))
+  const result = normalizeChatResult(await limited(
+    () => getLlmClient().chat({ model, messages: all, temperature: opts.temperature, jsonMode }), metric,
+  ))
+  if (result.usage?.promptTokens != null) metric.promptTokens = (metric.promptTokens ?? 0) + result.usage.promptTokens
+  if (result.usage?.completionTokens != null) metric.completionTokens = (metric.completionTokens ?? 0) + result.usage.completionTokens
+  return result.content
 }
 
 function parseWith<T>(raw: string, schema: z.ZodType<T>): { ok: true; data: T } | { ok: false; reason: string } {

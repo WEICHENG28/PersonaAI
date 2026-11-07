@@ -26,6 +26,15 @@
 
 ## 共用與決策
 
+### 2026-11-07｜P0-2 LLM 計時與用量指標｜AI 協助｜分支 opt/P0-2-llm-metrics
+- **做了什麼**：SDK client 保留 content 與 usage，`LlmClient.chat` 同時相容舊字串與新物件回傳。`llmText`／`llmJson`／`embed` 每次邏輯呼叫輸出一筆 `llm_metric`，包含模型、tag、成功／失敗、嘗試次數、累計排隊時間、總耗時與已回報的 token 用量。新增 `setLlmMetricSink` 及每次呼叫的 `onMetric`；預設輸出 JSON console，`LLM_METRICS_LOG=0` 關閉預設輸出，顯式收集器仍可使用。
+- **為什麼這樣做**：先保留舊平台的延遲與用量基準，再進行參數、預算、分道及平台切換。原本的重試次數、順序、JSON fallback、並行上限與回傳資料維持相容；token 用量累加各次已回傳回應的 usage，未回報時為 null。觀察者失敗只印固定警告，不更改模型結果或觸發重試；metric 不含 prompt、對話原文、用戶識別或原始平台錯誤。
+- **阿澈日誌**：`friend.reply` 以 `onMetric` 收集主回覆指標，放入「回应用户」的 `detail.llm`；`detail.timing` 含 `db.read`、`llm`、`db.write`、`task` 與 `totalMs`，並保留原有 `taskId`。totalMs 計到送出本筆日誌前，不包含該筆日誌自己的 DB I/O；task 建立耗時獨立列出，避免誤算為 db.write。
+- **改了哪些檔案**：新增 `server/lib/llm/metrics.ts`、`server/lib/timing.ts`；修改 `server/lib/llm/{client,index}.ts`、`server/friend/chat.ts`；擴充 `tests/social/llm.test.ts`、新增 `tests/social/llm-metrics.test.ts`、擴充 `tests/friend/chat.test.ts`，以及本紀錄。公開選項只新增 optional tag／onMetric，沒有修改 server/contracts 或資料表。
+- **驗證**：先觀察缺少 metrics／normalizeChatResult、SDK usage 回傳型態與阿澈日誌缺欄位的失敗，再轉綠；39 項目標測試通過，包含重試耗盡、schema 重試用量加總、embed 維度失敗、確定的排隊時間、觀察者失敗隔離、日誌開關與單調時鐘 spans。完整測試及建置結果見 PR。
+- **踩到的坑／注意事項**：P0-2 尚無串流與分道，因此 `stream=false`、`ttftMs=null`、`lane=fg`；P0-4 再加入真正的 fg/bg 管理。本次只在計畫列出的 friendChat 呼叫端接 `friend.reply`，其餘使用 llm.text／llm.json／llm.embed 預設 tag，其他具名 tag 待對應呼叫端任務接入。metric 的 attempts 是上層封裝嘗試次數，不另計 SDK 內部 json_object 400 fallback。
+- **還沒做完／待辦**：部署後由使用者在 Vercel Logs 以 llm_metric 篩選，量測舊平台阿澈 p50／p95 並補 DEVLOG，必須在 P0-5 切平台前完成。本次沒有呼叫真實模型或寫入共用 Supabase，未修改環境變數或新增套件；只做 P0-2，未開始 P0-3／P0-4。
+
 ### 2026-11-07｜學校平台（llmapi.paratera.com）探測結果（P0-1 實跑）｜Jerry（Claude 協助）
 - **怎麼量**：`scripts/llm-probe.ts`，從 Jerry 的電腦連平台。第一輪 13 個聊天模型＋2 個 embedding，每組 3 次、一次一個請求（357 個請求）；第二輪挑 5 個候選，每組 2 次、同時 12 個請求（92 個請求）。提示詞是一句打招呼，只適合比較模型之間的快慢；實際 prompt 有幾千字，首字時間會更長。後端搬到巴黎（X-3）後，每次呼叫約再多 0.25s 網路延遲。
 - **平台**：`/v1/models` 共 80 個模型。計畫裡的 `DeepSeek-V4-Flash`、`DeepSeek-V4-Pro` 不存在，實際名稱是 `DeepSeek-V4.1-Flash`、`DeepSeek-V4-Flash-0731`、`DeepSeek-V4-Pro-0813`。

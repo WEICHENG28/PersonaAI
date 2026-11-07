@@ -8,8 +8,17 @@ export interface ChatMessage {
   content: string
 }
 
+export interface LlmChatResult {
+  content: string
+  usage?: { promptTokens: number | null; completionTokens: number | null }
+}
+
+export function normalizeChatResult(value: string | LlmChatResult): LlmChatResult {
+  return typeof value === 'string' ? { content: value } : value
+}
+
 export interface LlmClient {
-  chat(req: { model: string; messages: ChatMessage[]; temperature?: number; jsonMode: boolean }): Promise<string>
+  chat(req: { model: string; messages: ChatMessage[]; temperature?: number; jsonMode: boolean }): Promise<string | LlmChatResult>
   embed(req: { model: string; input: string; dimensions: number }): Promise<number[]>
 }
 
@@ -45,7 +54,9 @@ function createOpenAiClient(): LlmClient {
       temperature,
       ...(json ? { response_format: { type: 'json_object' as const } } : {}),
     })
-    return res.choices[0]?.message?.content ?? ''
+    return { content: res.choices[0]?.message?.content ?? '',
+      ...(res.usage ? { usage: { promptTokens: res.usage.prompt_tokens ?? null,
+        completionTokens: res.usage.completion_tokens ?? null } } : {}) }
   }
 
   return {
