@@ -85,12 +85,12 @@ export async function extractProfile(userId: string): Promise<ShareableView> {
     .from('friend_messages')
     .select('role, content')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
-    .limit(400)
+    .eq('role', 'user')
+    .order('created_at', { ascending: false })
+    .limit(PROFILE_USER_LINES_LIMIT)
   if (mErr) throw new ProfileError(`读取对话失败：${mErr.message}`)
-  const userLines = (msgRows ?? [])
-    .filter((m: { role: string }) => m.role === 'user')
-    .slice(-PROFILE_USER_LINES_LIMIT)
+  const userLines = [...(msgRows ?? [])]
+    .reverse()
     .map((m: { content: string }) => m.content)
 
   const previousRow = await getProfileRow(userId)
@@ -208,3 +208,13 @@ export function shouldExtractProfile(userMessageCount: number): boolean {
 }
 
 export type { ProfileExtract }
+/** 全量计数，不能用截断的聊天上下文判断定期撷取。 */
+export async function countUserChatMessages(userId: string): Promise<number> {
+  const { count, error } = await getServiceClient().from('friend_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('role', 'user')
+    .eq('kind', 'chat')
+  if (error) throw new ProfileError('读取用户讯息数量失败')
+  return count ?? 0
+}

@@ -59,6 +59,7 @@ vi.mock('../../server/social/task', () => ({
 }))
 vi.mock('../../server/friend/memory', () => ({ extractMemories: vi.fn(async () => 0), listMemories: vi.fn(async () => []) }))
 vi.mock('../../server/friend/profile', () => ({
+  countUserChatMessages: vi.fn(async () => 12),
   extractProfile: vi.fn(async () => ({})),
   shouldExtractProfile: vi.fn(() => false),
 }))
@@ -205,4 +206,17 @@ describe('Nudge 计时器（前端）', () => {
     vi.advanceTimersByTime(120_000)
     expect(onNudge).not.toHaveBeenCalled()
   })
+})
+
+it('does not extract memories or profiles or count user messages for nudge', async () => {
+  const { friendChat } = await import('../../server/friend/chat.js')
+  const { extractMemories } = await import('../../server/friend/memory.js')
+  const { extractProfile, countUserChatMessages } = await import('../../server/friend/profile.js')
+  vi.mocked(extractMemories).mockClear(); vi.mocked(extractProfile).mockClear(); vi.mocked(countUserChatMessages).mockClear()
+  messages.length = 0
+  llmJsonMock.mockResolvedValue({ reply: '嗨', shared_event_id: null, task_intent: false })
+  await friendChat('u1', '', 'nudge')
+  expect(extractMemories).not.toHaveBeenCalled()
+  expect(extractProfile).not.toHaveBeenCalled()
+  expect(countUserChatMessages).not.toHaveBeenCalled()
 })

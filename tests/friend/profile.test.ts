@@ -68,13 +68,17 @@ function validExtract() {
 }
 
 function makeTable(name: string): TableMock {
+  let filters: [string, unknown][] = []
+  let descending = false
+  let head = false
+  const filtered = () => t.list.filter(row => filters.every(([key, value]) => row[key] === value))
   const t: TableMock = {
     list: [],
-    select: vi.fn(() => t.self),
-    eq: vi.fn(() => t.self),
+    select: vi.fn((_columns: string, opts?: { count?: string; head?: boolean }) => { filters = []; descending = false; head = opts?.head ?? false; return t.self }),
+    eq: vi.fn((key: string, value: unknown) => { filters.push([key, value]); return t.self }),
     is: vi.fn(() => t.self),
-    order: vi.fn(() => t.self),
-    limit: vi.fn(async () => ({ data: t.list, error: null })),
+    order: vi.fn((_key: string, opts?: { ascending: boolean }) => { descending = opts?.ascending === false; return t.self }),
+    limit: vi.fn(async (n: number) => { const rows = name === 'friend_messages' ? filtered() : [...t.list]; return { data: (descending ? [...rows].reverse() : rows).slice(0, n), error: null } }),
     maybeSingle: vi.fn(async () => ({ data: t.list[0] ?? null, error: null })),
     single: vi.fn(async () =>
       t.list[0] ? { data: t.list[0], error: null } : { data: null, error: { code: 'PGRST116', message: 'no rows' } },
@@ -93,7 +97,7 @@ function makeTable(name: string): TableMock {
       return t.self
     }),
   }
-  Object.assign(t, { self: t })
+  Object.assign(t, { self: t, then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: head ? null : filtered(), count: filtered().length, error: null }).then(resolve) })
   tables[name] = t
   return t
 }
@@ -193,9 +197,9 @@ describe('shouldExtractProfile', () => {
 describe('extractProfile（mock LLM/DB）', () => {
   it('撷取→写 shareable/agent、计算 embedding、写日志', async () => {
     tables['friend_messages']!.list.push(
-      { role: 'user', content: '我周末要去漫展' },
+      { user_id: 'u1', role: 'user', content: '我周末要去漫展' },
       { role: 'friend', content: '听起来不错' },
-      { role: 'user', content: '我也常看展' },
+      { user_id: 'u1', role: 'user', content: '我也常看展' },
     )
     const view = await extractProfile('u1')
     expect(view.exists).toBe(true)
@@ -231,7 +235,7 @@ describe('extractProfile（mock LLM/DB）', () => {
 
   it('只取 role=user 的最新 60 则', async () => {
     for (let i = 0; i < 80; i++) {
-      tables['friend_messages']!.list.push({ role: 'user', content: `msg-${i}` })
+      tables['friend_messages']!.list.push({ user_id: 'u1', role: 'user', content: `msg-${i}` })
     }
     await extractProfile('u1')
     const call = vi.mocked(llmJson).mock.calls[0]?.[0] as unknown as {
@@ -370,4 +374,26 @@ describe('contracts（无 DB 设定回退 fixtures；有 DB 读库）', () => {
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
     }
   })
+})
+
+it('filters user messages before descending limit, then renders chronological lines', async () => {
+  tables.friend_messages!.list.push(...Array.from({ length: 500 }, (_, n) => ({ user_id: 'u1', role: n % 2 ? 'friend' : 'user', content: `line-${n}` })))
+  await extractProfile('u1')
+  const table = tables.friend_messages!
+  expect(table.eq).toHaveBeenCalledWith('role', 'user')
+  expect(table.order).toHaveBeenCalledWith('created_at', { ascending: false })
+  expect(table.limit).toHaveBeenCalledWith(60)
+  const system = vi.mocked(llmJson).mock.calls[0]![0].system
+  expect(system).toContain('1. line-380')
+  expect(system).toContain('60. line-498')
+  expect(system).not.toContain('line-0')
+})
+it('counts all user chat messages scoped to this user with count/head', async () => {
+  const { countUserChatMessages } = await import('../../server/friend/profile.js')
+  tables.friend_messages!.list.push(
+    ...Array.from({ length: 12 }, () => ({ user_id: 'u1', role: 'user', kind: 'chat' })),
+    { user_id: 'u2', role: 'user', kind: 'chat' }, { user_id: 'u1', role: 'friend', kind: 'chat' },
+    { user_id: 'u1', role: 'user', kind: 'task_card' })
+  expect(await countUserChatMessages('u1')).toBe(12)
+  expect(tables.friend_messages!.select).toHaveBeenCalledWith('id', { count: 'exact', head: true })
 })
