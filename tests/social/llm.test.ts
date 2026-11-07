@@ -3,6 +3,14 @@ import { z } from 'zod'
 import { CONFIG } from '../../server/lib/config'
 import { LlmError, embed, extractJson, llmJson, llmText, llmTuning, setLlmClient, type LlmClient } from '../../server/lib/llm'
 import { setLogWriter, writeLog } from '../../server/lib/log'
+import { getLlmClient, normalizeChatResult } from '../../server/lib/llm/client.js'
+
+const sdkMock = vi.hoisted(() => ({ complete: vi.fn(), embed: vi.fn() }))
+vi.mock('openai', () => ({ default: class {
+  static APIError = class extends Error { status = 400 }
+  chat = { completions: { create: sdkMock.complete } }
+  embeddings = { create: sdkMock.embed }
+} }))
 
 beforeAll(() => {
   Object.assign(process.env, {
@@ -40,6 +48,28 @@ function fakeClient(replies: (string | Error)[], vector: number[] = [1, 2, 3, 4]
 const schema = z.object({ name: z.string(), score: z.number() })
 const base = { role: 'reason' as const, system: '你是测试', messages: [{ role: 'user' as const, content: '给我 JSON' }] }
 const MAX_ATTEMPTS = CONFIG.LLM_MAX_RETRIES + 1
+
+describe('chat result normalization and SDK usage', () => {
+  it('normalizes string mocks without losing structured zero token counts', () => {
+    expect(normalizeChatResult('你好')).toEqual({ content: '你好' })
+    expect(normalizeChatResult({ content: 'ok', usage: { promptTokens: 0, completionTokens: 0 } }))
+      .toEqual({ content: 'ok', usage: { promptTokens: 0, completionTokens: 0 } })
+  })
+
+  it('maps SDK content and usage into the structured client result', async () => {
+    sdkMock.complete.mockResolvedValueOnce({
+      choices: [{ message: { content: 'ok' } }], usage: { prompt_tokens: 3, completion_tokens: 2 },
+    })
+    await expect(getLlmClient().chat({ model: 'chat-model', messages: [], jsonMode: false }))
+      .resolves.toEqual({ content: 'ok', usage: { promptTokens: 3, completionTokens: 2 } })
+  })
+
+  it.each([0, 3])('preserves SDK embedding prompt usage (%s tokens)', async promptTokens => {
+    sdkMock.embed.mockResolvedValueOnce({ data: [{ embedding: [1, 2, 3, 4] }], usage: { prompt_tokens: promptTokens } })
+    await expect(getLlmClient().embed({ model: 'embed-model', input: '登山', dimensions: 4 }))
+      .resolves.toEqual({ vector: [1, 2, 3, 4], usage: { promptTokens } })
+  })
+})
 
 describe('extractJson', () => {
   it('從混雜文字中擷取第一段 JSON', () => {

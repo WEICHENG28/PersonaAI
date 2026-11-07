@@ -47,6 +47,7 @@ import { createTaskFromText } from '../../server/social/task'
 import { chatBodySchema, friendChat, friendIntro } from '../../server/friend/chat'
 import { renderFriendSystem, friendReplySchema } from '../../server/prompts/01_friend'
 import { ACHE, pickNextEvent } from '../../server/friend/persona'
+import { writeLog } from '../../server/lib/log'
 
 function makeTable(name: string): TableMock {
   const t: TableMock = {
@@ -131,6 +132,47 @@ describe('friendReplySchema', () => {
 })
 
 describe('friendChat 主流程（mock）', () => {
+  it('attributes delayed message inserts to db.write and friend initialization to setup', async () => {
+    let clock = 0
+    const clockSpy = vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    const friends = tables['ai_friends']!
+    friends.list.length = 0
+    const originalFriendInsert = friends.insert.getMockImplementation()!
+    friends.insert.mockImplementation(row => {
+      clock += 20
+      return originalFriendInsert(row)
+    })
+    const messages = tables['friend_messages']!
+    const originalMessageInsert = messages.insert.getMockImplementation()!
+    messages.insert.mockImplementation(row => {
+      clock += row.role === 'user' ? 40 : 10
+      return originalMessageInsert(row)
+    })
+    try {
+      await friendChat('u1', '你好')
+      const log = vi.mocked(writeLog).mock.calls.map(([entry]) => entry).find(entry => entry.action === '回应用户')!
+      expect(log.detail!.timing).toMatchObject({ setup: 20, 'db.read': 0, 'db.write': 50, totalMs: 70 })
+    } finally {
+      clockSpy.mockRestore()
+    }
+  })
+
+  it('records reply metrics and phase timings while retaining taskId in the response log', async () => {
+    const metric = { tag: 'friend.reply', role: 'chat' as const, model: 'mock', lane: 'fg' as const,
+      stream: false, ok: true, attempts: 1, queueMs: 0, ttftMs: null, totalMs: 2,
+      promptTokens: 3, completionTokens: 2 }
+    vi.mocked(llmJson).mockImplementationOnce(async opts => {
+      opts.onMetric?.(metric)
+      return { reply: '好，我去找', shared_event_id: null, task_intent: true } as never
+    })
+    await friendChat('u1', '帮我找人')
+    const log = vi.mocked(writeLog).mock.calls.map(([entry]) => entry).find(entry => entry.action === '回应用户')!
+    expect(log.detail).toMatchObject({ taskId: 'task-1', llm: metric })
+    const timing = log.detail!.timing as Record<string, number>
+    for (const key of ['db.read', 'llm', 'db.write', 'totalMs']) expect(timing[key]).toBeGreaterThanOrEqual(0)
+    expect(vi.mocked(llmJson).mock.calls[0]![0].tag).toBe('friend.reply')
+  })
+
   it('普通对话：存两条讯息、无任务卡', async () => {
     const out = await friendChat('u1', '我周末想去漫展')
     expect(out.reply).toContain('周末')

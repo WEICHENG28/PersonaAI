@@ -8,6 +8,8 @@ import { getServiceClient } from '../lib/supabase.js'
 import { llmJson } from '../lib/llm/index.js'
 import { CONFIG } from '../lib/config.js'
 import { writeLog } from '../lib/log.js'
+import { startTimer } from '../lib/timing.js'
+import type { LlmMetric } from '../lib/llm/metrics.js'
 import { runInBackground } from '../lib/background.js'
 import { assertAllowed, maskBlocked } from '../lib/moderation.js'
 import { assertWithinDailyLimit } from '../social/usage.js'
@@ -107,6 +109,8 @@ export async function friendIntro(userId: string): Promise<void> {
  *  （使用者每次沉默最多 1 次；分頁開多個也不會重複發）。
  */
 export async function friendChat(userId: string, text: string, mode?: 'nudge') {
+  const timer = startTimer()
+  let replyMetric: LlmMetric | null = null
   const db = getServiceClient()
   const isNudge = mode === 'nudge'
   // nudge 模式允许 text 为空；普通模式校验 1-1000 字
@@ -119,6 +123,9 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     await assertWithinDailyLimit('friend_message', userId)
   }
   const friend = await ensureFriendRow(userId)
+
+  // 校验、用量检查和朋友初始化可能混合读写，独立计入 setup。
+  timer.mark('setup')
 
   // 0. nudge 防重复：拉最近几则（含 meta），看最后一条 user 讯息之后有没有 nudge 讯息
   if (isNudge) {
@@ -134,6 +141,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
       if (row.meta?.nudge) return { reply: null, taskId: null, sharedEventId: null, nudged: true }
     }
   }
+  timer.mark('db.read')
 
   // 1. 存用户讯息（nudge 模式不保存用户消息，阿澈主动开口）
   if (!isNudge) {
@@ -142,6 +150,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
       .insert({ user_id: userId, role: 'user', kind: 'chat', content: body.text, meta: {} })
     if (uErr) throw new FriendChatError(`保存讯息失败：${uErr.message}`)
   }
+  timer.mark('db.write')
 
   // 2. 组上下文
   const lifeState = friend.life_state ?? getLifeUpdate(friend.story_stage)
@@ -160,6 +169,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   const memoriesText = await listMemories(userId)
     .then((rows) => rows.slice(0, 12).map((m) => `- ${m.content}`).join('\n') || '（还没有长期记忆）')
     .catch(() => '（还没有长期记忆）')
+  timer.mark('db.read')
 
   // 3. 呼叫 Prompt 1
   const system = renderFriendSystem({
@@ -175,11 +185,14 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     : recentText || body.text
   const reply = await llmJson({
     role: 'chat',
+    tag: 'friend.reply',
+    onMetric: (metric) => { replyMetric = metric },
     system,
     messages: [{ role: 'user', content: userContent }],
     temperature: 0.8,
     schema: friendReplySchema,
   })
+  timer.mark('llm')
 
   // 4. 存回复；shared_event_id 记入 ai_friends；nudge 讯息标 meta.nudge=true（防重复用）
   const { error: rErr } = await db
@@ -203,6 +216,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
       .eq('user_id', userId)
   }
 
+  timer.mark('db.write')
   // 5. task_intent → B 的 createTaskFromText + task_card 消息
   //    nudge 模式不处理 task_intent（LLM 可能误判，且 nudge 不该建任务）
   let taskId: string | null = null
@@ -226,12 +240,14 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   }
 
   // 7. 写日志
+  timer.mark('task')
   await writeLog({
     user_id: userId,
     agent: 'friend',
     action: '回应用户',
     reason: reply.shared_event_id ? `分享事件 ${reply.shared_event_id}` : '接住用户的话题',
-    detail: taskId ? { taskId } : undefined,
+    detail: { ...(taskId ? { taskId } : {}),
+      timing: { ...timer.spans(), totalMs: timer.totalMs() }, llm: replyMetric },
   })
 
   // 6. 背景（不等待）：A3 记忆撷取；A4 用户讯息数是 PROFILE_EXTRACT_EVERY 倍数时撷取档案。
