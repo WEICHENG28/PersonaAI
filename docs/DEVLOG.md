@@ -26,6 +26,14 @@
 
 ## 共用與決策
 
+### 2026-11-07｜P0-3 模型參數、token 與逾時預算｜AI 協助｜分支 opt/P0-3-model-params
+- **做了什麼**：新增 LLM_MODEL_PARAMS 精確名稱／最長前綴選擇與無效設定拒絕；chat／fast／reason token 上限 500／600／2000。阿澈主回覆 20s × 2，加退避最壞 40.8s；記憶與檔案擷取 25s × 2，最壞 50.8s。SDK JSON fallback 共用單次 timeout 預算。
+- **為什麼這樣做**：依 P0-1 探測，Qwen 使用 `thinking: {type: 'disabled'}`；不自動換模型或環境變數。未設 LLM_MODEL_PARAMS 時不新增平台特有參數。
+- **改了哪些檔案**：server/lib/llm/{env,client,index,metrics}.ts、server/lib/{config,timing}.ts、server/friend/{chat,memory,profile}.ts、tests/social/llm*.test.ts 與本紀錄。
+- **指標**：error 僅固定類別，保留最後一次失敗；成功重試不輸出 error。queueMs／totalMs 與 timer 各值在輸出時四捨五入，累積時保留精度。
+- **踩到的坑／注意事項**：worstCaseMs 僅計 LLM 執行與退避，不含現有共用佇列、DB／任務建立／多項背景工作的總時間；真正分道與更完整請求預算屬 P0-4。既有其他呼叫仍保留原重試次數。未呼叫真實模型、不讀 .env.local、不寫 Supabase、不安裝套件。
+- **還沒做完／待辦**：使用者依 P0-1 設定 LLM_MODEL_PARAMS（Qwen3.8-Max／Qwen3.8-Flash 的 thinking.type=disabled）；真實平台及部署驗證由使用者執行。保留 Draft PR，等待人工審查；測試結果見 PR。
+
 ### 2026-11-07｜P0-2 LLM 計時與用量指標｜AI 協助｜分支 opt/P0-2-llm-metrics
 - **做了什麼**：SDK client 保留 content 與 usage，`LlmClient.chat` 同時相容舊字串與新物件回傳。`llmText`／`llmJson`／`embed` 每次邏輯呼叫輸出一筆 `llm_metric`，包含模型、tag、成功／失敗、嘗試次數、累計排隊時間、總耗時與已回報的 token 用量。新增 `setLlmMetricSink` 及每次呼叫的 `onMetric`；預設輸出 JSON console，`LLM_METRICS_LOG=0` 關閉預設輸出，顯式收集器仍可使用。
 - **為什麼這樣做**：先保留舊平台的延遲與用量基準，再進行參數、預算、分道及平台切換。原本的重試次數、順序、JSON fallback、並行上限與回傳資料維持相容；token 用量累加各次已回傳回應的 usage，未回報時為 null。觀察者失敗只印固定警告，不更改模型結果或觸發重試；metric 不含 prompt、對話原文、用戶識別或原始平台錯誤。
@@ -33,7 +41,7 @@
 - **改了哪些檔案**：新增 `server/lib/llm/metrics.ts`、`server/lib/timing.ts`；修改 `server/lib/llm/{client,index}.ts`、`server/friend/chat.ts`；擴充 `tests/social/llm.test.ts`、新增 `tests/social/llm-metrics.test.ts`、擴充 `tests/friend/chat.test.ts`，以及本紀錄。公開選項只新增 optional tag／onMetric，沒有修改 server/contracts 或資料表。
 - **驗證**：先觀察缺少 metrics／normalizeChatResult、SDK usage 回傳型態與阿澈日誌缺欄位的失敗，再轉綠。獨立審查指出 embedding 遺漏 prompt usage、訊息寫入時間誤算進 db.read，另以 4 項 RED→GREEN 測試修正：保留 SDK 用量（含 0）、維度失敗仍記用量、可控時鐘驗證訊息 INSERT 與初始化歸類。43 項目標測試通過，另含重試耗盡、schema 重試用量加總、確定的排隊時間、觀察者隔離、日誌開關與 timer；完整測試及建置結果見 PR。
 - **踩到的坑／注意事項**：P0-2 尚無串流與分道，因此 `stream=false`、`ttftMs=null`、`lane=fg`；P0-4 再加入真正的 fg/bg 管理。本次只在計畫列出的 friendChat 呼叫端接 `friend.reply`，其餘使用 llm.text／llm.json／llm.embed 預設 tag，其他具名 tag 待對應呼叫端任務接入。metric 的 attempts 是上層封裝嘗試次數，不另計 SDK 內部 json_object 400 fallback。`LlmClient.embed` 擴為向量或含用量物件，保留原本向量 mock；對外 embed() 仍回傳向量，completionTokens 為 null。平台強制終止的呼叫可能來不及送出最後一筆 metric，部署後須搭配 timeout 紀錄解讀。
-- **還沒做完／待辦**：部署後由使用者在 Vercel Logs 以 llm_metric 篩選，量測舊平台阿澈 p50／p95 並補 DEVLOG，必須在 P0-5 切平台前完成。本次沒有呼叫真實模型或寫入共用 Supabase，未修改環境變數或新增套件；只做 P0-2，未開始 P0-3／P0-4。
+- **還沒做完／待辦**：舊平台金鑰失效，跳過；基準改用換到學校平台後第一次量到的數字（Jerry 決定）。本次沒有呼叫真實模型或寫入共用 Supabase，未修改環境變數或新增套件；只做 P0-2，未開始 P0-3／P0-4。
 
 ### 2026-11-07｜學校平台（llmapi.paratera.com）探測結果（P0-1 實跑）｜Jerry（Claude 協助）
 - **怎麼量**：`scripts/llm-probe.ts`，從 Jerry 的電腦連平台。第一輪 13 個聊天模型＋2 個 embedding，每組 3 次、一次一個請求（357 個請求）；第二輪挑 5 個候選，每組 2 次、同時 12 個請求（92 個請求）。提示詞是一句打招呼，只適合比較模型之間的快慢；實際 prompt 有幾千字，首字時間會更長。後端搬到巴黎（X-3）後，每次呼叫約再多 0.25s 網路延遲。

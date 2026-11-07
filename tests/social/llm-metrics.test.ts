@@ -164,3 +164,58 @@ describe('phase timer', () => {
     expect(timer.totalMs()).toBe(35)
   })
 })
+
+it('uses the last failure category and rounds elapsed milliseconds', async () => {
+  let now = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => now)
+  const chat = vi.fn().mockRejectedValueOnce(Object.assign(new Error('private'), { status: 401 }))
+    .mockImplementation(async () => { now = 2.6; throw Object.assign(new Error('private'), { status: 429 }) })
+  setLlmClient({ chat, embed: async () => [] })
+  await expect(llmText({ ...opts, maxAttempts: 2 })).rejects.toThrow()
+  expect(metrics[0]).toMatchObject({ error: 'http_429', totalMs: 3, queueMs: 0 })
+})
+it('rounds timer spans after accumulation', () => {
+  let now = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => now)
+  const timer = startTimer()
+  now = 0.6; timer.mark('db')
+  now = 1.2; timer.mark('db')
+  expect(timer.spans()).toEqual({ db: 1 })
+  expect(timer.totalMs()).toBe(1)
+})
+it('passes model parameters and per-role token and timeout defaults to the client', async () => {
+  vi.stubEnv('LLM_MODEL_PARAMS', '{"chat-model":{"thinking":{"type":"disabled"}}}')
+  const chat = vi.fn(async () => 'ok')
+  setLlmClient({ chat, embed: async () => [] })
+  await llmText(opts)
+  expect(chat).toHaveBeenCalledWith(expect.objectContaining({ maxTokens: 500, timeoutMs: 20000,
+    extraBody: { thinking: { type: 'disabled' } } }))
+})
+
+it.each([
+  [{ status: 401 }, 'http_401'], [{ status: 403 }, 'http_403'], [{ status: 429 }, 'http_429'],
+  [{ status: 400 }, 'http_4xx'], [{ status: 503 }, 'http_5xx'],
+  [{ name: 'APIConnectionTimeoutError' }, 'timeout'], [{ name: 'APIConnectionError' }, 'network'],
+  [{ message: 'secret' }, 'unknown'],
+])('classifies provider failure %j as %s', async (error, category) => {
+  setLlmClient({ chat: async () => { throw error }, embed: async () => [] })
+  await expect(llmText({ ...opts, maxAttempts: 1 })).rejects.toThrow()
+  expect(metrics[0]?.error).toBe(category)
+})
+it.each([['', 'empty'], ['not json', 'schema']])('classifies output failure %j', async (content, category) => {
+  setLlmClient({ chat: async () => content, embed: async () => [1] })
+  await expect(llmJson({ ...opts, maxAttempts: 1, schema: z.object({ name: z.string() }) })).rejects.toThrow()
+  expect(metrics[0]?.error).toBe(category)
+  await expect(embed('test')).rejects.toThrow()
+  expect(metrics[1]?.error).toBe('dimension')
+})
+
+it('classifies actual SDK timeout and network errors', async () => {
+  const OpenAI = (await import('openai')).default
+  for (const [error, category] of [[new OpenAI.APIConnectionTimeoutError(), 'timeout'],
+    [new OpenAI.APIConnectionError({}), 'network']] as const) {
+    setLlmClient({ chat: async () => { throw error }, embed: async () => [] })
+    await expect(llmText({ ...opts, maxAttempts: 1 })).rejects.toThrow()
+    expect(metrics.at(-1)?.error).toBe(category)
+  }
+})

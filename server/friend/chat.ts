@@ -186,6 +186,8 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   const reply = await llmJson({
     role: 'chat',
     tag: 'friend.reply',
+    timeoutMs: CONFIG.LLM_FG_TIMEOUT_MS,
+    maxAttempts: CONFIG.LLM_FG_MAX_RETRIES + 1,
     onMetric: (metric) => { replyMetric = metric },
     system,
     messages: [{ role: 'user', content: userContent }],

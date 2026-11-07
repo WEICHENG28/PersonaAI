@@ -16,6 +16,10 @@ export const CONFIG = {
   LOGIN_LOCK_MINUTES: 15,          // 鎖幾分鐘
   LLM_MAX_RETRIES: 2,
   LLM_TIMEOUT_MS: 30000,
+  LLM_MAX_TOKENS: { chat: 500, fast: 600, reason: 2000 },
+  LLM_FG_TIMEOUT_MS: 20000,
+  LLM_FG_MAX_RETRIES: 1,
+  LLM_BG_TIMEOUT_MS: 25000,
   TOOL_MAX_RETRIES: 1,
   TASK_MAX_FAILS: 3,               // 連續失敗幾次就暫停任務
   FRIEND_HISTORY_LIMIT: 20,        // AI 朋友聊天帶入幾則歷史訊息
