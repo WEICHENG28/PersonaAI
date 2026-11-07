@@ -15,6 +15,9 @@ export interface ProbeOptions {
   concurrency: number
 }
 
+const MAX_TOKENS = 1024
+const REASONING_EXHAUSTED = '思考用完 max_tokens，未输出正文'
+
 const HELP = `用法：npx tsx scripts/llm-probe.ts --models a,b [--embed e,f] [--runs 3] [--concurrency 3]
 --help          只显示帮助，不读取 .env.local，不调用 API
 --models        聊天模型列表，逗号分隔
@@ -22,7 +25,7 @@ const HELP = `用法：npx tsx scripts/llm-probe.ts --models a,b [--embed e,f] [
 --runs          每组重复次数（1–100，默认 3）
 --concurrency   同时执行的请求数（1–32，默认 3）
 每个聊天模型 × 3 个变体 × runs 执行普通非串流、串流和 JSON 检查（共 9 × runs 个请求）。
-每个 embedding 模型执行 runs 个请求。超时 30 秒，关闭自动重试；输出最多 256 tokens。
+每个 embedding 模型执行 runs 个请求。超时 30 秒，关闭自动重试；输出最多 ${MAX_TOKENS} tokens。
 所有请求共享并发上限；不保存模型正文，只保存指标和已脱敏错误。
 结果写入 .local/eval/probe-yyyyMMdd-HHmm.md。同一分钟重复运行会覆盖报告。
 请由使用者手动配置 LLM_BASE_URL、LLM_API_KEY 后运行；会消耗平台额度。`
@@ -74,13 +77,13 @@ async function readStream(client: OpenAI, job: Job, row: ProbeResult, start: num
   const options = requestOptions()
   const stream = await client.chat.completions.create({
     model: job.model, messages: [{ role: 'user', content: '请用一句简短的中文打招呼。' }],
-    ...THINKING_VARIANTS[job.variant], max_tokens: 256,
+    ...THINKING_VARIANTS[job.variant], max_tokens: MAX_TOKENS,
     stream: true, stream_options: { include_usage: true },
   }, options)
+  row.responseReceived = true
   let visible = false
-  let finished = false
   for await (const chunk of stream) {
-    if (chunk.choices[0]?.finish_reason) finished = true
+    if (chunk.choices[0]?.finish_reason) row.finishReason = chunk.choices[0].finish_reason
     const delta = chunk.choices[0]?.delta as (Reasoning & { content?: string | null }) | undefined
     row.reasoningChars += delta?.reasoning_content?.length ?? 0
     if (delta?.content?.length && row.ttftMs === null) row.ttftMs = now() - start
@@ -88,20 +91,26 @@ async function readStream(client: OpenAI, job: Job, row: ProbeResult, start: num
     row.completionTokens = chunk.usage?.completion_tokens ?? row.completionTokens
   }
   options.signal.throwIfAborted()
-  if (!visible) throw new Error('串流没有返回正文')
-  if (!finished) throw new Error('串流在完成标记之前结束')
+  if (!visible) throw new Error(row.finishReason === 'length' ? REASONING_EXHAUSTED : '串流没有返回正文')
+  if (!row.finishReason) throw new Error('串流在完成标记之前结束')
 }
 
 async function readNonstream(client: OpenAI, job: Job, row: ProbeResult) {
   const response = await client.chat.completions.create({
     model: job.model, messages: [{ role: 'user', content: job.json
       ? '请只输出一个 JSON 对象：{"ok":true}。' : '请用一句简短的中文打招呼。' }],
-    ...THINKING_VARIANTS[job.variant], max_tokens: 256, stream: false,
+    ...THINKING_VARIANTS[job.variant], max_tokens: MAX_TOKENS, stream: false,
     ...(job.json ? { response_format: { type: 'json_object' as const } } : {}),
   }, requestOptions())
+  row.responseReceived = true
+  row.finishReason = response.choices[0]?.finish_reason ?? null
   const message = response.choices[0]?.message
   row.completionTokens = response.usage?.completion_tokens ?? null
   row.reasoningChars = (message as (Reasoning | undefined))?.reasoning_content?.length ?? 0
+  if (!message?.content?.trim() && row.finishReason === 'length') {
+    if (job.json) row.jsonObject = 'invalid'
+    throw new Error(REASONING_EXHAUSTED)
+  }
   if (job.json) {
     let value: unknown
     try { value = JSON.parse(message?.content ?? '') } catch { /* 统一记为 invalid，不保存原文 */ }
@@ -118,7 +127,7 @@ async function measure(client: OpenAI, job: Job, secrets: string[], now: () => n
   const row: ProbeResult = {
     model: job.model, mode: job.mode, variant: job.variant, ok: false,
     ttftMs: null, totalMs: 0, completionTokens: null, reasoningChars: 0,
-    jsonObject: 'skipped',
+    jsonObject: 'skipped', finishReason: null, responseReceived: false,
     requestKind: job.mode === 'embed' ? 'embed' : job.json ? 'json_object' : 'text',
   }
   try {
@@ -126,6 +135,7 @@ async function measure(client: OpenAI, job: Job, secrets: string[], now: () => n
       const response = await client.embeddings.create({
         model: job.model, input: '这是平台向量维度探测。', dimensions: 1024, encoding_format: 'float',
       }, requestOptions())
+      row.responseReceived = true
       const vector = response.data[0]?.embedding
       if (!Array.isArray(vector) || !vector.length || !vector.every(Number.isFinite)) {
         throw new Error('embedding 未返回有效向量')
@@ -204,6 +214,10 @@ export async function main(args = process.argv.slice(2), deps: MainDeps = {}): P
     const name = `probe-${reportStamp(new Date())}.md`
     await writeFile(join(directory, name), report, { encoding: 'utf-8' })
     print(`报告已保存：.local/eval/${name}`)
+    if (rows.length && rows.every(row => !row.ok)) {
+      process.exitCode = 1
+      print('全部请求失败，请检查报告中的错误')
+    }
   } catch (error) {
     throw new Error(redactError(error instanceof Error ? error.message : String(error), secrets))
   }

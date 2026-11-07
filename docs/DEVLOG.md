@@ -344,10 +344,10 @@
 
 ### 2026-11-07｜P0-1 LLM 平台探測腳本｜Peter（AI 協助）｜分支 opt/P0-1-llm-probe
 - **做了什麼**：新增獨立 CLI，對每個聊天模型的 default／Qwen 關 thinking／GLM 關 thinking 三種變體重複量測普通非串流、串流與 json_object；embedding 請求 1024 維並記錄實際長度。Markdown 報告依模型、模式與變體彙整 TTFT、總延遲、成功率、錯誤率、reasoning 字數、tokens 與維度。
-- **為什麼這樣做**：先建立可重複、可比較的模型能力基準，再由使用者實測選平台。JSON 能力檢查為獨立請求，透過額外的 `requestKind` 標記，不混入普通文本的成功率、延遲、reasoning 或 tokens；所有請求共享有界並行池，SDK 與每次請求都關閉自動重試，避免掩蓋平台錯誤率及增加額度消耗。每次請求含串流總時間限制 30 秒、輸出最多 256 tokens。
+- **為什麼這樣做**：先建立可重複、可比較的模型能力基準，再由使用者實測選平台。JSON 能力檢查為獨立請求，透過額外的 `requestKind` 標記，不混入普通文本的成功率、延遲或 completion tokens；reasoning p50 依審查要求統計所有有回應的請求（包含失敗及 JSON 檢查），用 `responseReceived` 區分模型回應與純傳輸失敗，避免漏掉只輸出思考的模型。所有請求共享有界並行池，SDK 與每次請求都關閉自動重試；總時間限制維持 30 秒，輸出上限改為共用常數 1024 tokens，HELP 同步。
 - **改了哪些檔案**：`scripts/llm-probe.ts`、`scripts/probe/lib.ts`、`tests/social/llm-probe.test.ts`、本紀錄。
-- **驗證**：先觀察缺模組與 JSON 錯誤分類的失敗測試，再實作；18 項 mock 測試覆蓋百分位數、三種變體、並行上限、TTFT、串流中斷、JSON 拒絕／無效、實際 embedding 維度、錯誤脫敏及報告檔案；`--help` 在讀設定或建立 client 之前返回。獨立唯讀審查後，補上失敗測試並修正 SDK 日誌繞過脫敏、部分正文後 abort／缺少完成標記誤算成功、JSON 與普通文本成功率混算。完整測試與型別檢查結果見 PR。
-- **踩到的坑／注意事項**：JSON 請求的 HTTP 400 記 rejected；成功回應的非物件 JSON 記 invalid；連線或其他 HTTP 失敗記 skipped 並保留脫敏錯誤。未回傳 usage 時 tokens 為空，不用 0 偽裝量測值。報告不保存模型正文；錯誤先移除已知 key／URL，整份報告再脫敏一次；固定 `logLevel: 'off'`，避免 `OPENAI_LOG` 導致 SDK 自行輸出端點。SDK 可能吞下串流 abort，所以迭代結束後另檢查 signal 及 finish_reason。同一分鐘重跑會覆蓋同名報告。沒有 P0-1 Issue，因此 PR 不填假的 Closes 編號。
+- **驗證**：先觀察缺模組與 JSON 錯誤分類的失敗測試，再實作；21 項 mock 測試覆蓋百分位數、三種變體、並行上限、TTFT、串流中斷、JSON 拒絕／無效、實際 embedding 維度、錯誤脫敏及報告檔案；`--help` 在讀設定或建立 client 之前返回。獨立唯讀審查後修正 SDK 日誌、串流 abort 及統計問題；本次使用者審查修正另先觀察 5 項失敗再轉綠，驗證 1024-token 請求與 HELP、串流及非串流 length 無正文時保留思考字數和最後完成原因、報告截斷數、失敗回應的 reasoning p50、全部失敗仍寫報告且 exitCode 為 1。空串流成功回應也納入 reasoning 分母，另有 RED→GREEN 回歸案例。完整測試與型別檢查結果見 PR。
+- **踩到的坑／注意事項**：新增 `finishReason` 記錄完成原因；串流保留最後一個非空值。`length` 且無正文時固定錯誤為「思考用完 max_tokens，未输出正文」，失敗仍保留 reasoningChars，報告新增 length 截斷數。全部請求失敗時，先寫完報告，再設 exitCode=1 並印「全部请求失败，请检查报告中的错误」。JSON 的 HTTP 400 記 rejected，非物件 JSON 記 invalid，傳輸失敗記 skipped。未回傳 usage 時 tokens 為空。報告不保存模型正文；錯誤與整份報告脫敏，固定 SDK `logLevel: 'off'`，串流結束後檢查 signal 及完成原因。同一分鐘重跑會覆蓋同名報告。沒有 P0-1 Issue，因此 PR 不填假的 Closes 編號。
 - **還沒做完／待辦**：依計畫，真實平台量測交給使用者：設定 `.env.local` 的 `LLM_BASE_URL`、`LLM_API_KEY`，執行計畫 P0-1 的模型清單指令，再把摘要補到「共用與決策」。本次未讀取或修改 `.env.local`、未呼叫真實模型、未寫入 Supabase；平台相容性、實際速度與 embedding 是否為 1024 維尚未實測。
 
 ### 2026-11-07｜中國大陸可用：字型不擋畫面、Rive 執行檔自帶、香港主機部署工具｜Peter（AI 協助）

@@ -15,6 +15,8 @@ export interface ProbeResult {
   totalMs: number
   completionTokens: number | null
   reasoningChars: number
+  finishReason: string | null
+  responseReceived?: boolean
   jsonObject: 'ok' | 'rejected' | 'invalid' | 'skipped'
   requestKind?: 'text' | 'json_object' | 'embed'
   embedDim?: number
@@ -50,6 +52,8 @@ function summarizeGroup(rows: ProbeResult[]): string {
   const checks = rows.filter(isJson)
   const samples = rows.filter(r => !isJson(r))
   const ok = samples.filter(r => r.ok)
+  const responded = rows.filter(r => r.responseReceived ?? (r.ok || r.finishReason !== null ||
+    r.reasoningChars > 0 || r.ttftMs !== null || r.completionTokens !== null))
   const json = ['ok', 'rejected', 'invalid', 'skipped'].map(
     status => `${status}:${checks.filter(r => r.jsonObject === status).length}`,
   ).join(', ')
@@ -58,8 +62,9 @@ function summarizeGroup(rows: ProbeResult[]): string {
   return `| ${cell(first.model)} | ${first.mode} | ${first.variant} | ` +
     `${number(percentile(ok.flatMap(r => r.ttftMs === null ? [] : [r.ttftMs]), 50))} | ` +
     `${number(percentile(ok.map(r => r.totalMs), 50))} | ${success} | ${json} | ` +
-    `${number(percentile(ok.map(r => r.reasoningChars), 50))} | ` +
-    `${number(percentile(ok.flatMap(r => r.completionTokens === null ? [] : [r.completionTokens]), 50))} | ${dims} |`
+    `${number(percentile(responded.map(r => r.reasoningChars), 50))} | ` +
+    `${number(percentile(ok.flatMap(r => r.completionTokens === null ? [] : [r.completionTokens]), 50))} | ${dims} | ` +
+    `${rows.filter(r => r.finishReason === 'length').length} |`
 }
 
 export function summarizeProbe(results: ProbeResult[]): string {
@@ -76,12 +81,12 @@ export function summarizeProbe(results: ProbeResult[]): string {
   return [
     '# LLM 平台探测报告', '',
     `请求数：${results.length}；失败：${failed}；错误率：${errorRate}%（含 JSON 格式验证失败）。`,
-    '表内成功率仅统计普通文本/embedding 请求；延迟、reasoning、tokens 仅统计其中成功的请求。',
-    'JSON 能力检查单独计数（skipped 为传输或其他 HTTP 失败），不混入普通文本指标；总错误率涵盖所有请求。',
+    '表内成功率仅统计普通文本/embedding 请求；延迟、completion tokens 仅统计其中成功的请求。',
+    'JSON 能力检查单独计数（skipped 为传输或其他 HTTP 失败），不混入普通文本成功率、延迟及 tokens；总错误率涵盖所有请求。',
     'TTFT 为第一个非空正文 delta（不含 reasoning）；无正文或无 usage 时记为 —。',
-    'reasoning 字数和 completion tokens 均为成功请求的 p50；不保存模型输出。', '',
-    '| 模型 | 模式 | 变体 | p50 TTFT (ms) | p50 总时间 (ms) | 成功率 | json_object | p50 reasoning 字数 | p50 completion tokens | embedding 维度 |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    'p50 reasoning 字数统计所有有响应的请求（含失败及 JSON 检查）；length 截断数统计该组所有请求。不保存模型输出。', '',
+    '| 模型 | 模式 | 变体 | p50 TTFT (ms) | p50 总时间 (ms) | 成功率 | json_object | p50 reasoning 字数 | p50 completion tokens | embedding 维度 | length 截断数 |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
     ...[...groups.values()].map(summarizeGroup), '',
     ...(errors.length ? ['## 已脱敏错误', '', ...errors, ''] : []),
   ].join('\n')

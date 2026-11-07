@@ -9,7 +9,7 @@ import { percentile, redactError, summarizeProbe, type ProbeResult } from '../..
 const result = (extra: Partial<ProbeResult> = {}): ProbeResult => ({
   model: 'Qwen3.8-Flash', mode: 'stream', variant: 'qwen_no_think', ok: true,
   ttftMs: 100, totalMs: 200, completionTokens: 12, reasoningChars: 4,
-  jsonObject: 'skipped', ...extra,
+  jsonObject: 'skipped', finishReason: null, ...extra,
 })
 
 const options = { models: ['Qwen3.8-Flash'], embeds: ['GLM-Embedding-3'], runs: 1, concurrency: 3 }
@@ -64,6 +64,7 @@ describe('probe CLI and mocked platform', () => {
     expect(loadEnv).not.toHaveBeenCalled()
     expect(createClient).not.toHaveBeenCalled()
     expect(print.mock.calls.flat().join(' ')).toContain('--concurrency')
+    expect(print.mock.calls.flat().join(' ')).toContain('1024 tokens')
   })
 
   it('measures all variants, separates JSON checks, and records actual embedding dimensions', async () => {
@@ -83,6 +84,8 @@ describe('probe CLI and mocked platform', () => {
       expect.objectContaining({ stream: true, stream_options: { include_usage: true } }),
     ]))
     expect(fake.calls.filter(c => !('enable_thinking' in c) && !('thinking' in c))).toHaveLength(3)
+    expect(fake.calls.every(c => c.max_tokens === 1024)).toBe(true)
+    expect(rows.filter(r => r.mode !== 'embed').every(r => r.finishReason === 'stop')).toBe(true)
   })
 
   it.each(['not JSON', '[]', 'null'])('marks non-object JSON output invalid: %s', async text => {
@@ -179,6 +182,7 @@ describe('probe CLI and mocked platform', () => {
   })
 
   it('writes a scrubbed report with SDK retries disabled', async () => {
+    const exitCode = process.exitCode
     const cwd = await mkdtemp(join(tmpdir(), 'persona-probe-'))
     try {
       const fake = mockClient()
@@ -198,9 +202,56 @@ describe('probe CLI and mocked platform', () => {
       const report = await readFile(join(cwd, '.local/eval', names[0]!), 'utf-8')
       expect(report).not.toMatch(/secret123|http|private\.invalid/)
       expect(print.mock.calls.flat().join(' ')).not.toMatch(/secret123|http|private\.invalid/)
+      expect(process.exitCode).toBe(1)
+      expect(print).toHaveBeenCalledWith('全部请求失败，请检查报告中的错误')
     } finally {
+      process.exitCode = exitCode
       await rm(cwd, { recursive: true, force: true })
     }
+  })
+
+  it('preserves reasoning and final nonempty finish reason for length failures in every chat mode', async () => {
+    const fake = mockClient()
+    fake.chat.mockImplementation(async body => {
+      if (body.stream) return (async function* () {
+        yield { choices: [{ delta: { reasoning_content: '思考内容' }, finish_reason: null }] }
+        yield { choices: [{ delta: {}, finish_reason: 'length' }] }
+        yield { choices: [{ delta: {}, finish_reason: '' }] }
+        yield { choices: [], usage: { completion_tokens: 1024 } }
+      })()
+      const reply = response('')
+      return { ...reply, choices: [{ ...reply.choices[0], finish_reason: 'length',
+        message: { role: 'assistant', content: null, reasoning_content: '思考内容' } }] }
+    })
+    const rows = await runProbe({ ...options, embeds: [] }, fake.client)
+    expect(rows).toHaveLength(9)
+    expect(rows.every(r => !r.ok && r.finishReason === 'length' && r.reasoningChars === 4 &&
+      r.error === '思考用完 max_tokens，未输出正文')).toBe(true)
+    const report = summarizeProbe([rows[0]!])
+    expect(report).toContain('length 截断数')
+    const cells = report.split('\n').find(line => line.startsWith('| Qwen3.8-Flash |'))!
+      .split('|').map(cell => cell.trim())
+    expect(cells[8]).toBe('4')
+    expect(cells.at(-2)).toBe('1')
+  })
+
+  it('counts an empty stream response in reasoning p50 even when no chunks are emitted', async () => {
+    const fake = mockClient()
+    let streamCount = 0
+    fake.chat.mockImplementation(async body => {
+      if (!body.stream) return response('{"ok":true}')
+      const empty = streamCount++ === 0
+      return (async function* () {
+        if (!empty) yield { choices: [{ delta: { reasoning_content: '思考内容' }, finish_reason: 'length' }] }
+      })()
+    })
+    const rows = (await runProbe({ ...options, embeds: [], concurrency: 1 }, fake.client))
+      .filter(row => row.mode === 'stream').slice(0, 2)
+      .map(row => ({ ...row, variant: 'default' as const }))
+    const report = summarizeProbe(rows)
+    const cells = report.split('\n').find(line => line.startsWith('| Qwen3.8-Flash |'))!
+      .split('|').map(cell => cell.trim())
+    expect(cells[8]).toBe('2')
   })
 })
 
@@ -238,17 +289,31 @@ describe('probe statistics and report safety', () => {
     expect(report).not.toContain('http')
   })
 
-  it('keeps text success, reasoning and usage independent from JSON capability failures', () => {
+  it('keeps text success and usage independent from JSON capability failures', () => {
     const report = summarizeProbe([
       result({ mode: 'nonstream', requestKind: 'text', ttftMs: null, totalMs: 200,
         reasoningChars: 4, completionTokens: 12 }),
       result({ mode: 'nonstream', requestKind: 'json_object', ok: false, jsonObject: 'rejected',
-        totalMs: 9999, reasoningChars: 999, completionTokens: 999 }),
+        totalMs: 9999, reasoningChars: 0, completionTokens: null, responseReceived: false }),
       result({ mode: 'nonstream', requestKind: 'json_object', ok: false, jsonObject: 'skipped',
-        totalMs: 9999, reasoningChars: 999, completionTokens: 999 }),
+        totalMs: 9999, reasoningChars: 0, completionTokens: null, responseReceived: false }),
     ])
     expect(report).toContain('| Qwen3.8-Flash | nonstream | qwen_no_think | — | 200 | 1/1 (100.0%) |')
     expect(report).toContain('ok:0, rejected:1, invalid:0, skipped:1 | 4 | 12 |')
     expect(report).toContain('错误率：66.7%')
+  })
+
+  it('includes failed text and JSON responses in reasoning p50 but excludes failures without a response', () => {
+    const report = summarizeProbe([
+      result({ mode: 'nonstream', requestKind: 'text', finishReason: 'stop', reasoningChars: 4 }),
+      result({ mode: 'nonstream', requestKind: 'text', ok: false, finishReason: 'length', reasoningChars: 12 }),
+      result({ mode: 'nonstream', requestKind: 'json_object', ok: false, jsonObject: 'invalid',
+        finishReason: 'length', reasoningChars: 20 }),
+      result({ mode: 'nonstream', ok: false, reasoningChars: 0, ttftMs: null, completionTokens: null }),
+    ])
+    const cells = report.split('\n').find(line => line.startsWith('| Qwen3.8-Flash |'))!
+      .split('|').map(cell => cell.trim())
+    expect(cells[8]).toBe('12')
+    expect(cells.at(-2)).toBe('2')
   })
 })
