@@ -143,15 +143,15 @@ export async function llmJson<T>(opts: LlmJsonOptions<T>): Promise<T> {
   })
 }
 
-export async function embed(text: string): Promise<number[]> {
-  return withLlmMetric({ role: 'embed', tag: 'llm.embed' }, async metric => {
+export async function embed(text: string, lane: Lane = 'fg'): Promise<number[]> {
+  return withLlmMetric({ role: 'embed', tag: 'llm.embed', lane }, async metric => {
     const env = llmEnv()
     metric.model = env.MODEL_EMBED
     let reason = ''
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       metric.attempts = attempt
       try {
-        const result = await limited(() => getLlmClient().embed({ model: env.MODEL_EMBED, input: text, dimensions: env.EMBEDDING_DIM }), metric)
+        const result = await limited(() => getLlmClient().embed({ model: env.MODEL_EMBED, input: text, dimensions: env.EMBEDDING_DIM }), metric, lane)
         const { vector: vec, usage } = Array.isArray(result) ? { vector: result } : result
         if (usage?.promptTokens != null) metric.promptTokens = (metric.promptTokens ?? 0) + usage.promptTokens
         if (vec.length === env.EMBEDDING_DIM) return vec

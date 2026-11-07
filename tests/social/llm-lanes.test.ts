@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { llmText, llmJson, llmTuning, setLlmClient, setLlmMetricSink, type LlmMetric } from '../../server/lib/llm/index.js'
+import { llmText, llmJson, embed, llmTuning, setLlmClient, setLlmMetricSink, type LlmMetric } from '../../server/lib/llm/index.js'
 import { z } from 'zod'
 const opts = { role: 'chat' as const, system: '测试', messages: [] }
 beforeEach(() => {
@@ -61,4 +61,19 @@ it('releases both global and background slots after a rejected request', async (
   reject(new Error('failed'))
   await failed; await expect(next).resolves.toBe('ok')
   expect(chat).toHaveBeenCalledTimes(2)
+})
+
+it('embeddings use background capacity and emit actual lane, defaulting to fg', async () => {
+  const metrics: LlmMetric[] = []; setLlmMetricSink(m => metrics.push(m))
+  let release!: () => void
+  const starts: string[] = []
+  setLlmClient({ chat: async () => 'ok', embed: req => new Promise<number[]>(resolve => {
+    starts.push(req.input); release = () => resolve([1, 2, 3, 4])
+  }) })
+  const a = embed('a', 'bg'); const b = embed('b', 'bg')
+  expect(starts).toEqual(['a']); release(); await a
+  await vi.waitFor(() => expect(starts).toEqual(['a', 'b']))
+  release(); await b
+  const c = embed('c'); release(); await c
+  expect(metrics.map(m => m.lane)).toEqual(['bg', 'bg', 'fg'])
 })

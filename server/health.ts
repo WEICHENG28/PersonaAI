@@ -16,19 +16,35 @@ const REQUIRED = [
 
 export interface DeepHealth {
   env: Record<(typeof REQUIRED)[number], boolean>
-  /** 值的前後有引號或空白（常見的貼上錯誤） */
+  /** 值的前後有引號或空白，或模型参数不是有效对象（不返回实际值） */
   suspicious: string[]
-  database: 'ok' | 'missing_env' | string
-  llm: 'ok' | 'missing_env' | string
+  database?: 'ok' | 'missing_env' | string
+  llm?: 'ok' | 'missing_env' | string
 }
 
-export async function deepHealth(): Promise<DeepHealth> {
+let cached: { expires: number; value: Promise<Pick<DeepHealth, 'database' | 'llm'>> } | null = null
+
+export async function deepHealth({ full }: { full: boolean }): Promise<DeepHealth> {
   const env = Object.fromEntries(REQUIRED.map((k) => [k, Boolean(process.env[k])])) as DeepHealth['env']
-  const suspicious = REQUIRED.filter((k) => {
+  const suspicious: string[] = REQUIRED.filter((k) => {
     const v = process.env[k]
     return v !== undefined && (v !== v.trim() || /^["']|["']$/.test(v))
   })
-  return { env, suspicious, database: await checkDatabase(), llm: await checkLlm() }
+  const params = process.env.LLM_MODEL_PARAMS
+  if (params) {
+    try {
+      const parsed: unknown = JSON.parse(params)
+      const object = (value: unknown): value is Record<string, unknown> =>
+        value !== null && typeof value === 'object' && !Array.isArray(value)
+      if (!object(parsed) || !Object.values(parsed).every(object)) suspicious.push('LLM_MODEL_PARAMS')
+    } catch { suspicious.push('LLM_MODEL_PARAMS') }
+  }
+  if (!full) return { env, suspicious }
+  if (!cached || Date.now() >= cached.expires) {
+    cached = { expires: Date.now() + 60000,
+      value: Promise.all([checkDatabase(), checkLlm()]).then(([database, llm]) => ({ database, llm })) }
+  }
+  return { env, suspicious, ...await cached.value }
 }
 
 async function checkDatabase(): Promise<string> {
@@ -38,9 +54,9 @@ async function checkDatabase(): Promise<string> {
   try {
     const db = createClient(url, key, { auth: { persistSession: false } })
     const { error } = await db.from('users').select('id', { count: 'exact', head: true })
-    return error ? `error: ${error.message.slice(0, 80)}` : 'ok'
-  } catch (err) {
-    return `error: ${String(err).slice(0, 80)}`
+    return error ? 'error: database' : 'ok'
+  } catch {
+    return 'error: connection'
   }
 }
 
@@ -50,9 +66,9 @@ async function checkLlm(): Promise<string> {
   const key = process.env.LLM_API_KEY
   if (!base || !key) return 'missing_env'
   try {
-    const res = await fetch(`${base.replace(/\/$/, '')}/models`, { headers: { Authorization: `Bearer ${key}` } })
+    const res = await fetch(`${base.replace(/\/$/, '')}/models`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(5000) })
     return res.ok ? 'ok' : `error: HTTP ${res.status}`
-  } catch (err) {
-    return `error: ${String(err).slice(0, 80)}`
+  } catch {
+    return 'error: connection'
   }
 }
