@@ -296,6 +296,14 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-11-07｜L-2 建任務改背景、前端輪詢任務卡｜AI 協助｜分支 opt/L-2-task-background
+- **做了什麼／為什麼**：抽出 createTaskCard，task_intent 且非 nudge 時交給 runInBackground；POST 先回 taskPending:true、taskId:null 與本回合 user／friend 兩則訊息，不等待社交任務解析。預期回覆約快 2 秒，任務卡約 2～4 秒後出現；這是待本機量測的預期，沒有真實平台延遲數據。
+- **失敗行為**：成功寫 task_card 後回 taskId；建任務或存卡失敗時寫日誌，插入 role:friend、kind:chat、meta:{task_failed:true}。已確認為給用戶看的 TaskError／UsageLimitError／BlockedContentError 沿用 message，其他固定顯示「刚刚没帮你把任务建好，你再说一次想找什么样的人？」；日誌或失敗訊息再次寫入失敗只 console.error，不 throw。
+- **前端**：用本回合阿澈回覆的伺服器 created_at 作 sinceIso，保留 PostgreSQL 微秒，每 2 秒 GET，最多 30 秒。忽略舊卡與單次 GET 失敗；找到卡片或 task_failed 後只按 id 合併，保留新訊息與樂觀送出；只有 task_card 設 pendingTaskId。多個輪詢共用已認領結果，避免兩個任務都收到同一張卡後提前停止；輪詢更新訊息版本，使晚到的初始化快照改走合併。卸載後停止後續 GET 並丟棄在途結果；輪詢期間不排 nudge，結束後恢復原規則。mock 模式沿用原流程。
+- **超時／限制**：30 秒超時靜默停止輪詢，不顯示錯誤、不替換聊天；背景任務仍可能完成，較晚的卡片會在下次載入聊天紀錄時顯示。使用現有 Vercel waitUntil，未改 B 線任務逾時／重試策略：任務 LLM 沿用預設 3 次 × 20 秒加 800／1600ms 退避，最壞約 62.4 秒，尚未計入前景回覆、排隊與 DB，仍可能超過部署 60 秒上限而中斷；本 PR 不保證慢模型時卡片一定完成。本次未部署或實際量測。
+- **改了哪些檔案**：server/friend/{chat,taskCard}.ts、src/features/friend/{FriendPage.tsx,chatState.ts,chatFailure.ts,chatInitialization.ts,useTaskCardPolling.ts}、tests/friend/{chat,nudge,chat-state,chat-failure,task-card,task-card-polling}.test.ts、本紀錄。共用 server/contracts/social.ts 僅補 TaskError／UsageLimitError re-export，讓 A 透過 B 契約辨識用戶可見錯誤；未改 server/social/task.ts、shared/types.ts、套件或環境檔。FriendPage 333 行，輪詢生命週期獨立在 hook。
+- **驗證／待辦**：先看到永久 pending 會卡住回覆、taskPending／onTaskPending／nudge 的失敗，再實作；fake timers 測第三次找到、超時、取消、單次失敗、在途 GET 卡住與卸載，並測成功／用戶錯誤／二次寫入失敗不 throw。獨立審查發現重疊任務重複認領、晚到初始化蓋卡兩項競態，均以 RED→GREEN 修正，並補微秒邊界測試。LLM／Supabase 全 mock；同步 main 後 npm test 895/895、前後端 tsc 與 npm run build 通過（仍有大型 bundle 警告）。真實延遲交 Claude 本機量測；回滾用 revert，停在本任務 Draft PR。
+
 ### 2026-11-07｜M-5 背景擷取保留已確認的對外檔案｜AI 協助｜分支 opt/M-5-keep-confirmed
 - **做了什麼**：extractProfile 新增 optional opts.force；非 force 且上一版 shareable_confirmed===true，只 update agent_profile／updated_at，不改 shareable_profile／shareable_confirmed／card／embedding，也不重新 embed。回傳上一版 shareable、confirmed:true、exists:true；日誌固定為「已确认的对外档案不自动覆盖，只更新说话风格」。
 - **為什麼這樣做**：避免用戶進大廳後，背景擷取因新資訊覆蓋已確認檔案、清卡片並撤回確認，讓人默默從大廳消失。force、未確認草稿與沒有上一版都沿用原流程。

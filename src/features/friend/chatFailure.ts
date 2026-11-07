@@ -11,11 +11,12 @@ export function reconcileChatFailure(
 }
 
 /** 每段沉默最多主动接话一次；送出失败时暂停，直到错误被清除。 */
-export function shouldScheduleNudge({ messages, httpError }: {
+export function shouldScheduleNudge({ messages, httpError, taskPending = false }: {
   messages: FriendMessage[]
   httpError: string | null
+  taskPending?: boolean
 }): boolean {
-  if (httpError !== null || messages[messages.length - 1]?.role !== 'friend') return false
+  if (taskPending || httpError !== null || messages[messages.length - 1]?.role !== 'friend') return false
   const lastUserIdx = messages.map(message => message.role).lastIndexOf('user')
   return !messages.slice(lastUserIdx + 1).some(message => message.meta?.nudge === true)
 }

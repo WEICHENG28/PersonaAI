@@ -16,6 +16,7 @@ import { useOnboardingGuide } from '@features/social/components/OnboardingGuide'
 import { shouldScheduleNudge } from './chatFailure'
 import { applyChatResult, mergeInitializedHistory, sendChatTurn } from './chatState'
 import { initializeFriendPage } from './chatInitialization'
+import { useTaskCardPolling } from './useTaskCardPolling'
 import {
   isHttpMode,
   callFriendIntro,
@@ -45,6 +46,12 @@ export function FriendPage() {
   const [httpError, setHttpError] = useState<string | null>(null)
   // http 模式：后端建的待确认任务 ID（显示 B 的 TaskConfirmCard）；工作日志面板开关用后端 dev_mode
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
+  const polledMessageVersion = useRef(0)
+  const mergeTaskMessages = useCallback((update: (prev: FriendMessage[]) => FriendMessage[]) => {
+    polledMessageVersion.current++
+    setHttpMessages(update)
+  }, [])
+  const { taskPending, onTaskPending } = useTaskCardPolling(mergeTaskMessages, setPendingTaskId)
   const [httpDevMode, setHttpDevMode] = useState(false)
   const [messagesLoaded, setMessagesLoaded] = useState(false)
   const sendSeq = useRef(0)
@@ -69,6 +76,7 @@ export function FriendPage() {
     void initializeFriendPage({
       callFriendIntro, deliverReports, getFriendMessages, fetchSettings,
       readSendSeq: () => sendSeq.current,
+      readMessageVersion: () => polledMessageVersion.current,
       isSending: () => sendInFlight.current,
       hasUnconfirmedSend: () => unconfirmedSend.current,
       isActive: () => active,
@@ -113,10 +121,11 @@ export function FriendPage() {
       readSendSeq: () => sendSeq.current, callFriendChat, getFriendMessages, setMessages: setHttpMessages,
       onConfirmed: () => { unconfirmedSend.current = false; setMessagesLoaded(true) },
       onTask: setPendingTaskId,
+      onTaskPending,
       onError: error => setHttpError(error instanceof Error ? error.message : '阿澈刚刚恍神了，再说一次？'),
       onSettled: () => { sendInFlight.current = false; setHttpTyping(false) },
     })
-  }, [draft, s])
+  }, [draft, s, onTaskPending])
 
 
   // Nudge：http 模式下，最后一则是 AI 消息 + 用户沉默 75s → 阿澈主动接话。
@@ -125,12 +134,12 @@ export function FriendPage() {
   // 分頁在背景（document.visibilityState !== 'visible'）时不发。
   // 后端也有同样的防重复挡（meta.nudge 检查），双保险。
   useEffect(() => {
-    if (!isHttpMode || !shouldScheduleNudge({ messages: httpMessages, httpError })) return
+    if (!isHttpMode || !shouldScheduleNudge({ messages: httpMessages, httpError, taskPending })) return
     // 分頁在背景不发（等回到前景、effect 重跑时再计时）
     if (document.visibilityState !== 'visible') return
     const timer = setTimeout(async () => {
       if (document.visibilityState !== 'visible') return // 触发瞬间再确认一次
-      if (sendInFlight.current || unconfirmedSend.current) return
+      if (sendInFlight.current || unconfirmedSend.current || taskPending) return
       const seq = ++sendSeq.current
       sendInFlight.current = true
       setHttpTyping(true)
@@ -148,7 +157,7 @@ export function FriendPage() {
     }, 75_000) // 75 秒（60–90s 范围内）
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [httpMessages, httpError])
+  }, [httpMessages, httpError, taskPending])
 
   // 任務卡先關掉（再想想／點旁邊）：任務留著等確認，用通知告訴用戶去哪裡找
   const taskLater = (taskId: string) => {
