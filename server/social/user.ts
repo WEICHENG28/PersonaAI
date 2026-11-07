@@ -3,6 +3,7 @@
 // 完全沒接資料庫（記憶體模式）時，用固定的 dev 用戶，方便本機開發與測試。
 import type { Context } from 'hono'
 import { isAuthFailure, requireAuth } from '../lib/auth.js'
+import { findAppUserId } from '../lib/appUser.js'
 import { getAdminDb } from './db.js'
 
 export const DEV_USER_ID = 'dev-user'
@@ -15,8 +16,7 @@ export async function requireUserId(c: Context): Promise<string | Response> {
   const authed = await requireAuth(c)
   if (isAuthFailure(authed)) return authed
 
-  const { data, error } = await db.from('users').select('id').eq('auth_id', authed.authId).maybeSingle()
-  if (error) throw error
-  if (!data) return c.json({ ok: false, error: '找不到你的用户资料，请重新进入一次' }, 403)
-  return data.id as string
+  const id = await findAppUserId(authed.authId)
+  if (!id) return c.json({ ok: false, error: '找不到你的用户资料，请重新进入一次' }, 403)
+  return id
 }

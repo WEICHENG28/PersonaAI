@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearAuthCaches } from '../../server/lib/authCache'
 
 // 假的 A0b 驗證與資料庫：只測「token → auth_id → users.id」這段對應
 const authMock = vi.hoisted(() => ({ result: null as unknown }))
@@ -10,8 +11,10 @@ vi.mock('../../server/lib/auth', () => ({
   isAuthFailure: (v: unknown) => v instanceof Response,
 }))
 vi.mock('../../server/social/db', () => ({ getAdminDb: () => dbMock.db }))
+vi.mock('../../server/lib/supabase', () => ({ getServiceClient: () => dbMock.db }))
 
 const { requireUserId, DEV_USER_ID } = await import('../../server/social/user')
+beforeEach(() => clearAuthCaches())
 
 function fakeDb(row: { id: string } | null) {
   const eq = vi.fn(() => ({ maybeSingle: async () => ({ data: row, error: null }) }))

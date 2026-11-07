@@ -3,6 +3,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { isAuthFailure, requireAuth } from '../lib/auth.js'
+import { findAppUserId } from '../lib/appUser.js'
 import { initUserProfile } from '../lib/profile.js'
 import { BlockedContentError, assertAllowed } from '../lib/moderation.js'
 import { UsageLimitError } from '../social/usage.js'
@@ -390,16 +391,10 @@ friendRoutes.put('/profile/fun/mbti', async (c) => {
     return c.json({ ok: false, error: err instanceof FunLabelsError ? err.message : '保存失败，请再试一次' }, 500)
   }
 })
-
 /** auth.users id → public.users id（profile/init 已保证有行）。 */
 async function appUserId(authed: { authId: string }): Promise<string> {
-  const { getServiceClient } = await import('../lib/supabase.js')
-  const db = getServiceClient()
-  const { data, error } = await db
-    .from('users')
-    .select('id')
-    .eq('auth_id', authed.authId)
-    .single()
-  if (error || !data) throw new Error(`找不到用户：${error?.message ?? 'no row'}`)
-  return data.id as string
+  const id = await findAppUserId(authed.authId)
+    .catch((error: Error) => { throw new Error(`找不到用户：${error?.message ?? 'no row'}`) })
+  if (!id) throw new Error('找不到用户：no row')
+  return id
 }
