@@ -72,21 +72,19 @@
     z-index: 0;
     overflow: hidden;
   }
-  /* 登录卡：无包裹容器，直接 fixed 贴底浮在 bot 上 */
+  /* 登录卡：外层容器 display:contents 退場，卡片本身直接 fixed 贴底浮在 bot 上 */
   .login-right {
+    display: contents;
+  }
+  .login-card {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 10;
-    padding: var(--space-md) var(--space-md) calc(var(--space-lg) + env(safe-area-inset-bottom, 0));
-    background: var(--color-paper);
-    border-radius: 16px 16px 0 0;
+    margin: 0 var(--space-md) calc(var(--space-sm) + env(safe-area-inset-bottom, 0));
+    /* 卡片自身的圓角即可，不再要紙底sheet的整條圓角與陰影 */
     box-shadow: 0 -8px 32px color-mix(in oklab, var(--color-ink) 10%, transparent);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-    margin: 0;
   }
   .login-brand { display: none; }
   .login-sub-mobile { display: none; }
@@ -161,8 +159,9 @@
   background: var(--color-paper);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 20px color-mix(in oklab, var(--color-ink) 6%, transparent);
-  /* 内容底部让出 tabbar + safe-area 高度，输入栏不被底栏遮挡 */
-  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  /* 内容底部让出 tabbar 高度（撕紙上緣 8px + padding 12+12 + tab 56 ≈ 88px）
+     ＋輸入欄自身 margin 3xs；輸入欄緊貼紙緣上方不遮擋 */
+  padding-bottom: calc(var(--tabbar-h) + var(--space-2xs) + env(safe-area-inset-bottom, 0px));
 }
 
 .friend-chat-head {
@@ -199,6 +198,10 @@
   border: var(--rule-hair) solid var(--color-rule);
   background: var(--fibre), var(--color-card);
   box-shadow: 0 4px 14px color-mix(in oklab, var(--color-ink) 7%, transparent);
+}
+/* 手机：縮小輸入欄與底拦（tabbar）之間的距離（桌機讓位需求不同，見下方 media query 還原） */
+@media (max-width: 64rem) {
+  .friend-input-bar { margin-bottom: var(--space-3xs); }
 }
 /* 胶囊内的输入框：去边框、透明背景，融入胶囊 */
 .friend-input-bar .input {
@@ -580,7 +583,11 @@
 .log__text { font-size: var(--text-sm); }
 .log__reason { font-size: var(--text-xs); color: var(--color-muted); }
 
-/* ── 大厅 AI 浮动按钮 ── */
+/* ── 大厅 AI 浮动按钮 ──
+ * canvas 本体就是按钮（RiveAvatar fill 模式）：.lobby-ai-fab 直接挂在 <canvas> 上，
+ * 64×64 圆形裁切＋阴影；上面叠一层透明 .lobby-ai-fab-hit <button> 负责点击与无障碍。
+ * （canvas 不是可聚焦元素，点击/键盘焦点交给覆盖的 hit button）
+ * 位置/尺寸定义在 .lobby-ai-fab，hit 层用 inset:0 跟随。 */
 .lobby-ai-fab {
   position: fixed;
   bottom: calc(var(--bar-h) + var(--space-md));
@@ -594,13 +601,27 @@
   cursor: pointer;
   background: var(--color-card);
   box-shadow: 0 4px 16px color-mix(in oklab, var(--color-ink) 18%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   transition: box-shadow var(--dur-fast) var(--ease-snap), transform var(--dur-fast) var(--ease-snap);
+  overflow: hidden;
 }
-.lobby-ai-fab:hover { box-shadow: 0 6px 24px color-mix(in oklab, var(--color-ink) 24%, transparent); transform: translateY(-2px); }
-.lobby-ai-fab.is-open { background: var(--color-pear); }
+.lobby-ai-fab-hit {
+  position: fixed;
+  bottom: calc(var(--bar-h) + var(--space-md));
+  right: var(--space-md);
+  z-index: 121;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.lobby-ai-fab-hit:hover ~ .lobby-ai-fab,
+.lobby-ai-fab-hit:focus-visible ~ .lobby-ai-fab {
+  box-shadow: 0 6px 24px color-mix(in oklab, var(--color-ink) 24%, transparent);
+  transform: translateY(-2px);
+}
 
 /* 弹窗 */
 .lobby-ai-popup {
@@ -715,6 +736,11 @@
   /* 让它在 .page 里水平居中 */
   display: flex;
   justify-content: center;
+}
+/* 页面级占位（.page 直接子层）与上方筛选卡留同款间距（对齐 .lobby-grid 的 margin-top）；
+   thinking 气泡里的用法不受影响（不是 .page 直接子层） */
+.page > .loading-dots {
+  margin-top: var(--space-lg);
 }
 .dot-pulse {
   width: 6px;

@@ -45,7 +45,7 @@
 }
 
 /* ── 宽度切换：桌机顶栏放 nav；手机顶栏极简（wordmark + 阿澈），nav 在底拦 ── */
-.tabbar { display: flex; }
+.tabbar { display: block; }
 .knobs { display: none; }
 
 @media (min-width: 64rem) {
@@ -76,6 +76,10 @@
   gap: var(--space-lg);
   /* 高度加大到 84px（桌机），让按钮垂直居中有足够空间 */
   height: var(--bar-h);
+  /* 視覺置中修正：撕紙下緣 clip 掉 5-9px、下方陰影又再壓低視覺重心，
+     幾何居中的內容（wordmark、按鈕）看起來偏下。
+     用 padding-bottom 讓置中基準上移 2px（紙張背景維持滿高，不裁上緣） */
+  padding-bottom: 4px;
   /* 宽度占满整个窗口，safe space 用 padding 控制（不用 max-width 限制背景） */
   width: 100%;
   box-sizing: border-box;
@@ -153,7 +157,35 @@
 .knob:active { --edge: 1px; translate: 0 2px; }
 .knob.is-on { --edge: 1px; translate: 0 2px; background: var(--color-ink); color: var(--color-paper); }
 .knob--friend { margin-left: var(--space-md); }
-/* 纯图标 knob（设置、铃铛、换一个等）：正方形，无文字内边距 */
+/* AI 朋友 tab：chromabot 臉部同款漸層（上→下：玫瑰紅 #f46757 → 橘 #f49023 → 金黃 #f9a212）。
+ * 選中：實色漸層＋紙白字、壓下邊用漸層深端（焦糖 #b3541e）而非黑。
+ * 未選中：同漸層 18% 透明度浮在紙底上（淡一階）＋墨色文字、邊框壓淡。 */
+.knob--friend-tab {
+  background: var(--fibre), var(--color-paper-2);
+  background-image: linear-gradient(
+    175deg,
+    color-mix(in oklab, #f46757 18%, var(--color-paper-2)) 8%,
+    color-mix(in oklab, #f49023 18%, var(--color-paper-2)) 55%,
+    color-mix(in oklab, #f9a212 18%, var(--color-paper-2)) 96%
+  );
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, #b3541e 18%, transparent),
+    0 var(--edge) 0 0 color-mix(in oklab, #b3541e 22%, var(--color-edge));
+}
+.knob--friend-tab:hover { background-color: transparent; }
+.knob--friend-tab.is-on {
+  /* 選中：原漸層加深一階（保留色相走向，≈12% 壓暗），對比更足 */
+  background: linear-gradient(
+    175deg,
+    color-mix(in oklab, #f46757 88%, #7a1f14) 8%,
+    color-mix(in oklab, #f49023 88%, #7a1f14) 55%,
+    color-mix(in oklab, #f9a212 88%, #7a1f14) 96%
+  );
+  color: #fff7ec;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, #b3541e 45%, transparent),
+    0 var(--edge) 0 0 color-mix(in oklab, #b3541e 82%, var(--color-ink));
+}
+/* 純图标 knob（设置、铃铛、换一个等）：正方形，无文字内边距 */
 .knob--icon { padding: 0; width: 44px; justify-content: center; }
 .knob__meta { font-size: var(--text-sm); }
 /* 手机：Profile 钮只显示头像圆片（隐藏名字），顶栏更简洁 */
@@ -161,17 +193,35 @@
   .knob--profile .knob__meta { display: none; }
 }
 
-/* ── 手机底部 tab 拦 ── */
+/* ── 手机底部 tab 拦 ──
+ * 撕紙上緣（跟頂欄同款紙張質感）：filter（陰影）放父層 .tabbar、
+ * clip-path 放子層 .tabbar__inner——父 filter / 子 clip 是標準做法，
+ * 同掛一個元素部分瀏覽器會丟掉 filter（頂欄踩過的坑）。 */
 .tabbar {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 300;
+  will-change: filter;
+  filter: drop-shadow(0 -1px 1px color-mix(in oklab, var(--color-ink) 12%, transparent))
+    drop-shadow(0 -8px 16px color-mix(in oklab, var(--color-ink) 16%, transparent));
+}
+
+.tabbar__inner {
+  display: flex;
   gap: var(--space-3xs);
-  padding: var(--space-2xs) var(--space-xs) calc(var(--space-xs) + env(safe-area-inset-bottom, 0));
+  padding: var(--space-md) var(--space-xs) calc(var(--space-sm) + env(safe-area-inset-bottom, 0));
   background: var(--grain), var(--fibre), var(--color-card);
-  box-shadow: 0 -6px 18px -10px oklch(20% 0.014 255 / 0.3);
+  /* 撕紙上緣（陰影在父層，這裡裁形狀；點位與頂欄下緣同款參差） */
+  clip-path: polygon(
+    0 8px, 3% 7px, 6% 8px, 9% 6px, 12% 8px, 15% 7px, 18% 9px, 21% 6px,
+    24% 8px, 27% 7px, 30% 9px, 33% 6px, 36% 8px, 39% 7px, 42% 9px,
+    45% 6px, 48% 8px, 51% 7px, 54% 9px, 57% 6px, 60% 8px, 63% 7px,
+    66% 9px, 69% 6px, 72% 8px, 75% 7px, 78% 9px, 81% 6px, 84% 8px,
+    87% 7px, 90% 9px, 93% 6px, 96% 8px, 100% 7px,
+    100% 100%, 0 100%
+  );
 }
 
 .tabbar__tab {
@@ -191,8 +241,21 @@
 }
 
 .tabbar__tab.is-on {
+  /* 選中：原本的墨色紙卡（只有 AI 朋友是漸層，見 .tabbar__tab--friend.is-on） */
   background: var(--color-ink);
   color: var(--color-paper);
+}
+
+/* AI 朋友 tab：選中用 chromabot 漸層（與桌機 .knob--friend-tab.is-on 同款壓暗版） */
+.tabbar__tab--friend.is-on {
+  background: linear-gradient(
+    175deg,
+    color-mix(in oklab, #f46757 88%, #7a1f14) 8%,
+    color-mix(in oklab, #f49023 88%, #7a1f14) 55%,
+    color-mix(in oklab, #f9a212 88%, #7a1f14) 96%
+  );
+  color: #fff7ec;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, #b3541e 45%, transparent);
 }
 
 .tabbar__label { pointer-events: none; }

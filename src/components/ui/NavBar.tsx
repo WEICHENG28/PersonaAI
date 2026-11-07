@@ -1,5 +1,4 @@
 import { NavLink, useLocation, useNavigate } from 'react-router'
-import { RiveAvatar } from './RiveAvatar'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { NotificationBell } from '@features/twin/components/NotificationBell'
@@ -42,13 +41,10 @@ export function NavBar() {
                 <NavLink
                   key={tab.to}
                   to={tab.to}
-                  className={`knob ${isActive(tab) ? 'is-on' : ''}`}
+                  className={`knob ${isActive(tab) ? 'is-on' : ''} ${tab.to === '/friend' ? 'knob--friend-tab' : ''}`}
                 >
                   {tab.to === '/friend' ? (
-                    <>
-                      <RiveAvatar name="chromabot" size={22} />
-                      <span>AI 朋友</span>
-                    </>
+                    <span>AI 朋友</span>
                   ) : t(tab.key)}
                 </NavLink>
               ))}
@@ -68,33 +64,22 @@ export function NavBar() {
         </nav>
       </header>
 
-      {/* ── 手机底部 tab 拦 ── */}
+      {/* ── 手机底部 tab 拦（撕紙上緣，跟頂欄同款） ── */}
       {user && (
         <nav className="tabbar safe-bottom" aria-label="主导览">
-          {TABS.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              className={`tabbar__tab ${isActive(tab) ? 'is-on' : ''}`}
-            >
-              <span className="tabbar__label">{t(tab.key)}</span>
-              {tab.to === '/friend' && unread > 0 && <i className="tabbar__dot" />}
-            </NavLink>
-          ))}
-          {/* Profile 也进底拦（第 4 格） */}
-          <NavLink
-            to="/profile"
-            className={`tabbar__tab ${/^\/profile/.test(location.pathname) ? 'is-on' : ''}`}
-          >
-            <span className="tabbar__label">{t('nav.profile')}</span>
-          </NavLink>
-          {/* Settings 进底拦（第 5 格） */}
-          <NavLink
-            to="/settings"
-            className={`tabbar__tab ${/^\/settings/.test(location.pathname) ? 'is-on' : ''}`}
-          >
-            <span className="tabbar__label">设置</span>
-          </NavLink>
+          <div className="tabbar__inner">
+            {TABS.map((tab) => (
+              <NavLink
+                key={tab.to}
+                to={tab.to}
+                className={`tabbar__tab ${isActive(tab) ? 'is-on' : ''} ${tab.to === '/friend' ? 'tabbar__tab--friend' : ''}`}
+              >
+                <span className="tabbar__label">{t(tab.key)}</span>
+                {tab.to === '/friend' && unread > 0 && <i className="tabbar__dot" />}
+              </NavLink>
+            ))}
+            {/* Profile / Settings 改走頂欄右端鈕（ProfileKnob / SettingsKnob），不再占底拦格子 */}
+          </div>
         </nav>
       )}
     </>
