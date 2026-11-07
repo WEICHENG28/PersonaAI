@@ -5,10 +5,11 @@ import { LlmError, embed, extractJson, llmJson, llmText, llmTuning, setLlmClient
 import { setLogWriter, writeLog } from '../../server/lib/log'
 import { getLlmClient, normalizeChatResult } from '../../server/lib/llm/client.js'
 
-const sdkMock = vi.hoisted(() => ({ complete: vi.fn() }))
+const sdkMock = vi.hoisted(() => ({ complete: vi.fn(), embed: vi.fn() }))
 vi.mock('openai', () => ({ default: class {
   static APIError = class extends Error { status = 400 }
   chat = { completions: { create: sdkMock.complete } }
+  embeddings = { create: sdkMock.embed }
 } }))
 
 beforeAll(() => {
@@ -61,6 +62,12 @@ describe('chat result normalization and SDK usage', () => {
     })
     await expect(getLlmClient().chat({ model: 'chat-model', messages: [], jsonMode: false }))
       .resolves.toEqual({ content: 'ok', usage: { promptTokens: 3, completionTokens: 2 } })
+  })
+
+  it.each([0, 3])('preserves SDK embedding prompt usage (%s tokens)', async promptTokens => {
+    sdkMock.embed.mockResolvedValueOnce({ data: [{ embedding: [1, 2, 3, 4] }], usage: { prompt_tokens: promptTokens } })
+    await expect(getLlmClient().embed({ model: 'embed-model', input: '登山', dimensions: 4 }))
+      .resolves.toEqual({ vector: [1, 2, 3, 4], usage: { promptTokens } })
   })
 })
 

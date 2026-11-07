@@ -124,6 +124,9 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   }
   const friend = await ensureFriendRow(userId)
 
+  // 校验、用量检查和朋友初始化可能混合读写，独立计入 setup。
+  timer.mark('setup')
+
   // 0. nudge 防重复：拉最近几则（含 meta），看最后一条 user 讯息之后有没有 nudge 讯息
   if (isNudge) {
     const { data: recentRows } = await db
@@ -138,6 +141,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
       if (row.meta?.nudge) return { reply: null, taskId: null, sharedEventId: null, nudged: true }
     }
   }
+  timer.mark('db.read')
 
   // 1. 存用户讯息（nudge 模式不保存用户消息，阿澈主动开口）
   if (!isNudge) {
@@ -146,6 +150,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
       .insert({ user_id: userId, role: 'user', kind: 'chat', content: body.text, meta: {} })
     if (uErr) throw new FriendChatError(`保存讯息失败：${uErr.message}`)
   }
+  timer.mark('db.write')
 
   // 2. 组上下文
   const lifeState = friend.life_state ?? getLifeUpdate(friend.story_stage)

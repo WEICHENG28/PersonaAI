@@ -9,7 +9,7 @@ import { llmEnv, modelFor } from './env.js'
 import { extractJson } from './json.js'
 
 export { extractJson } from './json.js'
-export { setLlmClient, normalizeChatResult, type LlmClient, type LlmChatResult } from './client.js'
+export { setLlmClient, normalizeChatResult, type LlmClient, type LlmChatResult, type LlmEmbedResult } from './client.js'
 export { setLlmMetricSink, type LlmMetric } from './metrics.js'
 
 export type LlmMessage = { role: 'user' | 'assistant'; content: string }
@@ -126,7 +126,9 @@ export async function embed(text: string): Promise<number[]> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       metric.attempts = attempt
       try {
-        const vec = await limited(() => getLlmClient().embed({ model: env.MODEL_EMBED, input: text, dimensions: env.EMBEDDING_DIM }), metric)
+        const result = await limited(() => getLlmClient().embed({ model: env.MODEL_EMBED, input: text, dimensions: env.EMBEDDING_DIM }), metric)
+        const { vector: vec, usage } = Array.isArray(result) ? { vector: result } : result
+        if (usage?.promptTokens != null) metric.promptTokens = (metric.promptTokens ?? 0) + usage.promptTokens
         if (vec.length === env.EMBEDDING_DIM) return vec
         // 長度不符是設定錯誤，重試也不會好
         throw new LlmError('embed', `向量長度 ${vec.length}，預期 ${env.EMBEDDING_DIM}`, attempt)

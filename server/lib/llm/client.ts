@@ -13,13 +13,18 @@ export interface LlmChatResult {
   usage?: { promptTokens: number | null; completionTokens: number | null }
 }
 
+export interface LlmEmbedResult {
+  vector: number[]
+  usage?: { promptTokens: number | null }
+}
+
 export function normalizeChatResult(value: string | LlmChatResult): LlmChatResult {
   return typeof value === 'string' ? { content: value } : value
 }
 
 export interface LlmClient {
   chat(req: { model: string; messages: ChatMessage[]; temperature?: number; jsonMode: boolean }): Promise<string | LlmChatResult>
-  embed(req: { model: string; input: string; dimensions: number }): Promise<number[]>
+  embed(req: { model: string; input: string; dimensions: number }): Promise<number[] | LlmEmbedResult>
 }
 
 let override: LlmClient | null = null
@@ -75,7 +80,8 @@ function createOpenAiClient(): LlmClient {
     },
     async embed({ model, input, dimensions }) {
       const res = await sdk.embeddings.create({ model, input, dimensions })
-      return res.data[0]?.embedding ?? []
+      return { vector: res.data[0]?.embedding ?? [],
+        ...(res.usage ? { usage: { promptTokens: res.usage.prompt_tokens ?? null } } : {}) }
     },
   }
 }

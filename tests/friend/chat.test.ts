@@ -132,6 +132,31 @@ describe('friendReplySchema', () => {
 })
 
 describe('friendChat 主流程（mock）', () => {
+  it('attributes delayed message inserts to db.write and friend initialization to setup', async () => {
+    let clock = 0
+    const clockSpy = vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    const friends = tables['ai_friends']!
+    friends.list.length = 0
+    const originalFriendInsert = friends.insert.getMockImplementation()!
+    friends.insert.mockImplementation(row => {
+      clock += 20
+      return originalFriendInsert(row)
+    })
+    const messages = tables['friend_messages']!
+    const originalMessageInsert = messages.insert.getMockImplementation()!
+    messages.insert.mockImplementation(row => {
+      clock += row.role === 'user' ? 40 : 10
+      return originalMessageInsert(row)
+    })
+    try {
+      await friendChat('u1', '你好')
+      const log = vi.mocked(writeLog).mock.calls.map(([entry]) => entry).find(entry => entry.action === '回应用户')!
+      expect(log.detail!.timing).toMatchObject({ setup: 20, 'db.read': 0, 'db.write': 50, totalMs: 70 })
+    } finally {
+      clockSpy.mockRestore()
+    }
+  })
+
   it('records reply metrics and phase timings while retaining taskId in the response log', async () => {
     const metric = { tag: 'friend.reply', role: 'chat' as const, model: 'mock', lane: 'fg' as const,
       stream: false, ok: true, attempts: 1, queueMs: 0, ttftMs: null, totalMs: 2,

@@ -77,8 +77,22 @@ describe('logical LLM call metrics', () => {
     await expect(embed('登山')).rejects.toThrow()
     expect(bad).toHaveBeenCalledOnce()
     expect(metrics).toEqual([
-      expect.objectContaining({ role: 'embed', model: 'embed-model', ok: true, attempts: 1 }),
-      expect.objectContaining({ role: 'embed', ok: false, attempts: 1 }),
+      expect.objectContaining({ role: 'embed', model: 'embed-model', ok: true, attempts: 1, promptTokens: null }),
+      expect.objectContaining({ role: 'embed', ok: false, attempts: 1, promptTokens: null }),
+    ])
+  })
+
+  it('retains embedding usage including zero and usage consumed by invalid dimensions', async () => {
+    const provider = vi.fn()
+      .mockResolvedValueOnce({ vector: [1, 2, 3, 4], usage: { promptTokens: 0 } })
+      .mockResolvedValueOnce({ vector: [1], usage: { promptTokens: 7 } })
+    setLlmClient({ chat: async () => '', embed: provider })
+    await expect(embed('登山')).resolves.toEqual([1, 2, 3, 4])
+    await expect(embed('登山')).rejects.toThrow()
+    expect(provider).toHaveBeenCalledTimes(2)
+    expect(metrics).toEqual([
+      expect.objectContaining({ role: 'embed', ok: true, attempts: 1, promptTokens: 0, completionTokens: null }),
+      expect.objectContaining({ role: 'embed', ok: false, attempts: 1, promptTokens: 7, completionTokens: null }),
     ])
   })
 
