@@ -314,6 +314,15 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-11-07｜X-5 記憶頁接上後端｜AI 協助｜分支 opt/X-5-memory-http
+- **做了什麼**：MemoriesSection 的 http 模式載入 listMemories，編輯採後端回傳的 MemoryRow 更新；刪除與「这不太像我」分別呼叫 DELETE／POST，成功後才移除本地列表項目。mock 仍讀 store，刪除仍走 s.deleteMemory，沒有改 useDemoStore。
+- **為什麼這樣做**：原頁面 http 模式也讀假資料，正式站永遠顯示空記憶；編輯後還原地修改 store，刪除不打後端。本次將載入、顯示狀態與不可變列表更新抽出，操作失敗保留列表及編輯內容；載入失敗顯示簡體固定錯誤，不冒充「还没有记忆」。
+- **介面**：保留既有 Card／mem-list／mem／mem-del／textarea 樣式；只補載入／錯誤狀態與同樣式的「不像我」動作。載入結果與操作以世代檢查避免卸載後套用，操作期間停用其他動作。
+- **改了哪些檔案**：src/features/friend/{ProfilePage.tsx,MemoriesSection.tsx,memoryState.ts,FunLabelsSection.tsx}、src/lib/api/friend.ts、tests/friend/memory-http.test.ts、本紀錄。ProfilePage 原 570 行，抽出記憶後仍超過單檔限制，因此將自足 FunLabelsSection 原樣移出（已核對函式內容，未改行為／樣式）；現 367 行。
+- **驗證**：先觀察缺少 memoryState 的失敗再實作；8 項離線測試涵蓋 HTTP 載入、不用 demo rows、mock 不發請求、載入失敗不顯示空狀態、edit/delete/not-like-me 成功與失敗、不可變列表及四個 API 方法／路徑。完整測試與 build 見 PR。
+- **審查**：主代理完成自我檢查；獨立 TypeScript 唯讀審查恢復後完成，未發現阻擋問題，另重跑 8 項記憶測試與型別檢查通過。同步最新 main 的 L-1／UI 更新，DEVLOG 衝突保留雙方紀錄，整合後全套 869 測試與 production build 通過。
+- **還沒做完／待辦**：需人工審查 Draft PR；未呼叫真實平台、不讀 .env.local、不連真實資料庫／寫 Supabase、不安裝套件。未修改後端或 store，未部署。
+
 ### 2026-11-07｜L-2 建任務改背景、前端輪詢任務卡｜AI 協助｜分支 opt/L-2-task-background
 - **做了什麼／為什麼**：抽出 createTaskCard，task_intent 且非 nudge 時交給 runInBackground；POST 先回 taskPending:true、taskId:null 與本回合 user／friend 兩則訊息，不等待社交任務解析。預期回覆約快 2 秒，任務卡約 2～4 秒後出現；這是待本機量測的預期，沒有真實平台延遲數據。
 - **失敗行為**：成功寫 task_card 後回 taskId；建任務或存卡失敗時寫日誌，插入 role:friend、kind:chat、meta:{task_failed:true}。已確認為給用戶看的 TaskError／UsageLimitError／BlockedContentError 沿用 message，其他固定顯示「刚刚没帮你把任务建好，你再说一次想找什么样的人？」；日誌或失敗訊息再次寫入失敗只 console.error，不 throw。
