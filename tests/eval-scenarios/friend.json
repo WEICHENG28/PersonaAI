@@ -1,0 +1,182 @@
+[
+  {
+    "id": "friend-short-01",
+    "kind": "friend",
+    "tags": ["short"],
+    "history": [],
+    "userText": "嗯。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-short-02",
+    "kind": "friend",
+    "tags": ["short"],
+    "history": [],
+    "userText": "还行吧。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-short-03",
+    "kind": "friend",
+    "tags": ["short"],
+    "history": [],
+    "userText": "有点累。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-short-04",
+    "kind": "friend",
+    "tags": ["short"],
+    "history": [],
+    "userText": "刚下班。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-emotion-01",
+    "kind": "friend",
+    "tags": ["emotion"],
+    "history": [],
+    "userText": "今天努力做的方案被否了，有点失落。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-emotion-02",
+    "kind": "friend",
+    "tags": ["emotion"],
+    "history": [],
+    "userText": "事情一件接一件，我感觉脑子快转不动了。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-emotion-03",
+    "kind": "friend",
+    "tags": ["emotion"],
+    "history": [],
+    "userText": "刚收到项目通过的消息，开心得想转圈。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-emotion-04",
+    "kind": "friend",
+    "tags": ["emotion"],
+    "history": [],
+    "userText": "聚会时一直插不上话，回来有点难受。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-ask-friend-01",
+    "kind": "friend",
+    "tags": ["ask_friend"],
+    "history": [],
+    "userText": "阿澈，你今天过得怎么样？",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-ask-friend-02",
+    "kind": "friend",
+    "tags": ["ask_friend"],
+    "history": [],
+    "userText": "你也会有突然不想聊天的时候吗？",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-ask-friend-03",
+    "kind": "friend",
+    "tags": ["ask_friend"],
+    "history": [],
+    "userText": "如果今天只能做一件放松的事，你会选什么？",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-sharing-01",
+    "kind": "friend",
+    "tags": ["sharing"],
+    "history": [],
+    "userText": "今天第一次把面包烤成功了，虽然形状不太好看。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-sharing-02",
+    "kind": "friend",
+    "tags": ["sharing"],
+    "history": [{"role": "user", "kind": "chat", "content": "最近在读一本讲友情的小说。"}, {"role": "friend", "kind": "chat", "content": "等你看完，我也想听听结尾给你的感觉。"}],
+    "userText": "上次说的那本书看完了，结尾比我想的温柔。",
+    "memories": ["用户最近在读小说"],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-sharing-03",
+    "kind": "friend",
+    "tags": ["sharing"],
+    "history": [],
+    "userText": "今天跑步终于没有中途停下，感觉自己进步了一点。",
+    "memories": ["用户最近开始练习跑步"],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-find-people-01",
+    "kind": "friend",
+    "tags": ["find_people"],
+    "history": [],
+    "userText": "帮我找两个喜欢摄影的人一起交流。",
+    "memories": [],
+    "expect": {"taskIntent": true}
+  },
+  {
+    "id": "friend-find-people-02",
+    "kind": "friend",
+    "tags": ["find_people"],
+    "history": [],
+    "userText": "我想找能一起打羽毛球的伙伴，帮我看看有没有合适的人。",
+    "memories": [],
+    "expect": {"taskIntent": true}
+  },
+  {
+    "id": "friend-find-people-03",
+    "kind": "friend",
+    "tags": ["find_people"],
+    "history": [{"role": "user", "kind": "chat", "content": "最近想找人一起读书。"}, {"role": "friend", "kind": "chat", "content": "要我帮你找两个喜欢读书、愿意交流的人吗？"}],
+    "userText": "好啊",
+    "memories": [],
+    "expect": {"taskIntent": true}
+  },
+  {
+    "id": "friend-closing-01",
+    "kind": "friend",
+    "tags": ["closing"],
+    "history": [],
+    "userText": "今天先聊到这儿，我去吃饭了。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-closing-02",
+    "kind": "friend",
+    "tags": ["closing"],
+    "history": [],
+    "userText": "我准备睡觉了，晚安。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-closing-03",
+    "kind": "friend",
+    "tags": ["closing"],
+    "history": [],
+    "userText": "谢谢你听我说这么多，我想自己安静一会儿。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  }
+]
