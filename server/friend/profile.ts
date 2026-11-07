@@ -7,6 +7,7 @@
  * API：GET /api/profile（只回 shareable 与确认状态）、PUT /api/profile/shareable、POST /api/profile/extract。
  */
 import { z } from 'zod'
+import { conditionKeyword, isNegated } from '../../shared/negation.js'
 import { getServiceClient } from '../lib/supabase.js'
 import { llmJson, embed } from '../lib/llm/index.js'
 import { writeLog } from '../lib/log.js'
@@ -62,6 +63,18 @@ export function shareableChanged(a: ShareableProfile | null, b: ShareableProfile
     a.chat_style !== b.chat_style ||
     a.looking_for !== b.looking_for
   )
+}
+
+/** 只依明確提及主題的子句判斷；任一正向提及或完全沒提及都保留，不推斷省略主題。 */
+export function dropNegatedInterests(interests: string[], userLines: string[]): string[] {
+  const clauses = userLines.flatMap(line => line.split(/[，,。；;！!？?]/)).map(conditionKeyword)
+  return interests.filter(interest => {
+    if (isNegated(interest)) return false
+    const key = conditionKeyword(interest).key
+    if (!key) return false
+    const mentions = clauses.filter(clause => clause.key.includes(key))
+    return mentions.length === 0 || mentions.some(clause => !clause.negated)
+  })
 }
 
 /** 读当前 user_profiles 行（无行回 null）。 */
@@ -131,10 +144,14 @@ export async function extractProfile(userId: string, opts?: { force?: boolean })
   }
 
   // 3. 写入 shareable／agent；内容有变 → confirmed 归 false
-  const changed = shareableChanged(previousRow?.shareable_profile ?? null, out.shareable_profile)
+  const shareable: ShareableProfile = {
+    ...out.shareable_profile,
+    interests: dropNegatedInterests(out.shareable_profile.interests, userLines),
+  }
+  const changed = shareableChanged(previousRow?.shareable_profile ?? null, shareable)
   const { error: wErr } = await db.from('user_profiles').upsert({
     user_id: userId,
-    shareable_profile: out.shareable_profile,
+    shareable_profile: shareable,
     agent_profile: out.agent_profile,
     shareable_confirmed: changed ? false : (previousRow?.shareable_confirmed ?? false),
     card: null,
@@ -145,7 +162,7 @@ export async function extractProfile(userId: string, opts?: { force?: boolean })
   // 4. embedding（失败不致命：大厅会退回关键字排序）
   let embeddingNote = '已更新'
   try {
-    const vector = await embed(shareableToText(out.shareable_profile), 'bg')
+    const vector = await embed(shareableToText(shareable), 'bg')
     await db.from('user_profiles').update({ embedding: vector }).eq('user_id', userId)
   } catch (err) {
     embeddingNote = '向量更新失败（大厅暂用关键字排序）'
@@ -159,7 +176,7 @@ export async function extractProfile(userId: string, opts?: { force?: boolean })
     reason: `${userLines.length} 则用户讯息；shareable ${changed ? '有变化，待重新确认' : '无变化'}；${embeddingNote}`,
   })
 
-  return { shareable: out.shareable_profile, confirmed: false, exists: true }
+  return { shareable, confirmed: false, exists: true }
 }
 
 /** GET /api/profile 用：只回 shareable 与确认状态，绝不回 agent_profile。 */

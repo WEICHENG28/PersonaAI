@@ -1,7 +1,7 @@
 // Prompt 3｜用户档案撷取（docs/07A，MODEL_REASON，temperature 0.2）。拥有者：A。
 import { z } from 'zod'
 
-/** 07A 规格逐字，仅介面文字简体。 */
+/** M-4 兴趣撷取规则；保留 X-2 的简体输出要求。 */
 export const PROFILE_PROMPT_SYSTEM = `你在后台分析用户和 AI 朋友的对话，建立两份资料。
 
 规则：
@@ -17,6 +17,10 @@ export const PROFILE_PROMPT_SYSTEM = `你在后台分析用户和 AI 朋友的�
 - 用户说「不喜欢」「讨厌」「不感兴趣」的，绝对不能放进 interests。
   例：用户说「我不喜欢看展」→ 看展不进 interests；「我喜欢打游戏」→ 打游戏进 interests。
 - 将用户明确表示不喜欢、想避开的事物，放入 agent_profile.avoidance 清单（给社交 Agent 选人参考），不放入 shareable_profile。
+- 只根据用户自己的事：用户提到别人（朋友、家人）喜欢什么，不算用户的兴趣。
+- 过去的兴趣（「以前喜欢」「现在不玩了」）不放进 interests。
+- 只是在考虑、还没确定的（「可能会试试」）不放进 interests。
+- 只提到一次的经历（例如「昨天吃了一次火锅」）不算兴趣；要用户说喜欢，或在不同时候多次正面提到才算。
 
 输入：
 - 用户说过的话：{{user_lines}}
@@ -32,7 +36,7 @@ export const PROFILE_PROMPT_SYSTEM = `你在后台分析用户和 AI 朋友的�
       "C": {…}, "E": {…}, "A": {…}, "N": {…}
     },
     "values": ["…"],
-    "avoidance": ["用户不喜欢或想避开的话题/事物，例如昆虫、看展"],
+    "avoidance": ["用户不喜欢或想避开的话题/事物"],
     "style": {"sentence_length": "short|medium|long", "tone": "…", "emoji_level": 0-3, "formality": "casual|neutral|formal"}
   }
 }`
@@ -75,8 +79,8 @@ export type ProfileExtract = z.infer<typeof profileExtractSchema>
 
 /** 填入 system 的 {{...}}。 */
 export function renderProfileSystem(vars: { userLines: string; previous: string }): string {
-  return PROFILE_PROMPT_SYSTEM.replace('{{user_lines}}', vars.userLines)
-    .replace('{{previous}}', vars.previous)
+  return PROFILE_PROMPT_SYSTEM.replace(/\{\{(user_lines|previous)\}\}/g,
+    (_match, key: string) => key === 'user_lines' ? vars.userLines : vars.previous)
 }
 
 /** 撷取行数上限（07A A4：最新 60 则，只取 role user）。 */
