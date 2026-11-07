@@ -77,3 +77,10 @@ describe('第一個任務與漏斗', () => {
     expect(buildFunnel([])[0]).toMatchObject({ users: 0, percent: 0 })
   })
 })
+
+it('filters negation and strips positive prefixes before saving quick interests', () => {
+  expect(normalizeQuickProfile({ intro: '你好', interests: ['不喜欢昆虫', '登山', '喜欢摄影'], looking_for: '朋友' }).interests)
+    .toEqual(['登山', '摄影'])
+  expect(() => normalizeQuickProfile({ intro: '你好', interests: ['不喜欢昆虫', '登山'], looking_for: '朋友' }))
+    .toThrow('「不喜欢……」不算兴趣，至少写 2 个你喜欢的事')
+})

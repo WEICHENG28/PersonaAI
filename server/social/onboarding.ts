@@ -3,6 +3,7 @@
  * 進度全部從資料庫現有的紀錄算出來（不存額外狀態、不用 migration），所以中途離開下次回來會停在原來那一步。
  * 漏斗統計（管理員）也用同一套判斷。擁有者：B。
  */
+import { isNegated, stripLikePrefix } from '../../shared/negation.js'
 import type { ShareableProfile } from '../../shared/types.js'
 import { CONFIG } from '../lib/config.js'
 import { assertAllowed } from '../lib/moderation.js'
@@ -89,10 +90,12 @@ export interface QuickProfileInput {
 /** 快速建檔：三個問題直接生成對外檔案（不用先聊很多句）。只檢查內容，存檔交給 save。 */
 export function normalizeQuickProfile(input: QuickProfileInput): { intro: string; interests: string[]; chat_style: string; looking_for: string } {
   const intro = input.intro.trim()
-  const interests = [...new Set(input.interests.map((i) => i.trim()).filter(Boolean))].slice(0, 8)
+  const interests = [...new Set(input.interests.filter(i => !isNegated(i)).map(stripLikePrefix).filter(Boolean))].slice(0, 8)
   const looking_for = input.looking_for.trim()
   if (!intro) throw new OnboardingError('用一句话介绍一下自己吧')
-  if (interests.length < 2) throw new OnboardingError('至少写 2 个兴趣，别人才找得到你')
+  if (interests.length < 2) throw new OnboardingError(input.interests.some(isNegated)
+    ? '「不喜欢……」不算兴趣，至少写 2 个你喜欢的事'
+    : '至少写 2 个兴趣，别人才找得到你')
   if (!looking_for) throw new OnboardingError('说说想认识什么样的人')
   assertAllowed(intro, looking_for, ...interests)
   return { intro, interests, chat_style: '轻松自然，喜欢真诚交流', looking_for }
