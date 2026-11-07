@@ -4,10 +4,10 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { isAuthFailure, requireAuth } from '../lib/auth.js'
+import { findAppUserId } from '../lib/appUser.js'
 import { runInBackground, scheduleInBackground } from '../lib/background.js'
 import { writeLog } from '../lib/log.js'
 import { CONFIG } from '../lib/config.js'
-import { getServiceClient } from '../lib/supabase.js'
 import { runTwinRounds, startConversation } from '../contracts/twin.js'
 import { ChatRoomError, createChatRoomApi, MESSAGE_MAX, messageBodySchema, type ChatRoomApi } from '../twin/chatRoom.js'
 import { supabaseChatRoomStore } from '../twin/chatRoomStore.js'
@@ -57,10 +57,14 @@ const respondBodySchema = z.object({ response: z.union([humanResponseSchema, ano
 async function resolveAppUserId(c: Context): Promise<string | Response> {
   const authed = await requireAuth(c)
   if (isAuthFailure(authed)) return authed
-  const { data, error } = await getServiceClient().from('users').select('id').eq('auth_id', authed.authId).maybeSingle()
-  if (error) throw new Error(`读取用户失败：${error.message}`)
-  if (!data) return c.json({ ok: false, error: '找不到你的用户资料，请重新进入一次' }, 403)
-  return data.id as string
+  let id: string | null
+  try {
+    id = await findAppUserId(authed.authId)
+  } catch (error) {
+    throw new Error(`读取用户失败：${(error as Error).message}`)
+  }
+  if (!id) return c.json({ ok: false, error: '找不到你的用户资料，请重新进入一次' }, 403)
+  return id
 }
 
 /** 先確認登入與 id（對話或通知），再執行 run；ChatRoomError 原樣回給用戶，其他錯誤交給 app.onError。 */

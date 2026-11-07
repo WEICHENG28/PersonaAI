@@ -252,6 +252,16 @@ export async function editMemory(id: string, content: string): Promise<MemoryRow
   })
 }
 
+/** DELETE /api/memory/:id：删除自己的记忆。 */
+export async function deleteMemory(id: string): Promise<void> {
+  await apiCall<null>(`/api/memory/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** POST /api/memory/:id/not-like-me：标记「不像我」并移除。 */
+export async function markMemoryNotLikeMe(id: string): Promise<void> {
+  await apiCall<null>(`/api/memory/${encodeURIComponent(id)}/not-like-me`, { method: 'POST' })
+}
+
 // ── A9: Fun Labels ────────────────────────────────────────────────────────────
 
 export interface FunLabels {

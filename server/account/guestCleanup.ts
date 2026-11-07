@@ -7,6 +7,7 @@
  */
 import { CONFIG } from '../lib/config.js'
 import { getServiceClient } from '../lib/supabase.js'
+import { invalidateAuthUser } from '../lib/authCache.js'
 
 export interface GuestCleanupDeps {
   /** 建立時間早於 cutoff 的游客帳號（auth id）。 */
@@ -82,6 +83,7 @@ export function supabaseGuestCleanupDeps(): GuestCleanupDeps {
       // 刪 auth 帳號 → users 和其餘 on delete cascade 的表一起刪
       const { error } = await db.auth.admin.deleteUser(authId)
       if (error) throw error
+      invalidateAuthUser(authId)
     },
   }
 }

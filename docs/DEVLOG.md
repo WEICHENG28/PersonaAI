@@ -26,6 +26,14 @@
 
 ## 共用與決策
 
+### 2026-11-07｜L-4 登入驗證與用戶 id 記憶體快取｜AI 協助｜分支 opt/L-4-auth-cache
+- **做了什麼**：新增無套件的 Map TTL 快取，各最多 500 筆並按插入順序淘汰，時鐘可注入。JWT 僅以 SHA-256 作 key；只有 getUser 驗證成功且非 banned 才快取，期限為 60 秒與 exp 剩餘時間的較短者。authId → users.id 僅成功查到才快取 5 分鐘，空值與錯誤不快取。
+- **為什麼這樣做**：三條線共用用戶 id 查詢，減少香港／台灣到巴黎的重複等待；同一登入者使用相同 JWT 且兩種快取皆命中時，60 秒內第二支以後的 API 預期少兩次資料庫／Auth 來回。冷啟動、換 token、到期或容量淘汰仍需查詢；實際效果由 Claude 在本機量測。
+- **保留行為**：friend 找不到用戶仍 throw，由原路由處理；twin、social 仍回 403「找不到你的用户资料，请重新进入一次」；social 無 DB 仍回 DEV_USER_ID。requireAuth 的簽名、401／403 文案與所有回應格式不變。
+- **改了哪些檔案**：server/lib/{authCache,appUser,auth}.ts、server/routes/friend.ts（A）；server/social/user.ts、server/routes/admin.ts、server/account/guestCleanup.ts、tests/social/user.test.ts（B）；server/routes/twin.ts（C）；tests/friend/auth-cache.test.ts 與本紀錄（跨線共用決策，三線已同意）。不改 shared/types.ts、前端、套件或環境檔。
+- **踩到的坑／限制**：管理員停用／恢復與游客 Auth 刪除成功後，清掉同 authId 的兩種快取；失效前已開始的查詢不會再填回舊資料。目前 repo 沒有另外的自行刪帳 API，刪除入口是 guestCleanup 的 deleteUser（users cascade）。失效僅作用於同一 Vercel 實例；其他實例最多 60 秒後才重新驗證被停用帳號，登出後 token 在其他實例最多 60 秒內仍可能命中快取（此處的 60 秒是快取額外保留期，登出是否撤銷 access token 仍依 Supabase 行為）。
+- **驗收／待辦**：先觀察同 JWT 重複驗證測試失敗（getUser 2 次，預期 1 次），再實作；新增 37 個測試涵蓋 TTL／exp、錯誤／banned、500 筆上限、雜湊 key、雙快取失效與三條線相容，共用快取的路由測試確認 Auth／users 查詢各一次。同步 main 後 npm test 903/903、前後端 tsc 與 npm run build 通過（仍有大型 bundle 警告），獨立程式碼及 TypeScript 審查無待修問題。LLM／Supabase 全 mock；實際延遲交 Claude 本機量測。回滾用 revert；本任務完成後停在 Draft PR，不接續下一任務。
+
 ### 2026-11-07｜M-1 共用否定判斷與關鍵字／建檔修正｜AI 協助｜分支 opt/M-1-negation
 - **做了什麼**：新增 shared/negation.ts，逐字採用計畫 NEGATION_PATTERN，提供 isNegated、stripLikePrefix、conditionKeyword；不新增否定詞。matchesKeyword 只計正向條件，rankCandidates 改以 keywordBonus 對正向命中加 0.1、否定命中扣 0.1。
 - **為什麼這樣做**：避免「不喜欢昆虫」替昆蟲興趣加分、變成開場話題或快速建檔興趣；使用可測試的固定規則，不額外呼叫 LLM。
@@ -35,6 +43,7 @@
 - **驗證**：新增五組失敗測試後實作；獨立審查發現後置否定丟失主題，以六項 RED→GREEN 測試修正解析。pattern.source 與計畫逐字一致，含不喜欢／不太喜欢、哪怕例外、正負排名、開場話題建議與回退、負查詢、快速建檔固定文案。完整測試與型別檢查結果見 PR。
 - **踩到的坑／注意事項**：這是指定 pattern 的字串規則，不是完整中文語意解析；複合條件依第一個否定片語解析；否定後有字取後方，無字則保留前方主題（去介詞「对」），不做完整中文語意拆解。既有資料不回填；全程 mock，未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件。
 - **還沒做完／待辦**：保留 Draft PR，等待人工審查；未開始 M-2。
+
 ### 2026-11-07｜X-4 Vercel 改香港區域｜Jerry 決定（AI 協助）｜分支 opt/X-4-hkg-region
 - **做了什麼／為什麼**：依 Jerry 回報，學校平台在北京（火山引擎），巴黎連北京常逾時，阿澈和記憶擷取大量失敗；將 vercel.json 的 regions 從 ["cdg1"] 改成 ["hkg1"]。
 - **代價與後續**：每次資料庫查詢約多 0.18s，靠 L-1 並行化補回。
@@ -312,6 +321,15 @@
 - **Prompt**：換上計畫固定文案，加入保留否定、標示過去、忽略他人、不確定 confidence≤0.5、排除玩笑／假設等規則；X-2 完整簡體要求保留在「只输出 JSON」前。renderMemorySystem 改單次 regex＋函式 replacer，字面 $&／$1／{{recent}} 不會被展開或二次替換；memoryPromptUser 改固定短指令並更新 extractMemories 呼叫端。
 - **改了哪些檔案**：server/friend/memory.ts、server/prompts/02_memory.ts、tests/friend/memory.test.ts、新增 tests/friend/memory-polarity.test.ts、本紀錄。只讀取 M-1 共用否定工具，未改 shared/negation.ts、shared/types.ts、B／C 實作、前端、套件或環境檔。
 - **驗證／待辦**：失敗測試先重現正反誤去重、缺少相反記憶處理、替換字串錯誤；獨立 code／TypeScript 審查發現插入失敗遺失記憶及過期快照去重兩項問題，以四項 RED→GREEN 測試修正。涵蓋正反雙向、同向包含、跑步／跑步機、持有者／已刪／編輯保護、軟刪先於新增、精確日誌、二次操作失敗補償。固定 prompt 已逐字比對計畫＋X-2；相關 46 測試、完整 948/948、前後端 tsc、build 通過（仍有大型 bundle 警告）。LLM／Supabase 全 mock，實際模型記憶品質未量測；回滾用 revert，本次停在 M-3 Draft PR。
+
+### 2026-11-07｜X-5 記憶頁接上後端｜AI 協助｜分支 opt/X-5-memory-http
+- **做了什麼**：MemoriesSection 的 http 模式載入 listMemories，編輯採後端回傳的 MemoryRow 更新；刪除與「这不太像我」分別呼叫 DELETE／POST，成功後才移除本地列表項目。mock 仍讀 store，刪除仍走 s.deleteMemory，沒有改 useDemoStore。
+- **為什麼這樣做**：原頁面 http 模式也讀假資料，正式站永遠顯示空記憶；編輯後還原地修改 store，刪除不打後端。本次將載入、顯示狀態與不可變列表更新抽出，操作失敗保留列表及編輯內容；載入失敗顯示簡體固定錯誤，不冒充「还没有记忆」。
+- **介面**：保留既有 Card／mem-list／mem／mem-del／textarea 樣式；只補載入／錯誤狀態與同樣式的「不像我」動作。載入結果與操作以世代檢查避免卸載後套用，操作期間停用其他動作。
+- **改了哪些檔案**：src/features/friend/{ProfilePage.tsx,MemoriesSection.tsx,memoryState.ts,FunLabelsSection.tsx}、src/lib/api/friend.ts、tests/friend/memory-http.test.ts、本紀錄。ProfilePage 原 570 行，抽出記憶後仍超過單檔限制，因此將自足 FunLabelsSection 原樣移出（已核對函式內容，未改行為／樣式）；現 367 行。
+- **驗證**：先觀察缺少 memoryState 的失敗再實作；8 項離線測試涵蓋 HTTP 載入、不用 demo rows、mock 不發請求、載入失敗不顯示空狀態、edit/delete/not-like-me 成功與失敗、不可變列表及四個 API 方法／路徑。完整測試與 build 見 PR。
+- **審查**：主代理完成自我檢查；獨立 TypeScript 唯讀審查恢復後完成，未發現阻擋問題，另重跑 8 項記憶測試與型別檢查通過。同步最新 main 的 L-1／UI 更新，DEVLOG 衝突保留雙方紀錄，整合後全套 869 測試與 production build 通過。
+- **還沒做完／待辦**：需人工審查 Draft PR；未呼叫真實平台、不讀 .env.local、不連真實資料庫／寫 Supabase、不安裝套件。未修改後端或 store，未部署。
 
 ### 2026-11-07｜L-2 建任務改背景、前端輪詢任務卡｜AI 協助｜分支 opt/L-2-task-background
 - **做了什麼／為什麼**：抽出 createTaskCard，task_intent 且非 nudge 時交給 runInBackground；POST 先回 taskPending:true、taskId:null 與本回合 user／friend 兩則訊息，不等待社交任務解析。預期回覆約快 2 秒，任務卡約 2～4 秒後出現；這是待本機量測的預期，沒有真實平台延遲數據。
