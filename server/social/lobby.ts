@@ -1,5 +1,5 @@
-import { conditionKeyword } from '../../shared/negation.js'
 // B2｜搜尋大廳（docs/07B 的 B2、02 F4）。擁有者：B。
+import { conditionKeyword } from '../../shared/negation.js'
 import type { LobbyCandidate, LobbyQuery, Purpose, ShareableProfile } from '../../shared/types.js'
 import { embed } from '../lib/llm/index.js'
 import { writeLog } from '../lib/log.js'
@@ -78,14 +78,16 @@ function rankScore(c: { similarity: number; is_seed: boolean }): number {
 
 export async function searchLobby(userId: string, q: LobbyQuery): Promise<LobbyCandidate[]> {
   const conditions = q.conditions ?? []
+  const negativeKeys = conditions.map(conditionKeyword).filter(c => c.negated).map(c => c.key)
   // 互相屏蔽的人不出現在大廳，社交 Agent 也不會去找（server/social/safety.ts）
   const excluded = new Set([userId, ...(q.excludeIds ?? []), ...(await blockedIdsFor(userId))])
   const purpose = q.purpose ?? 'friend'
   const pool = (await (override ?? defaultSource)()).filter(
-    (e) => !excluded.has(e.user_id) && (purpose === 'friend' || e.purposes.includes(purpose)),
+    (e) => !excluded.has(e.user_id) && (purpose === 'friend' || e.purposes.includes(purpose))
+      && !negativeKeys.some(key => keywordHit(key, e.shareable.interests)),
   )
 
-  const queryText = q.text?.trim() || [...conditions, PURPOSE_LABEL[purpose]].join('，')
+  const queryText = q.text?.trim() || [...conditions.filter(c => !conditionKeyword(c).negated), PURPOSE_LABEL[purpose]].join('，')
   const { vector, note } = await queryVector(queryText, pool)
   const result = rankCandidates(pool, vector, conditions).slice(0, q.limit ?? DEFAULT_LIMIT)
 

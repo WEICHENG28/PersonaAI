@@ -149,3 +149,21 @@ it('penalizes a topic preceding trailing negation', async () => {
   const { keywordBonus } = await import('../../server/social/lobby.js')
   expect(keywordBonus(['对昆虫不感兴趣'], ['昆虫'])).toBe(-0.1)
 })
+
+it.each([
+  { conditions: ['不喜欢昆虫'], expected: '交友' },
+  { conditions: ['喜欢登山', '不喜欢昆虫'], expected: '喜欢登山，交友' },
+])('embeds only positive conditions and excludes negated interests: $conditions', async ({ conditions, expected }) => {
+  const provider = fakeEmbed([1, 0])
+  setLobbySource(async () => [entry('insects', ['昆虫'], [1, 0]), entry('hiking', ['登山'], [0, 1])])
+  const result = await searchLobby('me', { conditions })
+  expect(provider).toHaveBeenCalledWith(expect.objectContaining({ input: expected }))
+  expect(result.map(r => r.user_id)).toEqual(['hiking'])
+})
+it.each([true, false])('excludes negative interest matches even with explicit query text, vectors=%s', async vectors => {
+  const provider = fakeEmbed([1, 0])
+  setLobbySource(async () => [entry('insects', ['昆虫'], vectors ? [1, 0] : null), entry('hiking', ['登山'], vectors ? [0, 1] : null)])
+  const result = await searchLobby('me', { text: '寻找朋友', conditions: ['不喜欢昆虫'], limit: 5 })
+  expect(result.map(r => r.user_id)).toEqual(['hiking'])
+  if (vectors) expect(provider).toHaveBeenCalledWith(expect.objectContaining({ input: '寻找朋友' }))
+})

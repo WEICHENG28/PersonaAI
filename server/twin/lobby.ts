@@ -1,8 +1,8 @@
-import { conditionKeyword } from '../../shared/negation.js'
 // C9 大廳（docs/07C C9）：卡片列表、篩選、「我自己聊」、「讓分身去聊」；C10 助手在 lobbyAssistant.ts。擁有者：C。
 // 候選人與相似度來自 B 的 searchLobby（contracts/social），查詢文字用「我的興趣＋想找的人」，所以 AI 預估是「我和對方合不合」。
 // 卡片內容來自 user_profiles.card；為 null（或格式不對）時用 Prompt 10 產生並快取。
 // AI 預估只回文字等級（很可能合得來／可以聊聊看／差異較大），不回相似度數字、向量或對外檔案以外的資料。
+import { conditionKeyword } from '../../shared/negation.js'
 import { z } from 'zod'
 import type { AgentTask, LobbyCandidate, LobbyQuery, Purpose, ShareableProfile, StartConversationInput } from '../../shared/types.js'
 import type { LlmJsonOptions } from '../lib/llm/index.js'

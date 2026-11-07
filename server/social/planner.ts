@@ -1,6 +1,6 @@
-import { conditionKeyword, isNegated } from '../../shared/negation.js'
 // B4｜規劃器：用 LLM 挑下一位、決定代聊下一步（docs/07B 的 B4、Prompt 4）。擁有者：B。
 // LLM 的輸出一律驗證；無效或沒回應時退回程式規則，任務不會卡住。
+import { conditionKeyword, isNegated } from '../../shared/negation.js'
 import type { AgentProfile, AgentTask, Evaluation, LobbyCandidate, ShareableProfile } from '../../shared/types.js'
 import { CONFIG } from '../lib/config.js'
 import { LlmError, llmJson } from '../lib/llm/index.js'

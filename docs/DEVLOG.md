@@ -29,6 +29,7 @@
 ### 2026-11-07｜M-1 共用否定判斷與關鍵字／建檔修正｜AI 協助｜分支 opt/M-1-negation
 - **做了什麼**：新增 shared/negation.ts，逐字採用計畫 NEGATION_PATTERN，提供 isNegated、stripLikePrefix、conditionKeyword；不新增否定詞。matchesKeyword 只計正向條件，rankCandidates 改以 keywordBonus 對正向命中加 0.1、否定命中扣 0.1。
 - **為什麼這樣做**：避免「不喜欢昆虫」替昆蟲興趣加分、變成開場話題或快速建檔興趣；使用可測試的固定規則，不額外呼叫 LLM。
+- **PR #134 修正**：向量分不出否定，所以否定條件不進查詢文字，命中的人直接排除。沒有 q.text 時僅將正向條件與目的標籤送入 embedding；有 q.text 也會在排名前排除命中否定興趣的人，keywordBonus 保留原樣。另將四個檔案新 import 移至檔頭說明下。
 - **跨線處理**：planner 排除否定條件及其關鍵字（含建議話題與共同興趣回退）；C 線大廳負查詢僅在興趣／簡介不含該字時符合。快速建檔先濾否定、去喜歡前綴，再去重／限量；因否定過濾而不足兩項時逐字回固定文案「「不喜欢……」不算兴趣，至少写 2 个你喜欢的事」。
 - **改了哪些檔案**：共用 shared/negation.ts、docs/DEVLOG.md；B 線 server/social/{lobby,planner,onboarding}.ts 與 tests/social/{negation,lobby,planner,onboarding}.test.ts；C 線 server/twin/lobby.ts 與 tests/twin/lobby.test.ts。跨線與新共用檔修改已獲三人同意，未修改契約／型別／資料表。
 - **驗證**：新增五組失敗測試後實作；獨立審查發現後置否定丟失主題，以六項 RED→GREEN 測試修正解析。pattern.source 與計畫逐字一致，含不喜欢／不太喜欢、哪怕例外、正負排名、開場話題建議與回退、負查詢、快速建檔固定文案。完整測試與型別檢查結果見 PR。

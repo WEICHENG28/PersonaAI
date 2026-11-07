@@ -1,9 +1,9 @@
-import { isNegated, stripLikePrefix } from '../../shared/negation.js'
 /**
  * 新手引導（Peter 2026-11-06）：讓第一次來的人走完「聊天 → 檔案 → 進大廳 → 交辦任務 → 看結果」。
  * 進度全部從資料庫現有的紀錄算出來（不存額外狀態、不用 migration），所以中途離開下次回來會停在原來那一步。
  * 漏斗統計（管理員）也用同一套判斷。擁有者：B。
  */
+import { isNegated, stripLikePrefix } from '../../shared/negation.js'
 import type { ShareableProfile } from '../../shared/types.js'
 import { CONFIG } from '../lib/config.js'
 import { assertAllowed } from '../lib/moderation.js'
