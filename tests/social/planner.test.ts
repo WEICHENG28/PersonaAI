@@ -159,3 +159,13 @@ describe('cleanReason', () => {
     expect(cleanReason('都喜欢登山，节奏也慢', 'x')).toBe('都喜欢登山，节奏也慢')
   })
 })
+
+it('never uses a negated condition as an opening topic, including suggestions and common interests', () => {
+  expect(chooseOpeningTopic(undefined, [], ['昆虫'], ['不喜欢昆虫']) ?? '').not.toContain('昆虫')
+  expect(chooseOpeningTopic('登山时聊昆虫', ['登山'], ['登山'], ['不喜欢昆虫'])).toBe('登山')
+  expect(chooseOpeningTopic('昆虫', ['昆虫', '摄影'], ['昆虫', '摄影'], ['不喜欢昆虫'])).toBe('摄影')
+})
+
+it('excludes topics preceding trailing negation from opening suggestions', () => {
+  expect(chooseOpeningTopic('登山时聊昆虫', ['登山'], ['登山'], ['对昆虫不感兴趣'])).toBe('登山')
+})

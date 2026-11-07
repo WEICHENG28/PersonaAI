@@ -34,6 +34,16 @@
 - **踩到的坑／限制**：管理員停用／恢復與游客 Auth 刪除成功後，清掉同 authId 的兩種快取；失效前已開始的查詢不會再填回舊資料。目前 repo 沒有另外的自行刪帳 API，刪除入口是 guestCleanup 的 deleteUser（users cascade）。失效僅作用於同一 Vercel 實例；其他實例最多 60 秒後才重新驗證被停用帳號，登出後 token 在其他實例最多 60 秒內仍可能命中快取（此處的 60 秒是快取額外保留期，登出是否撤銷 access token 仍依 Supabase 行為）。
 - **驗收／待辦**：先觀察同 JWT 重複驗證測試失敗（getUser 2 次，預期 1 次），再實作；新增 37 個測試涵蓋 TTL／exp、錯誤／banned、500 筆上限、雜湊 key、雙快取失效與三條線相容，共用快取的路由測試確認 Auth／users 查詢各一次。同步 main 後 npm test 903/903、前後端 tsc 與 npm run build 通過（仍有大型 bundle 警告），獨立程式碼及 TypeScript 審查無待修問題。LLM／Supabase 全 mock；實際延遲交 Claude 本機量測。回滾用 revert；本任務完成後停在 Draft PR，不接續下一任務。
 
+### 2026-11-07｜M-1 共用否定判斷與關鍵字／建檔修正｜AI 協助｜分支 opt/M-1-negation
+- **做了什麼**：新增 shared/negation.ts，逐字採用計畫 NEGATION_PATTERN，提供 isNegated、stripLikePrefix、conditionKeyword；不新增否定詞。matchesKeyword 只計正向條件，rankCandidates 改以 keywordBonus 對正向命中加 0.1、否定命中扣 0.1。
+- **為什麼這樣做**：避免「不喜欢昆虫」替昆蟲興趣加分、變成開場話題或快速建檔興趣；使用可測試的固定規則，不額外呼叫 LLM。
+- **PR #134 修正**：向量分不出否定，所以否定條件不進查詢文字，命中的人直接排除。沒有 q.text 時僅將正向條件與目的標籤送入 embedding；有 q.text 也會在排名前排除命中否定興趣的人，keywordBonus 保留原樣。另將四個檔案新 import 移至檔頭說明下。
+- **跨線處理**：planner 排除否定條件及其關鍵字（含建議話題與共同興趣回退）；C 線大廳負查詢僅在興趣／簡介不含該字時符合。快速建檔先濾否定、去喜歡前綴，再去重／限量；因否定過濾而不足兩項時逐字回固定文案「「不喜欢……」不算兴趣，至少写 2 个你喜欢的事」。
+- **改了哪些檔案**：共用 shared/negation.ts、docs/DEVLOG.md；B 線 server/social/{lobby,planner,onboarding}.ts 與 tests/social/{negation,lobby,planner,onboarding}.test.ts；C 線 server/twin/lobby.ts 與 tests/twin/lobby.test.ts。跨線與新共用檔修改已獲三人同意，未修改契約／型別／資料表。
+- **驗證**：新增五組失敗測試後實作；獨立審查發現後置否定丟失主題，以六項 RED→GREEN 測試修正解析。pattern.source 與計畫逐字一致，含不喜欢／不太喜欢、哪怕例外、正負排名、開場話題建議與回退、負查詢、快速建檔固定文案。完整測試與型別檢查結果見 PR。
+- **踩到的坑／注意事項**：這是指定 pattern 的字串規則，不是完整中文語意解析；複合條件依第一個否定片語解析；否定後有字取後方，無字則保留前方主題（去介詞「对」），不做完整中文語意拆解。既有資料不回填；全程 mock，未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件。
+- **還沒做完／待辦**：保留 Draft PR，等待人工審查；未開始 M-2。
+
 ### 2026-11-07｜X-4 Vercel 改香港區域｜Jerry 決定（AI 協助）｜分支 opt/X-4-hkg-region
 - **做了什麼／為什麼**：依 Jerry 回報，學校平台在北京（火山引擎），巴黎連北京常逾時，阿澈和記憶擷取大量失敗；將 vercel.json 的 regions 從 ["cdg1"] 改成 ["hkg1"]。
 - **代價與後續**：每次資料庫查詢約多 0.18s，靠 L-1 並行化補回。
@@ -303,6 +313,14 @@
 ---
 
 ## A：AI 朋友線（Vincent）
+
+### 2026-11-07｜L-2 建任務改背景、前端輪詢任務卡｜AI 協助｜分支 opt/L-2-task-background
+- **做了什麼／為什麼**：抽出 createTaskCard，task_intent 且非 nudge 時交給 runInBackground；POST 先回 taskPending:true、taskId:null 與本回合 user／friend 兩則訊息，不等待社交任務解析。預期回覆約快 2 秒，任務卡約 2～4 秒後出現；這是待本機量測的預期，沒有真實平台延遲數據。
+- **失敗行為**：成功寫 task_card 後回 taskId；建任務或存卡失敗時寫日誌，插入 role:friend、kind:chat、meta:{task_failed:true}。已確認為給用戶看的 TaskError／UsageLimitError／BlockedContentError 沿用 message，其他固定顯示「刚刚没帮你把任务建好，你再说一次想找什么样的人？」；日誌或失敗訊息再次寫入失敗只 console.error，不 throw。
+- **前端**：用本回合阿澈回覆的伺服器 created_at 作 sinceIso，保留 PostgreSQL 微秒，每 2 秒 GET，最多 30 秒。忽略舊卡與單次 GET 失敗；找到卡片或 task_failed 後只按 id 合併，保留新訊息與樂觀送出；只有 task_card 設 pendingTaskId。多個輪詢共用已認領結果，避免兩個任務都收到同一張卡後提前停止；輪詢更新訊息版本，使晚到的初始化快照改走合併。卸載後停止後續 GET 並丟棄在途結果；輪詢期間不排 nudge，結束後恢復原規則。mock 模式沿用原流程。
+- **超時／限制**：30 秒超時靜默停止輪詢，不顯示錯誤、不替換聊天；背景任務仍可能完成，較晚的卡片會在下次載入聊天紀錄時顯示。使用現有 Vercel waitUntil，未改 B 線任務逾時／重試策略：任務 LLM 沿用預設 3 次 × 20 秒加 800／1600ms 退避，最壞約 62.4 秒，尚未計入前景回覆、排隊與 DB，仍可能超過部署 60 秒上限而中斷；本 PR 不保證慢模型時卡片一定完成。本次未部署或實際量測。
+- **改了哪些檔案**：server/friend/{chat,taskCard}.ts、src/features/friend/{FriendPage.tsx,chatState.ts,chatFailure.ts,chatInitialization.ts,useTaskCardPolling.ts}、tests/friend/{chat,nudge,chat-state,chat-failure,task-card,task-card-polling}.test.ts、本紀錄。共用 server/contracts/social.ts 僅補 TaskError／UsageLimitError re-export，讓 A 透過 B 契約辨識用戶可見錯誤；未改 server/social/task.ts、shared/types.ts、套件或環境檔。FriendPage 333 行，輪詢生命週期獨立在 hook。
+- **驗證／待辦**：先看到永久 pending 會卡住回覆、taskPending／onTaskPending／nudge 的失敗，再實作；fake timers 測第三次找到、超時、取消、單次失敗、在途 GET 卡住與卸載，並測成功／用戶錯誤／二次寫入失敗不 throw。獨立審查發現重疊任務重複認領、晚到初始化蓋卡兩項競態，均以 RED→GREEN 修正，並補微秒邊界測試。LLM／Supabase 全 mock；同步 main 後 npm test 895/895、前後端 tsc 與 npm run build 通過（仍有大型 bundle 警告）。真實延遲交 Claude 本機量測；回滾用 revert，停在本任務 Draft PR。
 
 ### 2026-11-07｜M-5 背景擷取保留已確認的對外檔案｜AI 協助｜分支 opt/M-5-keep-confirmed
 - **做了什麼**：extractProfile 新增 optional opts.force；非 force 且上一版 shareable_confirmed===true，只 update agent_profile／updated_at，不改 shareable_profile／shareable_confirmed／card／embedding，也不重新 embed。回傳上一版 shareable、confirmed:true、exists:true；日誌固定為「已确认的对外档案不自动覆盖，只更新说话风格」。

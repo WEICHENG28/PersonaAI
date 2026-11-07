@@ -226,3 +226,15 @@ describe('matchesName：用名字（ID）找人', () => {
     expect(matchesName('夏夏', undefined)).toBe(true)
   })
 })
+
+it('negative search matches only profiles without the keyword', async () => {
+  const { matchesQuery } = await import('../../server/twin/lobby.js')
+  expect(matchesQuery(profile('', ['昆虫']), '不喜欢昆虫')).toBe(false)
+  expect(matchesQuery(profile('研究昆虫', ['登山']), '不喜欢昆虫')).toBe(false)
+  expect(matchesQuery(profile('', ['登山']), '不喜欢昆虫')).toBe(true)
+})
+
+it('handles a search topic preceding trailing negation', async () => {
+  const { matchesQuery } = await import('../../server/twin/lobby.js')
+  expect(matchesQuery(profile('', ['登山']), '对昆虫不感兴趣')).toBe(true)
+})
