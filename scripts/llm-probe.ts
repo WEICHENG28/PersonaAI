@@ -71,20 +71,25 @@ type Reasoning = { reasoning_content?: string }
 const requestOptions = () => ({ maxRetries: 0, timeout: 30_000, signal: AbortSignal.timeout(30_000) })
 
 async function readStream(client: OpenAI, job: Job, row: ProbeResult, start: number, now: () => number) {
+  const options = requestOptions()
   const stream = await client.chat.completions.create({
     model: job.model, messages: [{ role: 'user', content: '请用一句简短的中文打招呼。' }],
     ...THINKING_VARIANTS[job.variant], max_tokens: 256,
     stream: true, stream_options: { include_usage: true },
-  }, requestOptions())
+  }, options)
   let visible = false
+  let finished = false
   for await (const chunk of stream) {
+    if (chunk.choices[0]?.finish_reason) finished = true
     const delta = chunk.choices[0]?.delta as (Reasoning & { content?: string | null }) | undefined
     row.reasoningChars += delta?.reasoning_content?.length ?? 0
     if (delta?.content?.length && row.ttftMs === null) row.ttftMs = now() - start
     if (delta?.content?.trim()) visible = true
     row.completionTokens = chunk.usage?.completion_tokens ?? row.completionTokens
   }
+  options.signal.throwIfAborted()
   if (!visible) throw new Error('串流没有返回正文')
+  if (!finished) throw new Error('串流在完成标记之前结束')
 }
 
 async function readNonstream(client: OpenAI, job: Job, row: ProbeResult) {
@@ -114,6 +119,7 @@ async function measure(client: OpenAI, job: Job, secrets: string[], now: () => n
     model: job.model, mode: job.mode, variant: job.variant, ok: false,
     ttftMs: null, totalMs: 0, completionTokens: null, reasoningChars: 0,
     jsonObject: 'skipped',
+    requestKind: job.mode === 'embed' ? 'embed' : job.json ? 'json_object' : 'text',
   }
   try {
     if (job.mode === 'embed') {
@@ -186,7 +192,7 @@ export async function main(args = process.argv.slice(2), deps: MainDeps = {}): P
   const secrets = [apiKey, baseURL]
   try {
     const client = (deps.createClient ?? (config => new OpenAI(config)))({
-      baseURL, apiKey, maxRetries: 0, timeout: 30_000,
+      baseURL, apiKey, maxRetries: 0, timeout: 30_000, logLevel: 'off',
     })
     const rows = await runProbe(opts, client, secrets)
     const report = redactError([

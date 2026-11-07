@@ -31,6 +31,7 @@ function mockClient(json = '{"ok":true}') {
         clock += 20
         yield { choices: [{ delta: { content: '你好' } }] }
         clock += 10
+        yield { choices: [{ delta: {}, finish_reason: 'stop' }] }
         yield { choices: [], usage: { prompt_tokens: 5, completion_tokens: 9, total_tokens: 14 } }
       })()
     }
@@ -152,6 +153,31 @@ describe('probe CLI and mocked platform', () => {
     expect(JSON.stringify(rows)).not.toContain('secret123')
   })
 
+  it('marks streams aborted after visible text as failed even if the iterator ends normally', async () => {
+    const fake = mockClient()
+    const controller = new AbortController()
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal)
+    fake.chat.mockImplementation(async () => (async function* () {
+      yield { choices: [{ delta: { content: '你好' }, finish_reason: null }] }
+      controller.abort(new Error('probe deadline'))
+    })())
+    try {
+      const rows = await runProbe({ ...options, embeds: [] }, fake.client)
+      expect(rows.filter(r => r.mode === 'stream').every(r => !r.ok && r.ttftMs !== null)).toBe(true)
+    } finally {
+      timeout.mockRestore()
+    }
+  })
+
+  it('rejects a clean EOF without a terminal completion chunk', async () => {
+    const fake = mockClient()
+    fake.chat.mockImplementation(async () => (async function* () {
+      yield { choices: [{ delta: { content: '你好' }, finish_reason: null }] }
+    })())
+    const rows = await runProbe({ ...options, embeds: [] }, fake.client)
+    expect(rows.filter(r => r.mode === 'stream').every(r => !r.ok)).toBe(true)
+  })
+
   it('writes a scrubbed report with SDK retries disabled', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'persona-probe-'))
     try {
@@ -163,7 +189,9 @@ describe('probe CLI and mocked platform', () => {
         cwd, loadEnv: vi.fn(), env: { LLM_BASE_URL: 'https://private.invalid/v1', LLM_API_KEY: 'secret123' },
         createClient, print,
       })
-      expect(createClient).toHaveBeenCalledWith(expect.objectContaining({ maxRetries: 0, timeout: 30000 }))
+      expect(createClient).toHaveBeenCalledWith(expect.objectContaining({
+        maxRetries: 0, timeout: 30000, logLevel: 'off',
+      }))
       const names = await readdir(join(cwd, '.local/eval'))
       expect(names).toHaveLength(1)
       expect(names[0]).toMatch(/^probe-\d{8}-\d{4}\.md$/)
@@ -208,5 +236,19 @@ describe('probe statistics and report safety', () => {
     expect(report).toContain('rejected:1')
     expect(report).toContain('1024')
     expect(report).not.toContain('http')
+  })
+
+  it('keeps text success, reasoning and usage independent from JSON capability failures', () => {
+    const report = summarizeProbe([
+      result({ mode: 'nonstream', requestKind: 'text', ttftMs: null, totalMs: 200,
+        reasoningChars: 4, completionTokens: 12 }),
+      result({ mode: 'nonstream', requestKind: 'json_object', ok: false, jsonObject: 'rejected',
+        totalMs: 9999, reasoningChars: 999, completionTokens: 999 }),
+      result({ mode: 'nonstream', requestKind: 'json_object', ok: false, jsonObject: 'skipped',
+        totalMs: 9999, reasoningChars: 999, completionTokens: 999 }),
+    ])
+    expect(report).toContain('| Qwen3.8-Flash | nonstream | qwen_no_think | — | 200 | 1/1 (100.0%) |')
+    expect(report).toContain('ok:0, rejected:1, invalid:0, skipped:1 | 4 | 12 |')
+    expect(report).toContain('错误率：66.7%')
   })
 })

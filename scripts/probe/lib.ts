@@ -16,6 +16,7 @@ export interface ProbeResult {
   completionTokens: number | null
   reasoningChars: number
   jsonObject: 'ok' | 'rejected' | 'invalid' | 'skipped'
+  requestKind?: 'text' | 'json_object' | 'embed'
   embedDim?: number
   error?: string
 }
@@ -44,17 +45,19 @@ const number = (n: number | null): string => n === null ? '—' : String(Math.ro
 
 function summarizeGroup(rows: ProbeResult[]): string {
   const first = rows[0]!
-  const ok = rows.filter(r => r.ok)
-  // JSON 能力检查是独立请求，不混入普通文本的延迟基准。
-  const timed = ok.filter(r => r.jsonObject === 'skipped')
+  const isJson = (r: ProbeResult) => r.requestKind === 'json_object' ||
+    (r.requestKind === undefined && r.jsonObject !== 'skipped')
+  const checks = rows.filter(isJson)
+  const samples = rows.filter(r => !isJson(r))
+  const ok = samples.filter(r => r.ok)
   const json = ['ok', 'rejected', 'invalid', 'skipped'].map(
-    status => `${status}:${rows.filter(r => r.jsonObject === status).length}`,
+    status => `${status}:${checks.filter(r => r.jsonObject === status).length}`,
   ).join(', ')
+  const success = samples.length ? `${ok.length}/${samples.length} (${(100 * ok.length / samples.length).toFixed(1)}%)` : '—'
   const dims = [...new Set(rows.flatMap(r => r.embedDim === undefined ? [] : [r.embedDim]))].join(', ') || '—'
   return `| ${cell(first.model)} | ${first.mode} | ${first.variant} | ` +
-    `${number(percentile(timed.flatMap(r => r.ttftMs === null ? [] : [r.ttftMs]), 50))} | ` +
-    `${number(percentile(timed.map(r => r.totalMs), 50))} | ${ok.length}/${rows.length} ` +
-    `(${(100 * ok.length / rows.length).toFixed(1)}%) | ${json} | ` +
+    `${number(percentile(ok.flatMap(r => r.ttftMs === null ? [] : [r.ttftMs]), 50))} | ` +
+    `${number(percentile(ok.map(r => r.totalMs), 50))} | ${success} | ${json} | ` +
     `${number(percentile(ok.map(r => r.reasoningChars), 50))} | ` +
     `${number(percentile(ok.flatMap(r => r.completionTokens === null ? [] : [r.completionTokens]), 50))} | ${dims} |`
 }
@@ -73,7 +76,8 @@ export function summarizeProbe(results: ProbeResult[]): string {
   return [
     '# LLM 平台探测报告', '',
     `请求数：${results.length}；失败：${failed}；错误率：${errorRate}%（含 JSON 格式验证失败）。`,
-    '延迟仅统计成功的普通文本/embedding 请求；JSON 能力检查独立执行，不计入延迟。',
+    '表内成功率仅统计普通文本/embedding 请求；延迟、reasoning、tokens 仅统计其中成功的请求。',
+    'JSON 能力检查单独计数（skipped 为传输或其他 HTTP 失败），不混入普通文本指标；总错误率涵盖所有请求。',
     'TTFT 为第一个非空正文 delta（不含 reasoning）；无正文或无 usage 时记为 —。',
     'reasoning 字数和 completion tokens 均为成功请求的 p50；不保存模型输出。', '',
     '| 模型 | 模式 | 变体 | p50 TTFT (ms) | p50 总时间 (ms) | 成功率 | json_object | p50 reasoning 字数 | p50 completion tokens | embedding 维度 |',
