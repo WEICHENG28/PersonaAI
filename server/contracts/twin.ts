@@ -2,7 +2,7 @@
 // guardText 是 C2（server/twin/guard.ts）；代聊五個函式是 C3（server/twin/conversation.ts）。
 // 沒設定 Supabase 時（B 的記憶體模式、測試）代聊函式改用記憶體版（server/twin/conversationStub.ts，回傳假資料）。
 // 擁有者：C。簽名是共用約定，改前三人同意；內部實作 C 自由替換。
-import type { ChatMessage, GuardResult, StartConversationInput } from '../../shared/types.js'
+import type { ChatMessage, GuardResult, ShareableProfile, StartConversationInput } from '../../shared/types.js'
 import { createConversationApi, defaultConversationDeps, type ConversationApi } from '../twin/conversation.js'
 import { memoryConversationApi } from '../twin/conversationStub.js'
 import { guardText as guardTextImpl } from '../twin/guard.js'
@@ -47,6 +47,6 @@ export async function markWaitingHuman(conversationId: string): Promise<void> {
 }
 
 /** 隱私守門（07C C2）：規則遮蔽個資＋Prompt 13 檢查；text 是可以送出的版本。 */
-export async function guardText(text: string, ownerUserId: string): Promise<GuardResult> {
-  return guardTextImpl(text, ownerUserId)
+export async function guardText(text: string, ownerUserId: string, opts?: { shareable?: ShareableProfile | null }): Promise<GuardResult> {
+  return guardTextImpl(text, ownerUserId, opts)
 }

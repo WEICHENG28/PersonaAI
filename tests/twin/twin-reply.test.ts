@@ -166,7 +166,7 @@ describe('twinReply', () => {
 
   it('訊息先過隱私守門，寫入的是守門後的版本，is_ai = true', async () => {
     const msg = await createTwinReply(h.deps)('conv-1', AN)
-    expect(h.guard).toHaveBeenCalledWith('我也喜欢爬山。', AN)
+    expect(h.guard).toHaveBeenCalledWith('我也喜欢爬山。', AN, { shareable: anShareable })
     expect(h.inserted).toEqual([
       { conversation_id: 'conv-1', sender_id: AN, is_ai: true, guard_rewritten: false, content: '我也喜欢爬山。' },
     ])
@@ -293,7 +293,7 @@ describe('twinReply', () => {
       const retry = h.llm.mock.calls[1]![0] as { messages: { content: string }[] }
       expect(retry.messages[0]!.content).toContain('「咖啡确实是我露营时不会漏掉的东西！」几乎一样')
       expect(h.guard).toHaveBeenCalledTimes(1)
-      expect(h.guard).toHaveBeenCalledWith('我没有特别固定的煮法，比较喜欢简单的挂耳。', AN)
+      expect(h.guard).toHaveBeenCalledWith('我没有特别固定的煮法，比较喜欢简单的挂耳。', AN, { shareable: anShareable })
       expect(h.inserted).toHaveLength(1)
       expect(msg.content).toBe('我没有特别固定的煮法，比较喜欢简单的挂耳。')
     })
