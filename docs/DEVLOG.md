@@ -26,6 +26,15 @@
 
 ## 共用與決策
 
+### 2026-11-07｜M-1 共用否定判斷與關鍵字／建檔修正｜AI 協助｜分支 opt/M-1-negation
+- **做了什麼**：新增 shared/negation.ts，逐字採用計畫 NEGATION_PATTERN，提供 isNegated、stripLikePrefix、conditionKeyword；不新增否定詞。matchesKeyword 只計正向條件，rankCandidates 改以 keywordBonus 對正向命中加 0.1、否定命中扣 0.1。
+- **為什麼這樣做**：避免「不喜欢昆虫」替昆蟲興趣加分、變成開場話題或快速建檔興趣；使用可測試的固定規則，不額外呼叫 LLM。
+- **跨線處理**：planner 排除否定條件及其關鍵字（含建議話題與共同興趣回退）；C 線大廳負查詢僅在興趣／簡介不含該字時符合。快速建檔先濾否定、去喜歡前綴，再去重／限量；因否定過濾而不足兩項時逐字回固定文案「「不喜欢……」不算兴趣，至少写 2 个你喜欢的事」。
+- **改了哪些檔案**：共用 shared/negation.ts、docs/DEVLOG.md；B 線 server/social/{lobby,planner,onboarding}.ts 與 tests/social/{negation,lobby,planner,onboarding}.test.ts；C 線 server/twin/lobby.ts 與 tests/twin/lobby.test.ts。跨線與新共用檔修改已獲三人同意，未修改契約／型別／資料表。
+- **驗證**：新增五組失敗測試後實作；獨立審查發現後置否定丟失主題，以六項 RED→GREEN 測試修正解析。pattern.source 與計畫逐字一致，含不喜欢／不太喜欢、哪怕例外、正負排名、開場話題建議與回退、負查詢、快速建檔固定文案。完整測試與型別檢查結果見 PR。
+- **踩到的坑／注意事項**：這是指定 pattern 的字串規則，不是完整中文語意解析；複合條件依第一個否定片語解析；否定後有字取後方，無字則保留前方主題（去介詞「对」），不做完整中文語意拆解。既有資料不回填；全程 mock，未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件。
+- **還沒做完／待辦**：保留 Draft PR，等待人工審查；未開始 M-2。
+
 ### 2026-11-07｜P0-5 平台設定範例、向量重算工具與 health 保護｜AI 協助｜分支 opt/P0-5-platform-switch
 - **做了什麼**：.env.example 依 P0-1 暫定 Kimi-K2.6／Qwen3.8-Max／Qwen3.8-Flash／GLM-Embedding-3（1024 維），Qwen thinking.type=disabled，待 E-3 定案；網址與金鑰留空。重算工具提供分頁讀取、可控並行、維度／有限數字檢查與逐筆失敗續跑；預設 dry-run 只讀清單，不呼叫模型、不寫入，--apply 才重算並以 pgvector 字串保存。
 - **為什麼這樣做**：新平台 embedding 與既有向量不相容，提供人工維護工具；本 PR 只交付工具與範例，不切換實際環境。抽出既有 admin 驗證，公開 deepHealth 僅回 env/suspicious，完整檢查須 admin token，結果／進行中的 Promise 快取 60 秒，避免重複探測。

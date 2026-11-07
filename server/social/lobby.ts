@@ -1,3 +1,4 @@
+import { conditionKeyword } from '../../shared/negation.js'
 // B2｜搜尋大廳（docs/07B 的 B2、02 F4）。擁有者：B。
 import type { LobbyCandidate, LobbyQuery, Purpose, ShareableProfile } from '../../shared/types.js'
 import { embed } from '../lib/llm/index.js'
@@ -44,18 +45,27 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return na && nb ? dot / Math.sqrt(na * nb) : 0
 }
 
-/** 條件關鍵字出現在對方興趣裡（雙向包含，例如「喜欢登山」對上「登山」）。 */
+/** 正向条件命中兴趣才算符合。 */
 export function matchesKeyword(conditions: string[], interests: string[]): boolean {
-  const keys = conditions.map((c) => c.replace(/^喜欢|^爱/, '').trim()).filter(Boolean)
-  return keys.some((k) => interests.some((i) => i.includes(k) || k.includes(i)))
+  return conditions.map(conditionKeyword).some(({ key, negated }) => !negated && keywordHit(key, interests))
 }
 
-/** 依向量相似度排序，條件關鍵字有出現在 interests 的加 0.1；沒有向量就只看關鍵字。 */
+function keywordHit(key: string, interests: string[]): boolean {
+  return Boolean(key) && interests.some(i => Boolean(i.trim()) && (i.includes(key) || key.includes(i)))
+}
+
+/** 每项正向命中加分，否定命中扣分；空关键字不参与。 */
+export function keywordBonus(conditions: string[], interests: string[]): number {
+  return conditions.map(conditionKeyword).reduce((bonus, { key, negated }) =>
+    bonus + (keywordHit(key, interests) ? (negated ? -KEYWORD_BONUS : KEYWORD_BONUS) : 0), 0)
+}
+
+/** 依向量相似度排序，正向條件命中 interests 加 0.1，否定命中扣 0.1；沒有向量就只看關鍵字。 */
 export function rankCandidates(entries: LobbyEntry[], queryVector: number[] | null, conditions: string[]): LobbyCandidate[] {
   return entries
     .map((e) => {
       const base = queryVector && e.embedding ? cosineSimilarity(queryVector, e.embedding) : 0
-      const bonus = matchesKeyword(conditions, e.shareable.interests) ? KEYWORD_BONUS : 0
+      const bonus = keywordBonus(conditions, e.shareable.interests)
       return { user_id: e.user_id, display_name: e.display_name, shareable: e.shareable, similarity: round(base + bonus), is_seed: e.is_seed }
     })
     // 真人略加分再排序（只影響順序，顯示的相似度不變）

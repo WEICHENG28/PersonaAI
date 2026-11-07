@@ -134,3 +134,18 @@ describe('searchLobby', () => {
     expect(result.every((r) => r.shareable.interests.some((i) => i.includes('登山')))).toBe(true)
   })
 })
+
+it('does not reward negative conditions and penalizes matching interests', async () => {
+  const { keywordBonus } = await import('../../server/social/lobby.js')
+  expect(matchesKeyword(['不喜欢昆虫'], ['昆虫'])).toBe(false)
+  expect(matchesKeyword(['喜欢登山'], ['登山'])).toBe(true)
+  expect(keywordBonus(['不喜欢昆虫'], ['昆虫'])).toBeLessThan(0)
+  expect(keywordBonus(['喜欢登山'], ['登山'])).toBe(0.1)
+  expect(keywordBonus(['不喜欢'], ['昆虫'])).toBe(0)
+  expect(rankCandidates([entry('insects', ['昆虫'], null), entry('hiking', ['登山'], null)], null, ['不喜欢昆虫'])[0]?.user_id).toBe('hiking')
+})
+
+it('penalizes a topic preceding trailing negation', async () => {
+  const { keywordBonus } = await import('../../server/social/lobby.js')
+  expect(keywordBonus(['对昆虫不感兴趣'], ['昆虫'])).toBe(-0.1)
+})

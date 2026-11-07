@@ -1,3 +1,4 @@
+import { conditionKeyword } from '../../shared/negation.js'
 // C9 大廳（docs/07C C9）：卡片列表、篩選、「我自己聊」、「讓分身去聊」；C10 助手在 lobbyAssistant.ts。擁有者：C。
 // 候選人與相似度來自 B 的 searchLobby（contracts/social），查詢文字用「我的興趣＋想找的人」，所以 AI 預估是「我和對方合不合」。
 // 卡片內容來自 user_profiles.card；為 null（或格式不對）時用 Prompt 10 產生並快取。
@@ -129,12 +130,15 @@ export function myQueryText(me: ShareableProfile): string {
 
 /** 興趣關鍵字：雙向包含（「登山」對上「爱登山」），也看一句話介紹。 */
 export function matchesQuery(profile: ShareableProfile, q: string): boolean {
-  const key = q.toLowerCase()
+  const { key: keyword, negated } = conditionKeyword(q)
+  const key = keyword.toLowerCase()
+  if (!key) return false
   const hit = (s: string) => {
     const v = s.toLowerCase()
     return v.includes(key) || (v.length > 0 && key.includes(v))
   }
-  return profile.interests.some(hit) || profile.intro.toLowerCase().includes(key)
+  const matched = profile.interests.some(hit) || profile.intro.toLowerCase().includes(key)
+  return negated ? !matched : matched
 }
 
 /** 名字（帳號 ID）包含搜尋字就算，不分大小寫。 */

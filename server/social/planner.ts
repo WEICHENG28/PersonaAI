@@ -1,3 +1,4 @@
+import { conditionKeyword, isNegated } from '../../shared/negation.js'
 // B4｜規劃器：用 LLM 挑下一位、決定代聊下一步（docs/07B 的 B4、Prompt 4）。擁有者：B。
 // LLM 的輸出一律驗證；無效或沒回應時退回程式規則，任務不會卡住。
 import type { AgentProfile, AgentTask, Evaluation, LobbyCandidate, ShareableProfile } from '../../shared/types.js'
@@ -106,10 +107,16 @@ export async function pickMostSimilar(task: AgentTask, candidates: LobbyCandidat
  * 規劃器給的話題有提到我的興趣或任務條件就採用；否則改用雙方共同興趣，再不然用任務條件或我的第一個興趣。
  */
 export function chooseOpeningTopic(suggested: string | undefined, mine: string[], theirs: string[], conditions: string[]): string | undefined {
-  const keys = [...mine, ...conditions.map((c) => c.replace(/^喜欢|^爱/, ''))].map((k) => k.trim()).filter(Boolean)
-  if (suggested && keys.some((k) => suggested.includes(k))) return suggested
-  const common = mine.find((m) => theirs.some((t) => t.includes(m) || m.includes(t)))
-  return common ?? keys[0] ?? suggested
+  const parsed = conditions.map(conditionKeyword)
+  const excluded = parsed.filter(c => c.negated && c.key).map(c => c.key)
+  const allowed = (text: string) => !isNegated(text)
+    && !excluded.some(key => text.includes(key) || key.includes(text))
+  const interests = mine.map(k => k.trim()).filter(k => k && allowed(k))
+  const keys = [...interests, ...parsed.filter(c => !c.negated).map(c => c.key)]
+    .filter(k => k && allowed(k))
+  if (suggested && allowed(suggested) && keys.some(k => suggested.includes(k))) return suggested
+  const common = interests.find(m => theirs.some(t => allowed(t) && (t.includes(m) || m.includes(t))))
+  return common ?? keys[0] ?? (suggested && allowed(suggested) ? suggested : undefined)
 }
 
 async function fallback(task: AgentTask, candidates: LobbyCandidate[], note: string, myInterests: string[]): Promise<PickResult> {
