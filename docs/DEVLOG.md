@@ -305,6 +305,14 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-11-07｜M-3 記憶去重分正反、否定／過去／他人／不確定 prompt｜AI 協助｜分支 opt/M-3-memory-polarity
+- **做了什麼／為什麼**：isDuplicateMemory 簽名不變，先用 M-1 的 isNegated 比較正反，異向不算重複，同向保留原本 ≥2 字包含去重。memoryTopicKey 沿用 shared/negation.ts 的 NEGATION_PATTERN／stripLikePrefix，去掉「用户」、否定詞、喜歡前綴、標點與空白；findContradicted 只接受完整主題相同且正反相反的未刪記憶，因此「用户喜欢跑步」與「用户不喜欢跑步机」不互刪。不另建否定詞表，也不修改共用工具。
+- **寫入順序與日誌**：在新增之前，依 id、user_id、原內容、deleted_at:null 條件軟刪舊列，避免 LLM 等待時的並行編輯被誤刪；確實刪到才記「新记忆与旧记忆相反，旧记忆已移除：<舊內容>」。同方向的新記憶已存在時仍清除相反舊列；去重重新讀當前有效資料，不能用 LLM 等待前的舊快照。
+- **失敗保護／限制**：新增或後續軟刪失敗時，嘗試恢復本輪已刪列；恢復限定原 id／持有者／內容及本輪 deleted_at，避免覆蓋後續修改，並記錄恢復。這是補償處理、不是 DB transaction；恢復本身若失敗會 console.error，原錯誤仍往上拋，不能保證資料庫斷線時完全回復。正常新增路徑多一次有效記憶讀取；沒有 migration 或真實 DB 寫入。
+- **Prompt**：換上計畫固定文案，加入保留否定、標示過去、忽略他人、不確定 confidence≤0.5、排除玩笑／假設等規則；X-2 完整簡體要求保留在「只输出 JSON」前。renderMemorySystem 改單次 regex＋函式 replacer，字面 $&／$1／{{recent}} 不會被展開或二次替換；memoryPromptUser 改固定短指令並更新 extractMemories 呼叫端。
+- **改了哪些檔案**：server/friend/memory.ts、server/prompts/02_memory.ts、tests/friend/memory.test.ts、新增 tests/friend/memory-polarity.test.ts、本紀錄。只讀取 M-1 共用否定工具，未改 shared/negation.ts、shared/types.ts、B／C 實作、前端、套件或環境檔。
+- **驗證／待辦**：失敗測試先重現正反誤去重、缺少相反記憶處理、替換字串錯誤；獨立 code／TypeScript 審查發現插入失敗遺失記憶及過期快照去重兩項問題，以四項 RED→GREEN 測試修正。涵蓋正反雙向、同向包含、跑步／跑步機、持有者／已刪／編輯保護、軟刪先於新增、精確日誌、二次操作失敗補償。固定 prompt 已逐字比對計畫＋X-2；相關 46 測試、完整 948/948、前後端 tsc、build 通過（仍有大型 bundle 警告）。LLM／Supabase 全 mock，實際模型記憶品質未量測；回滾用 revert，本次停在 M-3 Draft PR。
+
 ### 2026-11-07｜L-2 建任務改背景、前端輪詢任務卡｜AI 協助｜分支 opt/L-2-task-background
 - **做了什麼／為什麼**：抽出 createTaskCard，task_intent 且非 nudge 時交給 runInBackground；POST 先回 taskPending:true、taskId:null 與本回合 user／friend 兩則訊息，不等待社交任務解析。預期回覆約快 2 秒，任務卡約 2～4 秒後出現；這是待本機量測的預期，沒有真實平台延遲數據。
 - **失敗行為**：成功寫 task_card 後回 taskId；建任務或存卡失敗時寫日誌，插入 role:friend、kind:chat、meta:{task_failed:true}。已確認為給用戶看的 TaskError／UsageLimitError／BlockedContentError 沿用 message，其他固定顯示「刚刚没帮你把任务建好，你再说一次想找什么样的人？」；日誌或失敗訊息再次寫入失敗只 console.error，不 throw。
