@@ -13,6 +13,7 @@ import {
   type RespondView,
 } from '@lib/api/twin'
 import { NOTIFY_TEXT, withChoice, withRead, withResponse } from './notificationView'
+import { startNotificationFeed } from './notificationFeed'
 
 /** Realtime 断线时，多久重新读一次通知。 */
 const FALLBACK_POLL_MS = 15000
@@ -55,11 +56,11 @@ export function useNotifications(enabled: boolean): NotificationsState {
   useEffect(() => {
     if (!enabled) return
     setRealtimeDown(false)
-    void reload()
-    return subscribeNotifications(
-      () => void reload(),
-      () => setRealtimeDown(true),
-    )
+    return startNotificationFeed({
+      subscribe: subscribeNotifications,
+      reload: () => void reload(),
+      onFailed: () => setRealtimeDown(true),
+    })
   }, [enabled, reload])
 
   useEffect(() => {
