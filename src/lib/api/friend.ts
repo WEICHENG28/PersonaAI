@@ -132,7 +132,9 @@ export interface FriendMessage {
 }
 
 export interface FriendChatResult {
-  reply: string
+  messages?: FriendMessage[]
+  taskPending?: boolean
+  reply: string | null
   taskId: string | null
   sharedEventId: string | null
 }

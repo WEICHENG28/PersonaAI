@@ -296,6 +296,16 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-11-07｜L-1 阿澈查詢並行、背景日誌與 POST 訊息回傳｜AI 協助｜分支 opt/L-1-friend-parallel
+- **做了什麼**：用量與朋友狀態並行；用戶 INSERT RETURNING、歷史及記憶讀取並行，再以 mergeHistory 按 id 去重／時間排序／截斷，確保上下文含本次輸入。POST 直接回傳本輪已儲存的 user／friend（有任務時含 task_card），前端套用 applyChatResult，舊格式才 GET；taskPending 預留 optional 欄位，本次不做 L-2。
+- **依序等待對照**：既有用戶的一般聊天（非 nudge、無 task_intent）：無事件為 7→3 批，有事件為 8→4 批。批次按關鍵路徑計、平行 SQL 算一批；改後分別為 [用量＋朋友狀態]、[用戶寫入＋歷史＋記憶]、回覆寫入，有事件再更新狀態。前景 SQL 總數分別 7→6、8→7，僅日誌移出前景，其餘是並行而非刪查詢；既有背景 count／記憶／檔案擷取不計入此表。
+- **為什麼這樣做**：香港連巴黎每次查詢約 180ms，優先消除依序等待。計畫原擬回覆／事件更新並行，但審查發現回覆失敗仍可能消耗事件，改保留先確認儲存成功再更新，換取正確性。新用戶初始化多一批，唯一鍵競爭再多一批；nudge 額外有防重複查詢，task_intent 保留現有建任務鏈（L-2 再改）。
+- **背景與計時**：countUserChatMessages 維持 M-2 整段背景 chain，不進前景 Promise.all。「回应用户」writeLog 改 runInBackground，仍包含 detail.timing／detail.llm／taskId；timing 在交付背景前取快照，整數毫秒。context 為讀寫重疊的整段時間，db.read 與 db.write 各量耗時，不能相加當總時間。
+- **前端保護**：POST、相容 GET、失敗恢復 GET 與延後執行的 state updater 均檢查 sendSeq；nudge 也增版本並守住送出狀態。保留 X-1 的恢復 GET／失敗原文標記。X-3 初始化 GET 因版本保護不能覆蓋時，只補缺少的 id，已顯示的新回覆與失敗暫存優先，避免快速 POST 漏掉舊歷史／intro／report。
+- **改了哪些檔案**：server/friend/chat.ts、src/lib/api/friend.ts、src/features/friend/{FriendPage.tsx,chatState.ts,chatInitialization.ts}、tests/friend/{chat,chat-state,chat-initialization-send,nudge}.test.ts、本紀錄。無契約／資料表／套件變更。
+- **驗證**：先觀察新介面與慢日誌的失敗再實作；獨立審查兩項發現以三項 RED→GREEN 修正。測試含兩組讀寫確實同時開始、背景 count 不阻塞、背景日誌 pending 仍回覆且保留 metric／timing、POST 直接回傳、舊回應與恢復 GET 不蓋新訊息、初始化交錯與事件儲存失敗。完整測試與型別結果見 PR。
+- **還沒做完／待辦**：真實 db.read p50 與一般成功送出單請求需部署驗證；本次僅 mock，不呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件。保留 Draft PR，未合併、未開始 L-2。
+
 ### 2026-11-07｜M-2 最新訊息查詢、記憶編輯與定期擷取修正｜AI 協助｜分支 opt/M-2-query-fixes
 - **做了什麼**：記憶查詢改 created_at 降序、精準 limit(6)，回 prompt 前複製並 reverse 成正序；檔案查詢先過濾 role=user，再降序取 PROFILE_USER_LINES_LIMIT（60）並 reverse。editMemory 改寫正確的 user_memory 表，保留 user_id／id／deleted_at 篩選。
 - **為什麼這樣做**：原本 ascending + 大 limit 只會看到舊訊息；聊天上下文的 user 數會穩定在約 10，無法觸發每 6 則擷取。新增 countUserChatMessages 以 exact/head 計全量、只算本用戶 role=user/kind=chat，friendChat 以此判斷。

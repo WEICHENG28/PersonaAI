@@ -13,7 +13,8 @@ import { LoadingDots } from '@components/ui/LoadingDots'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
 import { useLobbyInvite } from '@features/social/components/LobbyInvite'
 import { useOnboardingGuide } from '@features/social/components/OnboardingGuide'
-import { reconcileChatFailure, shouldScheduleNudge } from './chatFailure'
+import { shouldScheduleNudge } from './chatFailure'
+import { applyChatResult, mergeInitializedHistory, sendChatTurn } from './chatState'
 import { initializeFriendPage } from './chatInitialization'
 import {
   isHttpMode,
@@ -72,6 +73,7 @@ export function FriendPage() {
       hasUnconfirmedSend: () => unconfirmedSend.current,
       isActive: () => active,
       onMessages: (msgs) => { setHttpMessages(msgs); setMessagesLoaded(true) },
+      onStaleMessages: msgs => { setHttpMessages(prev => mergeInitializedHistory(prev, msgs)); setMessagesLoaded(true) },
       onSettings: (settings) => setHttpDevMode(settings?.dev_mode ?? false),
       onMessagesError: (error) => console.error('[FriendPage] loadMessages', error),
     })
@@ -81,7 +83,7 @@ export function FriendPage() {
   const send = useCallback(async () => {
     const text = draft.trim()
     if (!text) return
-    sendSeq.current += 1
+    const seq = ++sendSeq.current
     setDraft('')
 
     if (!isHttpMode) {
@@ -92,7 +94,7 @@ export function FriendPage() {
     // http 模式：乐观添加用户消息，再打 API
     sendInFlight.current = true
     unconfirmedSend.current = true
-    const tempId = `tmp-${Date.now()}`
+    const tempId = `tmp-${seq}-${Date.now()}`
     setHttpMessages((prev) => [
       ...prev,
       {
@@ -107,34 +109,13 @@ export function FriendPage() {
     setHttpTyping(true)
     setHttpError(null)
 
-    try {
-      const result = await callFriendChat(text)
-      // 拉最新消息（包含 AI 回复）
-      const msgs = await getFriendMessages()
-      unconfirmedSend.current = false
-      setHttpMessages(msgs)
-      setMessagesLoaded(true)
-      // task_intent：后端已建真任务（pending_confirm），显示 B 的确认卡
-      if (result.taskId) {
-        setPendingTaskId(result.taskId)
-        // 更新侧栏任务列表
-      }
-    } catch (e: unknown) {
-      setHttpError(e instanceof Error ? e.message : '阿澈刚刚恍神了，再说一次？')
-      // 后端可能已经保存用户消息；重读失败时保留原文并标记，避免用户误以为没送出。
-      let serverMessages: FriendMessage[] | null = null
-      try {
-        serverMessages = await getFriendMessages()
-      } catch { /* 无法确认保存状态，保留乐观消息 */ }
-      setHttpMessages((prev) => reconcileChatFailure(prev, tempId, serverMessages))
-      if (serverMessages !== null) {
-        unconfirmedSend.current = false
-        setMessagesLoaded(true)
-      }
-    } finally {
-      sendInFlight.current = false
-      setHttpTyping(false)
-    }
+    await sendChatTurn(text, tempId, seq, {
+      readSendSeq: () => sendSeq.current, callFriendChat, getFriendMessages, setMessages: setHttpMessages,
+      onConfirmed: () => { unconfirmedSend.current = false; setMessagesLoaded(true) },
+      onTask: setPendingTaskId,
+      onError: error => setHttpError(error instanceof Error ? error.message : '阿澈刚刚恍神了，再说一次？'),
+      onSettled: () => { sendInFlight.current = false; setHttpTyping(false) },
+    })
   }, [draft, s])
 
 
@@ -149,13 +130,20 @@ export function FriendPage() {
     if (document.visibilityState !== 'visible') return
     const timer = setTimeout(async () => {
       if (document.visibilityState !== 'visible') return // 触发瞬间再确认一次
+      if (sendInFlight.current || unconfirmedSend.current) return
+      const seq = ++sendSeq.current
+      sendInFlight.current = true
       setHttpTyping(true)
       try {
-        await callFriendChat('', 'nudge')
-        const msgs = await getFriendMessages()
-        setHttpMessages(msgs)
+        const result = await callFriendChat('', 'nudge')
+        if (seq !== sendSeq.current) return
+        if (result.messages) setHttpMessages(prev => seq === sendSeq.current ? applyChatResult(prev, '', result) ?? prev : prev)
+        else {
+          const msgs = await getFriendMessages()
+          if (seq === sendSeq.current) setHttpMessages(prev => seq === sendSeq.current ? msgs : prev)
+        }
       } catch { /* nudge 失败静默 */ } finally {
-        setHttpTyping(false)
+        if (seq === sendSeq.current) { sendInFlight.current = false; setHttpTyping(false) }
       }
     }, 75_000) // 75 秒（60–90s 范围内）
     return () => clearTimeout(timer)
