@@ -22,7 +22,7 @@ export interface GuardDeps {
   writeLog(entry: AgentLogInput): Promise<void>
 }
 
-export type GuardTextFn = (text: string, ownerUserId: string) => Promise<GuardResult>
+export type GuardTextFn = (text: string, ownerUserId: string, opts?: { shareable?: ShareableProfile | null }) => Promise<GuardResult>
 
 const GUARD_TEMPERATURE = 0
 
@@ -93,7 +93,7 @@ async function recheckRewrite(
 }
 
 export function createGuardText(deps: GuardDeps): GuardTextFn {
-  return async function guardText(text, ownerUserId) {
+  return async function guardText(text, ownerUserId, opts) {
     if (text.trim() === '') return { ok: true, text, issues: [] }
 
     // 1. 規則先擋；交給 LLM 的也是遮蔽後的版本，個資不送出去
@@ -104,7 +104,7 @@ export function createGuardText(deps: GuardDeps): GuardTextFn {
     let llm: GuardLlmResult
     let shareable: ShareableProfile | null
     try {
-      shareable = await deps.getShareableProfile(ownerUserId)
+      shareable = opts?.shareable !== undefined ? opts.shareable : await deps.getShareableProfile(ownerUserId)
       llm = await checkWithLlm(deps, shareable, rules.text)
     } catch (err) {
       const issues = hitsToIssues(rules.hits)
@@ -144,4 +144,4 @@ export function defaultGuardDeps(): GuardDeps {
 }
 
 /** server/contracts/twin.ts 的 guardText 呼叫這個。 */
-export const guardText: GuardTextFn = (text, ownerUserId) => createGuardText(defaultGuardDeps())(text, ownerUserId)
+export const guardText: GuardTextFn = (text, ownerUserId, opts) => createGuardText(defaultGuardDeps())(text, ownerUserId, opts)

@@ -35,6 +35,11 @@
 - **驗證**：新增五組失敗測試後實作；獨立審查發現後置否定丟失主題，以六項 RED→GREEN 測試修正解析。pattern.source 與計畫逐字一致，含不喜欢／不太喜欢、哪怕例外、正負排名、開場話題建議與回退、負查詢、快速建檔固定文案。完整測試與型別檢查結果見 PR。
 - **踩到的坑／注意事項**：這是指定 pattern 的字串規則，不是完整中文語意解析；複合條件依第一個否定片語解析；否定後有字取後方，無字則保留前方主題（去介詞「对」），不做完整中文語意拆解。既有資料不回填；全程 mock，未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件。
 - **還沒做完／待辦**：保留 Draft PR，等待人工審查；未開始 M-2。
+### 2026-11-07｜X-4 Vercel 改香港區域｜Jerry 決定（AI 協助）｜分支 opt/X-4-hkg-region
+- **做了什麼／為什麼**：依 Jerry 回報，學校平台在北京（火山引擎），巴黎連北京常逾時，阿澈和記憶擷取大量失敗；將 vercel.json 的 regions 從 ["cdg1"] 改成 ["hkg1"]。
+- **代價與後續**：每次資料庫查詢約多 0.18s，靠 L-1 並行化補回。
+- **改了哪些檔案**：僅 vercel.json 區域設定與本紀錄，其餘設定不動。
+- **還沒做完／待辦**：部署後確認香港區域與實際延遲、逾時改善；本次未部署或呼叫真實平台，保留 Draft PR 等待人工審查。
 
 ### 2026-11-07｜P0-5 平台設定範例、向量重算工具與 health 保護｜AI 協助｜分支 opt/P0-5-platform-switch
 - **做了什麼**：.env.example 依 P0-1 暫定 Kimi-K2.6／Qwen3.8-Max／Qwen3.8-Flash／GLM-Embedding-3（1024 維），Qwen thinking.type=disabled，待 E-3 定案；網址與金鑰留空。重算工具提供分頁讀取、可控並行、維度／有限數字檢查與逐筆失敗續跑；預設 dry-run 只讀清單，不呼叫模型、不寫入，--apply 才重算並以 pgvector 字串保存。
@@ -299,6 +304,15 @@
 ---
 
 ## A：AI 朋友線（Vincent）
+
+### 2026-11-07｜M-2 最新訊息查詢、記憶編輯與定期擷取修正｜AI 協助｜分支 opt/M-2-query-fixes
+- **做了什麼**：記憶查詢改 created_at 降序、精準 limit(6)，回 prompt 前複製並 reverse 成正序；檔案查詢先過濾 role=user，再降序取 PROFILE_USER_LINES_LIMIT（60）並 reverse。editMemory 改寫正確的 user_memory 表，保留 user_id／id／deleted_at 篩選。
+- **為什麼這樣做**：原本 ascending + 大 limit 只會看到舊訊息；聊天上下文的 user 數會穩定在約 10，無法觸發每 6 則擷取。新增 countUserChatMessages 以 exact/head 計全量、只算本用戶 role=user/kind=chat，friendChat 以此判斷。
+- **nudge**：記憶擷取、全量計數與檔案擷取全部包在 !isNudge，避免主動接話的佔位文字進入記憶。
+- **改了哪些檔案**：server/friend/{memory,profile,chat}.ts、tests/friend/{memory,profile,chat,nudge}.test.ts 與 A 線本紀錄。從 main 獨立開分支，未帶入 #134 或修改 M-1 的程式／測試檔。
+- **驗證**：六項新增回歸測試先失敗再實作；獨立審查發現 count 可能延後回覆，另補慢計數 RED→GREEN 測試，將計數至檔案擷取整段交給 runInBackground。覆蓋最新六則正序、500 則交錯訊息中的最新 60 則 user、正確記憶表與持有者篩選、count/head 與角色／kind／用戶隔離、視窗 10 但全量 12 仍擷取，以及 nudge 不擷取／不計數。完整測試與型別結果見 PR。
+- **踩到的坑／注意事項**：DB mock 新增篩選、降序、limit 與 count/head 行為，避免測試依賴舊資料排序。一般聊天額外有一次背景全量 count 查詢；計數 Promise 由背景工作保留，慢計數不阻塞主回覆，失敗用固定警告且跳過本輪檔案擷取。本次不改自動擷取覆蓋已確認檔案的規則（M-3）。
+- **還沒做完／待辦**：保留 Draft PR 等待人工審查；未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件；未開始 M-3。
 
 ### 2026-11-07｜X-2 檔案、記憶、回報與趣味 prompt 要求簡體輸出｜AI 協助｜分支 opt/X-2-prompt-simplified
 - **做了什麼**：在四份 prompt 的「只输出 JSON」之前加入計畫指定的固定文案，要求所有輸出使用簡體、將用戶輸入的繁體轉成簡體；檔案 intro 範例「20 字內」改為「20 字内」。
@@ -852,6 +866,15 @@
 ---
 
 ## C：分身與大廳線（Jerry）
+
+### 2026-11-07｜L-3 分身背景工作與守門重用檔案｜AI 協助｜分支 opt/L-3-twin-background
+- **做了什麼**：routes/twin 的本人發言後異常檢查改 runInBackground；種子自動回應使用 scheduleInBackground。延遲與 callback 共用同一個交給 waitUntil 的 Promise，callback 可回 Promise，必須 await 完成後才 resolve；同步 throw／非同步 reject 用固定警告後安全結束。
+- **為什麼這樣做**：Vercel 回覆後可能凍結裸 void／setTimeout 工作。計畫的 try run finally 範例會提早 resolve，依使用者明確指示改 await。requestHuman 原本的排程 callback 也會丟棄 respond 的 Promise，這次一併最小修改回傳它，才能追蹤完整生命週期。
+- **守門**：GuardTextFn 與 contracts/twin.guardText 新增 optional opts.shareable；值非 undefined（包含 null）就重用，不再讀取。twinReply 傳入已讀取的 shareable，改寫後重檢仍用同份檔案；舊兩參數與空 opts 保持讀取行為。
+- **改了哪些檔案**：server/routes/twin.ts、server/twin/{guard,twin,requestHuman}.ts、server/contracts/twin.ts（共用簽名，新增 optional）、server/lib/background.ts（B 線）、tests/twin/{guard,twin-reply,request-human,twin-routes-bg}.test.ts、本紀錄。從最新 main 獨立開分支，未合入 #134／#136，未修改它們的程式／測試檔。
+- **驗證**：先觀察九項新／變更測試失敗再實作；fake timers 與假的 Vercel request context 收集 waitUntil Promise，驗證 delay 前不跑、async run pending 時背景 Promise 不先完成、同步／非同步失敗、seed callback 回傳 Promise。另測 guard 重用非空與 null 檔案、舊介面相容，以及 twinReply 傳檔案。完整測試與型別結果見 PR。
+- **踩到的坑／注意事項**：只把 setTimeout 外層包 Promise 不夠，callback 也必須回傳內部非同步工作；延遲時間與背景工作仍共用 Vercel 函式生命週期，這不是持久化排程，也不延長 60s 上限。
+- **還沒做完／待辦**：保留 Draft PR 等待人工審查；未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件；未開始下一個任務。
 
 ### 2026-10-31｜分身品質修正（鬼打牆、日誌洗版）｜Jerry（AI 協助）｜PR #88
 - **做了什麼**：照「全線檢查結果」與 B9 的回報修 C 線兩件事（大廳 C9／C10 在 PR #87）。

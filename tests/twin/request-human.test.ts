@@ -291,3 +291,12 @@ describe('respond 回應請求真人', () => {
     expect(h.deps.endConversation).not.toHaveBeenCalled()
   })
 })
+
+it('returns the seed auto-response promise to the scheduler', async () => {
+  const h = harness({ seed: true, notification: notification({ id: 'n-new' }) })
+  await h.api.requestHuman(CONV_ID, ME)
+  const task = h.scheduled[0]!.run()
+  expect(task).toBeInstanceOf(Promise)
+  await task
+  expect(h.deps.postTwinMessage).toHaveBeenCalled()
+})

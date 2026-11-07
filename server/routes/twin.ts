@@ -4,6 +4,7 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { isAuthFailure, requireAuth } from '../lib/auth.js'
+import { runInBackground, scheduleInBackground } from '../lib/background.js'
 import { writeLog } from '../lib/log.js'
 import { CONFIG } from '../lib/config.js'
 import { getServiceClient } from '../lib/supabase.js'
@@ -233,7 +234,7 @@ export const twinRoutes = createTwinRoutes({
       twinReply,
       writeLog,
       // C8：每則本人訊息後背景檢查言行異常，不擋發言
-      afterHumanMessage: (id, userId) => void getAnomalyApi().checkAfterHumanMessage(id, userId),
+      afterHumanMessage: (id, userId) => runInBackground(getAnomalyApi().checkAfterHumanMessage(id, userId)),
     })),
   result: () =>
     (resultApi ??= createResultApi({
@@ -259,7 +260,7 @@ export const twinRoutes = createTwinRoutes({
       },
       endConversation: (id, reason, closerUserId) => getConversationApi().endConversation(id, reason, { closerUserId }),
       writeLog,
-      schedule: (ms, run) => void setTimeout(run, ms),
+      schedule: scheduleInBackground,
       now: () => new Date(),
       seedAutoResponse: CONFIG.SEED_AUTO_RESPONSE,
     })),

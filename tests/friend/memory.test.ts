@@ -31,7 +31,7 @@ vi.mock('../../server/lib/log', () => ({ writeLog: vi.fn(async () => {}) }))
 
 import { llmJson } from '../../server/lib/llm'
 import { writeLog } from '../../server/lib/log'
-import { extractMemories, isDuplicateMemory, listMemories, deleteMemory, markNotLikeMe } from '../../server/friend/memory'
+import { editMemory, extractMemories, isDuplicateMemory, listMemories, deleteMemory, markNotLikeMe } from '../../server/friend/memory'
 import { renderMemorySystem } from '../../server/prompts/02_memory'
 
 function makeTable(name: string): TableMock {
@@ -174,4 +174,21 @@ describe('listMemories / deleteMemory / markNotLikeMe', () => {
     const ok = await markNotLikeMe('u1', 'm1')
     expect(ok).toBe(true)
   })
+})
+
+it('queries only latest six messages and renders them chronologically', async () => {
+  const table = tables.friend_messages!
+  table.limit.mockResolvedValueOnce({ data: [6, 5, 4, 3, 2, 1].map(n => ({ role: 'user', content: `recent-${n}` })), error: null })
+  await extractMemories('u1', 'now')
+  expect(table.order).toHaveBeenCalledWith('created_at', { ascending: false })
+  expect(table.limit).toHaveBeenCalledWith(6)
+  const system = vi.mocked(llmJson).mock.calls[0]![0].system
+  expect(system.indexOf('recent-1')).toBeLessThan(system.indexOf('recent-6'))
+})
+it('edits user_memory with ownership and soft deletion filters', async () => {
+  tables.user_memory!.list.push({ id: 'm1', user_id: 'u1', content: 'old', deleted_at: null })
+  expect(await editMemory('u1', 'm1', ' new ')).toMatchObject({ content: 'new', source: 'user_edited', confidence: 1 })
+  expect(tables.user_memory!.eq).toHaveBeenCalledWith('user_id', 'u1')
+  expect(tables.user_memory!.eq).toHaveBeenCalledWith('id', 'm1')
+  expect(tables.user_memory!.is).toHaveBeenCalledWith('deleted_at', null)
 })

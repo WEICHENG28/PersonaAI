@@ -6,12 +6,11 @@ import type {
   AgentLogInput,
   ChatMessage,
   Controller,
-  GuardResult,
   ShareableProfile,
   StyleProfile,
 } from '../../shared/types.js'
 import { getShareableProfile, getStyleProfile } from '../contracts/friend.js'
-import { guardText } from './guard.js'
+import { guardText, type GuardTextFn } from './guard.js'
 import { maskBlocked } from '../lib/moderation.js'
 import { llmJson, type LlmJsonOptions } from '../lib/llm/index.js'
 import { writeLog } from '../lib/log.js'
@@ -78,7 +77,7 @@ export interface TwinDeps {
   store: TwinStore
   getShareableProfile(userId: string): Promise<ShareableProfile | null>
   getStyleProfile(userId: string): Promise<StyleProfile | null>
-  guardText(text: string, ownerUserId: string): Promise<GuardResult>
+  guardText: GuardTextFn
   llmJson<T>(opts: LlmJsonOptions<T>): Promise<T>
   writeLog(entry: AgentLogInput): Promise<void>
 }
@@ -191,7 +190,7 @@ export function createTwinReply(deps: TwinDeps): TwinReplyFn {
     const reply = await generateReply(deps, system, ownSaid, options.extraInstruction)
 
     // 4. 隱私守門 → 寫入 messages
-    const guarded = await deps.guardText(reply.message, speakerUserId)
+    const guarded = await deps.guardText(reply.message, speakerUserId, { shareable })
     const saved = await deps.store.insertMessage({
       conversation_id: conversationId,
       sender_id: speakerUserId,

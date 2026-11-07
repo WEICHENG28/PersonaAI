@@ -42,6 +42,13 @@ vi.mock('../../server/friend/memory', () => ({
   listMemories: vi.fn(async () => []),
 }))
 
+vi.mock('../../server/friend/profile', () => ({
+  countUserChatMessages: vi.fn(async () => 1),
+  shouldExtractProfile: (n: number) => n > 0 && n % 6 === 0,
+  extractProfile: vi.fn(async () => ({})),
+}))
+import { countUserChatMessages, extractProfile } from '../../server/friend/profile'
+
 import { llmJson } from '../../server/lib/llm'
 import { createTaskFromText } from '../../server/social/task'
 import { chatBodySchema, friendChat, friendIntro } from '../../server/friend/chat'
@@ -251,4 +258,25 @@ describe('friendIntro', () => {
     await friendIntro('u1')
     expect(tables['friend_messages']!.list).toHaveLength(0)
   })
+})
+
+it('extracts profile at full count 12 despite only ten recent user messages', async () => {
+  tables.friend_messages!.limit.mockResolvedValue({ data: Array.from({ length: 10 }, () => ({ role: 'user', kind: 'chat', content: 'hi' })), error: null })
+  vi.mocked(countUserChatMessages).mockResolvedValueOnce(12)
+  await friendChat('u1', 'hello')
+  expect(countUserChatMessages).toHaveBeenCalledWith('u1')
+  expect(extractProfile).toHaveBeenCalledWith('u1')
+})
+
+it('does not block the chat reply while the exact count is pending', async () => {
+  let release!: (value: number) => void
+  vi.mocked(countUserChatMessages).mockImplementationOnce(() => new Promise<number>(resolve => { release = resolve }))
+  let completed = false
+  const response = friendChat('u1', 'hello').then(() => { completed = true })
+  try {
+    await vi.waitFor(() => expect(countUserChatMessages).toHaveBeenCalled())
+    expect(completed).toBe(true)
+    expect(extractProfile).not.toHaveBeenCalled()
+  } finally { release(12); await response }
+  await vi.waitFor(() => expect(extractProfile).toHaveBeenCalledWith('u1'))
 })

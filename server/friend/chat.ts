@@ -17,7 +17,7 @@ import { createTaskFromText } from '../../server/social/task.js'
 import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend.js'
 import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona.js'
 import { extractMemories, listMemories } from './memory.js'
-import { extractProfile, shouldExtractProfile } from './profile.js'
+import { countUserChatMessages, extractProfile, shouldExtractProfile } from './profile.js'
 
 export interface FriendRow {
   story_stage: number
@@ -255,23 +255,25 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   // 6. 背景（不等待）：A3 记忆撷取；A4 用户讯息数是 PROFILE_EXTRACT_EVERY 倍数时撷取档案。
   //    失败只记日志，不影响回复。
   //    用 runInBackground：在 Vercel 上回覆送出后也会等它做完（原本 void 可能被中途停掉，记忆就没存到）
-  runInBackground(
-    extractMemories(userId, body.text).catch((err) => {
-      console.error('[friend] extractMemories failed', err)
-    }),
-  )
-  try {
-    const userCount = recent.filter((m) => m.role === 'user').length
-    if (shouldExtractProfile(userCount)) {
-      runInBackground(
-        extractProfile(userId).catch((err) => {
-          console.error('[friend] extractProfile failed', err)
-          return writeLog({ user_id: userId, agent: 'friend', action: '撷取用户档案', reason: `背景撷取失败：${String(err)}` }).catch(() => {})
-        }),
-      )
-    }
-  } catch {
-    // 触发判断失败不影响主流程
+  if (!isNudge) {
+    runInBackground(
+      extractMemories(userId, body.text).catch((err) => {
+        console.error('[friend] extractMemories failed', err)
+      }),
+    )
+    runInBackground((async () => {
+      try {
+        const userCount = await countUserChatMessages(userId)
+        if (shouldExtractProfile(userCount)) {
+          await extractProfile(userId).catch((err) => {
+            console.error('[friend] extractProfile failed', err)
+            return writeLog({ user_id: userId, agent: 'friend', action: '撷取用户档案', reason: `背景撷取失败：${String(err)}` }).catch(() => {})
+          })
+        }
+      } catch {
+        console.warn('[friend] 用户讯息计数失败，跳过本轮档案撷取')
+      }
+    })())
   }
 
   return { reply: maskBlocked(reply.reply), taskId, sharedEventId: reply.shared_event_id }

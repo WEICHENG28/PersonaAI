@@ -61,10 +61,10 @@ export async function extractMemories(userId: string, userText: string): Promise
     .from('friend_messages')
     .select('role, content')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
-    .limit(200)
-  const recent = (recentRows ?? [])
-    .slice(-RECENT_WINDOW)
+    .order('created_at', { ascending: false })
+    .limit(RECENT_WINDOW)
+  const recent = [...(recentRows ?? [])]
+    .reverse()
     .map((m: { role: string; content: string }) => `${m.role === 'user' ? '用户' : '阿澈'}：${m.content}`)
     .join('\n')
 
@@ -159,7 +159,7 @@ export async function editMemory(
   if (!trimmed) return false
 
   const { data, error } = await db
-    .from('friend_memories')
+    .from('user_memory')
     .update({ content: trimmed, source: 'user_edited', confidence: 1 })
     .eq('id', memoryId)
     .eq('user_id', userId)
