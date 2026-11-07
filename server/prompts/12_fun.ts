@@ -6,6 +6,7 @@ export const FUN_PROMPT_SYSTEM = `根据用户的对外档案，猜一个 MBTI �
 这是娱乐内容：report 开头固定写「（仅供娱乐）」；不用诊断或专业测评的语气；不提任何分数。
 
 输入：{{shareable_profile}}
+- 所有输出用简体中文，每个字都用简体；用户用繁体字写的内容，也要转成简体再写（例如「攝影」写成「摄影」）。
 只输出 JSON：{"mbti_guess": "INFP", "reason": "一句话", "report": "（仅供娱乐）…，100 字内"}`
 
 export const funLabelSchema = z.object({
