@@ -278,8 +278,14 @@
   /* 左右互換變體：桌機把 demo 組件放左邊、文字放右邊（記憶掌控區），文字靠右對齊 */
   .landing-feature--flip { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
   .landing-feature--flip .landing-feature__text { order: 2; justify-items: end; text-align: right; }
-  /* 副標收窄讓右緣參差、右對齊看得出來（46ch 剛好每行填滿，視覺像左對齊） */
-  .landing-feature--flip .landing-sec__sub { max-width: 40ch; }
+  /* 副標收窄讓右緣參差、右對齊看得出來（46ch 剛好每行填滿，視覺像左對齊）。
+     行尾全角標點（，。）字型內建半格留白，右對齊時「墨」收不齊：
+     halt 把標點收成半寬（跨瀏覽器）、hanging-punctuation 讓它懸出邊界（Safari） */
+  .landing-feature--flip .landing-sec__sub {
+    max-width: 40ch;
+    font-feature-settings: 'halt' 1;
+    hanging-punctuation: last allow-end;
+  }
   .landing-feature--flip .landing-mock { order: 1; }
 }
 
@@ -424,7 +430,7 @@
     0 3px 0 0 var(--color-edge);
 }
 
-/* AI 导购：问答 + 输入框（复刻 .input 的蓝 focus 感） */
+/* AI 导购：问答 + 输入框（复刻 .friend-input-bar 悬浮胶囊：卡纸底、髮絲框、pill 圆角） */
 .mock-ask { display: grid; gap: var(--space-sm); }
 
 .mock-ask__q {
@@ -444,24 +450,27 @@
   justify-content: space-between;
   gap: var(--space-sm);
   min-height: 44px;
-  padding: 0 var(--space-xs) 0 var(--space-md);
-  border-radius: var(--radius-input);
-  border: 1px solid var(--color-focus);
-  background: var(--fibre), var(--color-paper);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-focus) 25%, transparent);
+  /* 與 .friend-input-bar 同款卡紙膠囊（pill 底、髮絲框、右端小內距讓按鈕貼邊） */
+  padding: 0 var(--space-2xs) 0 var(--space-md);
+  border-radius: var(--radius-pill);
+  border: var(--rule-hair) solid var(--color-rule);
+  background: var(--fibre), var(--color-card);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--color-ink) 7%, transparent);
 }
 
 .mock-ask__input span { font-size: var(--text-sm); color: var(--color-muted); }
 .mock-ask__input b {
+  /* 與 .btn--small 同款：13px 圓角、厚卡紙壓下邊（不用 pill） */
   display: inline-flex;
   align-items: center;
   min-height: 32px;
-  padding: 0 var(--space-sm);
-  border-radius: 10px;
-  font: 600 var(--text-xs)/1 var(--font-body);
+  padding: 0 var(--space-md);
+  border-radius: 13px;
+  font: 600 var(--text-sm)/1 var(--font-body);
   color: var(--color-accent-ink);
   background: var(--fibre), var(--color-accent);
-  box-shadow: 0 2px 0 0 var(--color-accent-deep);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent-deep) 40%, transparent),
+    0 3px 0 0 var(--color-accent-deep);
 }
 
 /* mock 脚注里的纯 CSS 小图标（不引新资源） */

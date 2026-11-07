@@ -124,15 +124,18 @@ export function LobbyAIFloating() {
         </div>
       )}
 
-      {/* ── 浮动触发钮 ── */}
+      {/* ── 浮动触发钮：canvas 本体就是按钮（fill 模式占满 64×64 圆形框） ── */}
+      <RiveAvatar
+        name="fish"
+        fill
+        className={`lobby-ai-fab lobby-ai-fab--rive ${open ? 'is-open' : ''}`}
+      />
       <button
-        className={`lobby-ai-fab ${open ? 'is-open' : ''}`}
+        className="lobby-ai-fab-hit"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? '收起 AI 助手' : '打开 AI 助手'}
         title="大厅 AI 助手"
-      >
-        <RiveAvatar name="fish" size={48} />
-      </button>
+      />
     </>
   )
 }

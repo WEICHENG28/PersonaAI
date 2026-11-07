@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@components/ui/Button'
 import { Card } from '@components/ui/Card'
+import { LoadingDots } from '@components/ui/LoadingDots'
 import type { LobbyPurpose } from '@lib/api/twin'
 import { LobbyAIFloating } from './LobbyAIFloating'
 import { LobbyCard } from './LobbyCard'
@@ -106,7 +107,7 @@ function LobbyCards({ lobby, chat, onStart }: LobbyCardsProps) {
       </Card>
     )
   }
-  if (!lobby.cards) return <p className="empty">{LOBBY_TEXT.loading}</p>
+  if (!lobby.cards) return <LoadingDots label={LOBBY_TEXT.loading} />
   if (lobby.cards.length === 0) return <p className="empty">{LOBBY_TEXT.empty}</p>
   return (
     <div className="lobby-grid">

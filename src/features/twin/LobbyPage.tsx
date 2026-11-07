@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Chip } from '@components/ui/Button'
 import { Card } from '@components/ui/Card'
+import { LoadingDots } from '@components/ui/LoadingDots'
 import { api } from '@lib/api'
 import type { Candidate } from '@lib/api/types'
 import { isLiveChat } from '@lib/api/twin'
@@ -37,7 +38,7 @@ function DemoCandidates() {
   return (
     <>
       {!candidates ? (
-        <p className="empty">{t('common.loading')}</p>
+        <LoadingDots label={t('common.loading')} />
       ) : (
         <div className="lobby-grid">
           {candidates.map((c) => (
