@@ -13,6 +13,7 @@ import { LoadingDots } from '@components/ui/LoadingDots'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
 import { useLobbyInvite } from '@features/social/components/LobbyInvite'
 import { useOnboardingGuide } from '@features/social/components/OnboardingGuide'
+import { reconcileChatFailure, shouldScheduleNudge } from './chatFailure'
 import {
   isHttpMode,
   callFriendIntro,
@@ -116,8 +117,12 @@ export function FriendPage() {
       }
     } catch (e: unknown) {
       setHttpError(e instanceof Error ? e.message : '阿澈刚刚恍神了，再说一次？')
-      // 移除乐观消息
-      setHttpMessages((prev) => prev.filter((m) => m.id !== tempId))
+      // 后端可能已经保存用户消息；重读失败时保留原文并标记，避免用户误以为没送出。
+      let serverMessages: FriendMessage[] | null = null
+      try {
+        serverMessages = await getFriendMessages()
+      } catch { /* 无法确认保存状态，保留乐观消息 */ }
+      setHttpMessages((prev) => reconcileChatFailure(prev, tempId, serverMessages))
     } finally {
       setHttpTyping(false)
     }
@@ -130,13 +135,7 @@ export function FriendPage() {
   // 分頁在背景（document.visibilityState !== 'visible'）时不发。
   // 后端也有同样的防重复挡（meta.nudge 检查），双保险。
   useEffect(() => {
-    if (!isHttpMode || httpMessages.length === 0) return
-    const lastMsg = httpMessages[httpMessages.length - 1]
-    if (!lastMsg || lastMsg.role !== 'friend') return // 最后一则是用户，不 nudge
-    // 最后一条 user 讯息之后已经有过 nudge → 这段沉默已经接过话
-    const lastUserIdx = httpMessages.map((m) => m.role).lastIndexOf('user')
-    const afterUser = httpMessages.slice(lastUserIdx + 1)
-    if (afterUser.some((m) => m.meta?.nudge === true)) return
+    if (!isHttpMode || !shouldScheduleNudge({ messages: httpMessages, httpError })) return
     // 分頁在背景不发（等回到前景、effect 重跑时再计时）
     if (document.visibilityState !== 'visible') return
     const timer = setTimeout(async () => {
@@ -152,7 +151,7 @@ export function FriendPage() {
     }, 75_000) // 75 秒（60–90s 范围内）
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [httpMessages])
+  }, [httpMessages, httpError])
 
   // 任務卡先關掉（再想想／點旁邊）：任務留著等確認，用通知告訴用戶去哪裡找
   const taskLater = (taskId: string) => {
