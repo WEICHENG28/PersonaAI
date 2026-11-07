@@ -26,10 +26,21 @@ export interface FriendRow {
   intro_done: boolean
 }
 
-interface MessageRow {
+export interface FriendMessageRow {
+  id: string
   role: 'user' | 'friend'
   kind: string
   content: string
+  meta: Record<string, unknown>
+  created_at: string
+}
+const MESSAGE_COLUMNS = 'id, role, kind, content, meta, created_at'
+
+/** 查询可能已经读到并行插入的讯息；按 id 去重后取最新上下文。 */
+export function mergeHistory(rows: FriendMessageRow[], inserted: FriendMessageRow | null, limit: number): FriendMessageRow[] {
+  const byId = new Map(rows.map(row => [row.id, row]))
+  if (inserted) byId.set(inserted.id, inserted)
+  return [...byId.values()].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)).slice(-limit)
 }
 
 /** LLM 失敗或 500 時，前端顯示「阿澈剛剛恍神了，再說一次？」的統一錯誤。 */
@@ -120,9 +131,10 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   // 防濫用：用户的话有敏感词就不送出；每日用量到上限就请他明天再来（nudge 是阿澈主动说的，不检查）
   if (!isNudge) {
     assertAllowed(body.text)
-    await assertWithinDailyLimit('friend_message', userId)
   }
-  const friend = await ensureFriendRow(userId)
+  const [, friend] = await Promise.all([
+    isNudge ? Promise.resolve() : assertWithinDailyLimit('friend_message', userId), ensureFriendRow(userId),
+  ])
 
   // 校验、用量检查和朋友初始化可能混合读写，独立计入 setup。
   timer.mark('setup')
@@ -138,38 +150,43 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     const recentNudgeCheck = (recentRows ?? []) as Array<{ role: string; meta: { nudge?: boolean } | null }>
     for (const row of recentNudgeCheck) {
       if (row.role === 'user') break // 遇到 user 讯息还没看到 nudge → 这段沉默还没接过话，继续
-      if (row.meta?.nudge) return { reply: null, taskId: null, sharedEventId: null, nudged: true }
+      if (row.meta?.nudge) return { reply: null, taskId: null, sharedEventId: null, nudged: true, messages: [] as FriendMessageRow[] }
     }
   }
   timer.mark('db.read')
 
-  // 1. 存用户讯息（nudge 模式不保存用户消息，阿澈主动开口）
-  if (!isNudge) {
-    const { error: uErr } = await db
-      .from('friend_messages')
+  // 1–2. 用户写入与历史／记忆读取并行；全量 count 仍留在回覆后的背景链。
+  let readMs = timer.spans()['db.read'] ?? 0
+  let writeMs = 0
+  const insertUser = async (): Promise<FriendMessageRow | null> => {
+    if (isNudge) return null
+    const started = performance.now()
+    const { data, error } = await db.from('friend_messages')
       .insert({ user_id: userId, role: 'user', kind: 'chat', content: body.text, meta: {} })
-    if (uErr) throw new FriendChatError(`保存讯息失败：${uErr.message}`)
+      .select(MESSAGE_COLUMNS).single()
+    writeMs += performance.now() - started
+    if (error || !data) throw new FriendChatError('保存讯息失败')
+    return data as FriendMessageRow
   }
-  timer.mark('db.write')
-
-  // 2. 组上下文
+  const readContext = async () => {
+    const started = performance.now()
+    const [history, memories] = await Promise.all([
+      db.from('friend_messages').select(MESSAGE_COLUMNS).eq('user_id', userId)
+        .order('created_at', { ascending: false }).limit(CONFIG.FRIEND_HISTORY_LIMIT),
+      listMemories(userId).then(rows => rows.slice(0, 12).map(m => `- ${m.content}`).join('\n') || '（还没有长期记忆）')
+        .catch(() => '（还没有长期记忆）'),
+    ])
+    readMs += performance.now() - started
+    if (history.error) throw new FriendChatError('读取聊天记录失败')
+    return { history: (history.data ?? []) as FriendMessageRow[], memoriesText: memories }
+  }
+  const [userMessage, { history, memoriesText }] = await Promise.all([insertUser(), readContext()])
+  const recent = mergeHistory(history, userMessage, CONFIG.FRIEND_HISTORY_LIMIT)
+  const recentText = recent.map(m => `${m.role === 'user' ? '用户' : '阿澈'}：${m.content}`).join('\n')
   const lifeState = friend.life_state ?? getLifeUpdate(friend.story_stage)
   const lifeText = `${lifeState.mood}；${lifeState.doing}`
   const nextEvent = pickNextEvent(friend.story_stage, friend.shared_event_ids)
-  const { data: history } = await db
-    .from('friend_messages')
-    .select('role, kind, content')
-    .eq('user_id', userId)
-    // 取「最新」的 N 则再转回时间顺序（原本 ascending + limit 拿到的是最旧的 N 则，聊久了阿澈会看不到最近的话）
-    .order('created_at', { ascending: false })
-    .limit(CONFIG.FRIEND_HISTORY_LIMIT)
-  const recent = [...(history ?? [])].reverse() as MessageRow[]
-  const recentText = recent.map((m) => `${m.role === 'user' ? '用户' : '阿澈'}：${m.content}`).join('\n')
-  // 它记得的事（A3）：最新 12 条带进对话，阿澈才会越聊越了解你；读不到就当没有
-  const memoriesText = await listMemories(userId)
-    .then((rows) => rows.slice(0, 12).map((m) => `- ${m.content}`).join('\n') || '（还没有长期记忆）')
-    .catch(() => '（还没有长期记忆）')
-  timer.mark('db.read')
+  timer.mark('context')
 
   // 3. 呼叫 Prompt 1
   const system = renderFriendSystem({
@@ -197,26 +214,18 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   timer.mark('llm')
 
   // 4. 存回复；shared_event_id 记入 ai_friends；nudge 讯息标 meta.nudge=true（防重复用）
-  const { error: rErr } = await db
-    .from('friend_messages')
-    .insert({
-      user_id: userId,
-      role: 'friend',
-      kind: 'chat',
-      content: maskBlocked(reply.reply),
-      meta: {
-        ...(isNudge ? { nudge: true } : {}),
-        ...(reply.shared_event_id ? { event_id: reply.shared_event_id } : {}),
-      },
-    })
-  if (rErr) throw new FriendChatError(`保存回复失败：${rErr.message}`)
-
-  if (reply.shared_event_id && EVENTS.some((e) => e.id === reply.shared_event_id)) {
-    await db
-      .from('ai_friends')
-      .update({ shared_event_ids: [...friend.shared_event_ids, reply.shared_event_id!] })
-      .eq('user_id', userId)
+  const writeStarted = performance.now()
+  const savedReply = await db.from('friend_messages').insert({
+    user_id: userId, role: 'friend', kind: 'chat', content: maskBlocked(reply.reply),
+    meta: { ...(isNudge ? { nudge: true } : {}), ...(reply.shared_event_id ? { event_id: reply.shared_event_id } : {}) },
+  }).select(MESSAGE_COLUMNS).single()
+  if (savedReply.error || !savedReply.data) throw new FriendChatError('保存回复失败')
+  // 必须先确认回复已保存，失败时不能把尚未分享的事件标为已分享。
+  if (reply.shared_event_id && EVENTS.some(e => e.id === reply.shared_event_id)) {
+    await db.from('ai_friends').update({ shared_event_ids: [...friend.shared_event_ids, reply.shared_event_id] }).eq('user_id', userId)
   }
+  writeMs += performance.now() - writeStarted
+  const messages: FriendMessageRow[] = [...(userMessage ? [userMessage] : []), savedReply.data as FriendMessageRow]
 
   timer.mark('db.write')
   // 5. task_intent → B 的 createTaskFromText + task_card 消息
@@ -227,13 +236,15 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
       // 用户同意「要不要我帮你找人」时，body.text 可能只是「好啊」，所以优先用模型整理好的完整说法
       const task = await createTaskFromText(userId, reply.task_text?.trim() || body.text)
       taskId = task.id
-      await db.from('friend_messages').insert({
+      const card = await db.from('friend_messages').insert({
         user_id: userId,
         role: 'friend',
         kind: 'task_card',
         content: task.restatement ?? body.text,
         meta: { taskId: task.id },
-      })
+      }).select(MESSAGE_COLUMNS).single()
+      if (card.error) throw new FriendChatError('保存任务卡失败')
+      if (card.data) messages.push(card.data as FriendMessageRow)
     } catch (err) {
       // B 的解析失败不中断聊天，只写日志
       console.error('[friend] createTask failed', err)
@@ -243,14 +254,14 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
 
   // 7. 写日志
   timer.mark('task')
-  await writeLog({
+  runInBackground(writeLog({
     user_id: userId,
     agent: 'friend',
     action: '回应用户',
     reason: reply.shared_event_id ? `分享事件 ${reply.shared_event_id}` : '接住用户的话题',
     detail: { ...(taskId ? { taskId } : {}),
-      timing: { ...timer.spans(), totalMs: timer.totalMs() }, llm: replyMetric },
-  })
+      timing: { ...timer.spans(), 'db.read': Math.round(readMs), 'db.write': Math.round(writeMs), totalMs: timer.totalMs() }, llm: replyMetric },
+  }))
 
   // 6. 背景（不等待）：A3 记忆撷取；A4 用户讯息数是 PROFILE_EXTRACT_EVERY 倍数时撷取档案。
   //    失败只记日志，不影响回复。
@@ -276,7 +287,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     })())
   }
 
-  return { reply: maskBlocked(reply.reply), taskId, sharedEventId: reply.shared_event_id }
+  return { reply: maskBlocked(reply.reply), taskId, sharedEventId: reply.shared_event_id, messages, taskPending: false }
 }
 
 /** 取聊天记录（前端拉一次用；Realtime 由前端订阅，A 线后续接）。 */

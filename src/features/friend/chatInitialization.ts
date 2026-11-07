@@ -10,6 +10,7 @@ interface FriendInitializationDeps {
   hasUnconfirmedSend(): boolean
   isActive(): boolean
   onMessages(messages: FriendMessage[]): void
+  onStaleMessages?(messages: FriendMessage[]): void
   onSettings(settings: UserSettings | null): void
   onMessagesError(error: unknown): void
 }
@@ -29,8 +30,9 @@ export async function initializeFriendPage(deps: FriendInitializationDeps): Prom
     const blockedAtRead = deps.isSending() || deps.hasUnconfirmedSend()
     try {
       const messages = await deps.getFriendMessages()
-      if (deps.isActive() && shouldApplyInitMessages(seq, deps.readSendSeq(), blockedAtRead)) {
-        deps.onMessages(messages)
+      if (deps.isActive()) {
+        if (shouldApplyInitMessages(seq, deps.readSendSeq(), blockedAtRead)) deps.onMessages(messages)
+        else deps.onStaleMessages?.(messages)
       }
     } catch (error) {
       if (deps.isActive()) deps.onMessagesError(error)

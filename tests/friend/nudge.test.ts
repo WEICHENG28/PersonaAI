@@ -30,10 +30,10 @@ function makeFrom(name: string) {
       error: null,
     })),
     single: vi.fn(async () => ({ data: null, error: null })),
-    insert: vi.fn(async (payload: Row & { meta?: Record<string, unknown> }) => {
+    insert: vi.fn((payload: Row & { meta?: Record<string, unknown> }) => {
       if (payload.kind === 'task_card') insertedTaskCalls.push(String(payload.content))
       else messages.push({ role: payload.role, kind: payload.kind, content: payload.content, meta: payload.meta })
-      return { error: null }
+      return { error: null, select: () => ({ single: async () => ({ data: { id: `nudge-${messages.length}`, created_at: new Date().toISOString(), ...payload }, error: null }) }) }
     }),
     update: vi.fn().mockReturnThis(),
   }
