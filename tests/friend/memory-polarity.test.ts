@@ -54,6 +54,16 @@ beforeEach(() => {
 })
 
 describe('extractMemories 正反软删除流程', () => {
+  it('真实模型输出带前缀和细节时，仍软删相反旧记忆', async () => {
+    const old = memory('用户最近开始喜欢跑步，每天晚上跑三公里')
+    const content = '用户不喜欢跑步，觉得太累且坚持不下去'
+    state.rows.push(old)
+    mock.llm.mockResolvedValue({ memories: [{ content, confidence: 0.9 }] })
+    expect(await extractMemories('u1', content)).toBe(1)
+    expect(old.deleted_at).toEqual(expect.any(String))
+    expect(state.rows.filter(row => row.deleted_at === null).map(row => row.content)).toEqual([content])
+  })
+
   it('只软删同用户的相反完整主题，在插入新记忆之前，并写指定理由', async () => {
     const old = memory('用户喜欢跑步')
     const machine = memory('用户喜欢跑步机', 'machine')

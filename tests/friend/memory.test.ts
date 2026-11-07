@@ -126,6 +126,41 @@ describe('memoryTopicKey / findContradicted', () => {
   it('空主题不删除旧记忆', () => {
     expect(findContradicted('用户不喜欢', [row('用户喜欢')])).toEqual([])
   })
+  it.each([
+    ['用户不喜欢跑步，觉得太累且坚持不下去', '用户最近开始喜欢跑步，每天晚上跑三公里', 1],
+    ['用户喜欢爬山', '用户对爬山没兴趣，觉得太累', 1],
+    ['用户不喜欢跑步', '用户喜欢跑步机', 0],
+    ['用户以前常打篮球，现在不打了', '用户喜欢打篮球', 0],
+  ])('真实模型输出：%s / %s → %i 条相反记忆', (fresh, old, count) => {
+    expect(findContradicted(fresh, [row(old)])).toHaveLength(count)
+  })
+  it('只以首子句取街拍主题，忽略后续细节', () => {
+    expect(memoryTopicKey('用户喜欢街拍，周末常出去拍摄')).toBe('街拍')
+  })
+  it.each(['，', ',', '。', '；', ';', '、'])('在首个 %s 前截断', delimiter => {
+    expect(memoryTopicKey(`用户喜欢街拍${delimiter}周末常出去拍摄`)).toBe('街拍')
+  })
+  it.each(['最近', '开始', '一直', '现在', '其实', '真的', '还是', '也', '都', '本来', '最近开始', '其实真的也一直'])(
+    '连续移除开头时间／语气词：%s', prefix => {
+      expect(memoryTopicKey(`用户${prefix}喜欢跑步了的 `)).toBe('跑步')
+    },
+  )
+  it.each(['用户「喜欢跑步」', '用户「最近开始喜欢跑步」'])(
+    '保留原有标点整理，带引号前缀也能取主題：%s', content => {
+      expect(memoryTopicKey(content)).toBe('跑步')
+    },
+  )
+  it('引号包住喜欢前缀时仍能找到相反记忆', () => {
+    expect(findContradicted('用户不喜欢跑步', [row('用户「喜欢跑步」')])).toHaveLength(1)
+  })
+  it.each([
+    ['用户喜欢跑步，但不喜欢游泳', '用户喜欢跑步', 0],
+    ['用户喜欢跑步，不再熬夜', '用户喜欢跑步', 0],
+    ['用户不喜欢跑步', '用户喜欢跑步，但不喜欢游泳', 1],
+    ['用户喜欢跑步', '用户不喜欢跑步，但喜欢游泳', 1],
+  ])('正反与主題都只看首子句：%s / %s → %i', (fresh, old, count) => {
+    expect(findContradicted(fresh, [row(old)])).toHaveLength(count)
+  })
 })
 
 describe('renderMemorySystem', () => {

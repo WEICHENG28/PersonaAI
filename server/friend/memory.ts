@@ -4,7 +4,7 @@
  * API：GET /api/memory（未刪除）、DELETE /api/memory/[id]（設 deleted_at）。
  */
 import { z } from 'zod'
-import { NEGATION_PATTERN, isNegated, stripLikePrefix } from '../../shared/negation.js'
+import { conditionKeyword, isNegated } from '../../shared/negation.js'
 import { getServiceClient } from '../lib/supabase.js'
 import { llmJson } from '../lib/llm/index.js'
 import { CONFIG } from '../lib/config.js'
@@ -39,17 +39,27 @@ export function isDuplicateMemory(newContent: string, existing: readonly string[
   })
 }
 
-/** 只做 M-1 規則與字面正規化；完整主題必須相同，不使用 includes 判斷相反。 */
+/** 主題與正反使用同一首子句，避免其他子句的否定造成誤刪。 */
+function memoryTopic(content: string): { key: string; negated: boolean } {
+  const clause = (content.trim().replace(/^用户/, '').split(/[，,。；;、]/, 1)[0] ?? '').replace(/[\p{P}\s]/gu, '')
+  const text = clause.replace(/^(?:(?:最近|开始|一直|现在|其实|真的|还是|也|都|本来)\s*)+/, '')
+  const topic = conditionKeyword(text)
+  return { ...topic, key: topic.key.replace(/[了的\s]+$/, '') }
+}
+
+/** 由 M-1 取首子句的完整主題；不使用 includes 判斷相反。 */
 export function memoryTopicKey(content: string): string {
-  const text = content.trim().replace(/^用户/, '').replace(/[\p{P}\s]/gu, '')
-  return stripLikePrefix(text.replace(NEGATION_PATTERN, ''))
+  return memoryTopic(content).key
 }
 
 export function findContradicted(newContent: string, existing: MemoryRow[]): MemoryRow[] {
-  const topic = memoryTopicKey(newContent)
-  if (!topic) return []
-  return existing.filter(row => row.deleted_at === null
-    && isNegated(row.content) !== isNegated(newContent) && memoryTopicKey(row.content) === topic)
+  const topic = memoryTopic(newContent)
+  if (!topic.key) return []
+  return existing.filter(row => {
+    if (row.deleted_at !== null) return false
+    const old = memoryTopic(row.content)
+    return old.negated !== topic.negated && old.key === topic.key
+  })
 }
 
 /** 限定持有者、未刪除且內容未被並行編輯的舊列；只記錄確實移除的記憶。 */
