@@ -4,11 +4,12 @@
  * API：GET /api/memory（未刪除）、DELETE /api/memory/[id]（設 deleted_at）。
  */
 import { z } from 'zod'
+import { conditionKeyword, isNegated } from '../../shared/negation.js'
 import { getServiceClient } from '../lib/supabase.js'
 import { llmJson } from '../lib/llm/index.js'
 import { CONFIG } from '../lib/config.js'
 import { writeLog } from '../lib/log.js'
-import { extractedMemoriesSchema, renderMemorySystem } from '../prompts/02_memory.js'
+import { extractedMemoriesSchema, memoryPromptUser, renderMemorySystem, type ExtractedMemories } from '../prompts/02_memory.js'
 
 export interface MemoryRow {
   id: string
@@ -22,7 +23,7 @@ export interface MemoryRow {
 const RECENT_WINDOW = 6
 
 /**
- * 必測的去重函式：內容相同或互相包含（≥ 2 字才有包含意義）視為重複。
+ * 正反相同時，內容相同或互相包含（≥ 2 字才有包含意義）視為重複。
  */
 export function isDuplicateMemory(newContent: string, existing: readonly string[]): boolean {
   const n = newContent.trim()
@@ -30,11 +31,68 @@ export function isDuplicateMemory(newContent: string, existing: readonly string[
   return existing.some((e) => {
     const t = e.trim()
     if (!t) return false
+    if (isNegated(n) !== isNegated(t)) return false
     if (n === t) return true
     // 短内容互相包含才算重复（单字包含无意义）
     if (n.length >= 2 && t.length >= 2) return n.includes(t) || t.includes(n)
     return false
   })
+}
+
+/** 主題與正反使用同一首子句，避免其他子句的否定造成誤刪。 */
+function memoryTopic(content: string): { key: string; negated: boolean } {
+  const clause = (content.trim().replace(/^用户/, '').split(/[，,。；;、]/, 1)[0] ?? '').replace(/[\p{P}\s]/gu, '')
+  const text = clause.replace(/^(?:(?:最近|开始|一直|现在|其实|真的|还是|也|都|本来)\s*)+/, '')
+  const topic = conditionKeyword(text)
+  return { ...topic, key: topic.key.replace(/[了的\s]+$/, '') }
+}
+
+/** 由 M-1 取首子句的完整主題；不使用 includes 判斷相反。 */
+export function memoryTopicKey(content: string): string {
+  return memoryTopic(content).key
+}
+
+export function findContradicted(newContent: string, existing: MemoryRow[]): MemoryRow[] {
+  const topic = memoryTopic(newContent)
+  if (!topic.key) return []
+  return existing.filter(row => {
+    if (row.deleted_at !== null) return false
+    const old = memoryTopic(row.content)
+    return old.negated !== topic.negated && old.key === topic.key
+  })
+}
+
+/** 限定持有者、未刪除且內容未被並行編輯的舊列；只記錄確實移除的記憶。 */
+async function removeContradicted(userId: string, old: MemoryRow): Promise<string | null> {
+  const deletedAt = new Date().toISOString()
+  const { data, error } = await getServiceClient().from('user_memory')
+    .update({ deleted_at: deletedAt })
+    .eq('id', old.id).eq('user_id', userId).eq('content', old.content).is('deleted_at', null)
+    .select('id').maybeSingle()
+  if (error) throw new MemoryError(`移除旧记忆失败：${error.message}`)
+  if (!data) return null
+  await writeLog({
+    user_id: userId, agent: 'friend', action: '移除相反记忆',
+    reason: `新记忆与旧记忆相反，旧记忆已移除：${old.content}`,
+  })
+  return deletedAt
+}
+
+/** 新增或後續刪除失敗時補償；只還原本輪仍未變更的刪除，不復活別人後續編輯的列。 */
+async function restoreContradicted(userId: string, removed: { old: MemoryRow; deletedAt: string }[]): Promise<void> {
+  for (const { old, deletedAt } of removed) {
+    try {
+      const { data, error } = await getServiceClient().from('user_memory')
+        .update({ deleted_at: null }).eq('id', old.id).eq('user_id', userId)
+        .eq('content', old.content).eq('deleted_at', deletedAt).select('id').maybeSingle()
+      if (error) throw error
+      if (data) await writeLog({
+        user_id: userId, agent: 'friend', action: '恢复记忆', reason: `记忆更新失败，旧记忆已恢复：${old.content}`,
+      })
+    } catch (error) {
+      console.error('[memory] 恢复旧记忆失败', error)
+    }
+  }
 }
 
 /** LLM 失敗不致命：記憶晚一輪再抽也行（07A 流程第 6 步背景執行）。 */
@@ -46,7 +104,7 @@ export class MemoryError extends Error {
 }
 
 /**
- * 撷取并写入（幂等风格：失败就整批放弃，不写半套）。
+ * 撷取后先软删相反旧记忆，再批次新增；失败会尝试还原本轮删除并抛错（非事务）。
  * 回传实际写入的条数。
  */
 export async function extractMemories(userId: string, userText: string): Promise<number> {
@@ -74,26 +132,39 @@ export async function extractMemories(userId: string, userText: string): Promise
     maxAttempts: 2,
     role: 'fast',
     system: renderMemorySystem({ text: userText, recent, existing: existingText }),
-    messages: [{ role: 'user', content: userText }],
+    messages: [{ role: 'user', content: memoryPromptUser() }],
     temperature: 0,
     schema: extractedMemoriesSchema,
   })
 
-  // 去重后写入
-  const fresh = out.memories.filter(
-    (m) => !isDuplicateMemory(m.content, existing.map((e) => e.content)),
-  )
-  if (fresh.length === 0) return 0
+  return persistMemories(userId, existing, out.memories)
+}
 
-  const { error } = await db.from('user_memory').insert(
-    fresh.map((m) => ({
-      user_id: userId,
-      content: m.content,
-      source: 'user_stated',
-      confidence: Math.min(Math.max(m.confidence, 0), 1),
-    })),
-  )
-  if (error) throw new MemoryError(`写入记忆失败：${error.message}`)
+/** 寫入階段獨立處理補償與最新資料去重，維持擷取函式精簡。 */
+async function persistMemories(userId: string, existing: MemoryRow[], memories: ExtractedMemories['memories']): Promise<number> {
+  if (memories.length === 0) return 0
+  const db = getServiceClient()
+  const removed: { old: MemoryRow; deletedAt: string }[] = []
+  let fresh: typeof memories
+  try {
+    // 同方向的新记忆已经存在时，仍移除相反旧列；每条旧列只处理一次。
+    const contradicted = new Map(memories.flatMap(m => findContradicted(m.content, existing)).map(row => [row.id, row]))
+    for (const old of contradicted.values()) {
+      const deletedAt = await removeContradicted(userId, old)
+      if (deletedAt) removed.push({ old, deletedAt })
+    }
+    // LLM 等待期间用户可能已编辑／删除记忆，去重必须使用当前有效资料。
+    const current = await listMemories(userId)
+    fresh = memories.filter(m => !isDuplicateMemory(m.content, current.map(e => e.content)))
+    if (fresh.length === 0) return 0
+    const { error } = await db.from('user_memory').insert(
+      fresh.map(m => ({ user_id: userId, content: m.content, source: 'user_stated', confidence: Math.min(Math.max(m.confidence, 0), 1) })),
+    )
+    if (error) throw new MemoryError(`写入记忆失败：${error.message}`)
+  } catch (error) {
+    await restoreContradicted(userId, removed)
+    throw error
+  }
 
   await writeLog({
     user_id: userId,

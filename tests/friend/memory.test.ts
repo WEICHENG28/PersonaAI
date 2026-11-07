@@ -31,8 +31,8 @@ vi.mock('../../server/lib/log', () => ({ writeLog: vi.fn(async () => {}) }))
 
 import { llmJson } from '../../server/lib/llm'
 import { writeLog } from '../../server/lib/log'
-import { editMemory, extractMemories, isDuplicateMemory, listMemories, deleteMemory, markNotLikeMe } from '../../server/friend/memory'
-import { renderMemorySystem } from '../../server/prompts/02_memory'
+import { editMemory, extractMemories, isDuplicateMemory, memoryTopicKey, findContradicted, listMemories, deleteMemory, markNotLikeMe, type MemoryRow } from '../../server/friend/memory'
+import { memoryPromptUser, renderMemorySystem } from '../../server/prompts/02_memory'
 
 function makeTable(name: string): TableMock {
   const t: TableMock = {
@@ -75,6 +75,15 @@ beforeEach(() => {
 })
 
 describe('isDuplicateMemory（必测）', () => {
+  it.each([
+    ['不喜欢昆虫', '喜欢昆虫'], ['喜欢昆虫', '不喜欢昆虫'],
+    ['不太喜欢昆虫', '喜欢昆虫'], ['讨厌昆虫', '喜欢昆虫'],
+  ])('正反不同不算重复：%s / %s', (fresh, old) => {
+    expect(isDuplicateMemory(fresh, [old])).toBe(false)
+  })
+  it('同为否定时仍保留包含去重', () => {
+    expect(isDuplicateMemory('用户不喜欢昆虫', ['用户不喜欢昆虫和蜘蛛'])).toBe(true)
+  })
   it('完全相同算重复', () => {
     expect(isDuplicateMemory('用户计划周末去漫展', ['用户计划周末去漫展'])).toBe(true)
   })
@@ -98,6 +107,62 @@ describe('isDuplicateMemory（必测）', () => {
   })
 })
 
+describe('memoryTopicKey / findContradicted', () => {
+  const row = (content: string, id = 'm1', deleted_at: string | null = null): MemoryRow => ({
+    id, content, source: 'user_stated', confidence: 0.9, created_at: '2026-11-07T00:00:00Z', deleted_at,
+  })
+  it.each(['用户喜欢跑步', ' 用户 不太喜欢「跑步」！ ', '用户很喜欢跑步', '用户怕跑步', '用户不爱跑步'])(
+    '去掉用户、M-1 否定词／喜欢前缀和标点：%s', content => {
+      expect(memoryTopicKey(content)).toBe('跑步')
+    },
+  )
+  it('仅相同完整主题且正反相反时推翻，原始资料不变', () => {
+    const rows = [row('用户喜欢跑步'), row('用户喜欢跑步机', 'machine'), row('用户不喜欢跑步', 'same'), row('用户喜欢跑步', 'deleted', '2026-11-06')]
+    expect(findContradicted('用户不喜欢跑步', rows)).toEqual([rows[0]])
+    expect(findContradicted('用户喜欢跑步', [rows[2]!])).toEqual([rows[2]])
+    expect(findContradicted('用户不喜欢跑步机', [rows[0]!])).toEqual([])
+    expect(rows[0]?.deleted_at).toBeNull()
+  })
+  it('空主题不删除旧记忆', () => {
+    expect(findContradicted('用户不喜欢', [row('用户喜欢')])).toEqual([])
+  })
+  it.each([
+    ['用户不喜欢跑步，觉得太累且坚持不下去', '用户最近开始喜欢跑步，每天晚上跑三公里', 1],
+    ['用户喜欢爬山', '用户对爬山没兴趣，觉得太累', 1],
+    ['用户不喜欢跑步', '用户喜欢跑步机', 0],
+    ['用户以前常打篮球，现在不打了', '用户喜欢打篮球', 0],
+  ])('真实模型输出：%s / %s → %i 条相反记忆', (fresh, old, count) => {
+    expect(findContradicted(fresh, [row(old)])).toHaveLength(count)
+  })
+  it('只以首子句取街拍主题，忽略后续细节', () => {
+    expect(memoryTopicKey('用户喜欢街拍，周末常出去拍摄')).toBe('街拍')
+  })
+  it.each(['，', ',', '。', '；', ';', '、'])('在首个 %s 前截断', delimiter => {
+    expect(memoryTopicKey(`用户喜欢街拍${delimiter}周末常出去拍摄`)).toBe('街拍')
+  })
+  it.each(['最近', '开始', '一直', '现在', '其实', '真的', '还是', '也', '都', '本来', '最近开始', '其实真的也一直'])(
+    '连续移除开头时间／语气词：%s', prefix => {
+      expect(memoryTopicKey(`用户${prefix}喜欢跑步了的 `)).toBe('跑步')
+    },
+  )
+  it.each(['用户「喜欢跑步」', '用户「最近开始喜欢跑步」'])(
+    '保留原有标点整理，带引号前缀也能取主題：%s', content => {
+      expect(memoryTopicKey(content)).toBe('跑步')
+    },
+  )
+  it('引号包住喜欢前缀时仍能找到相反记忆', () => {
+    expect(findContradicted('用户不喜欢跑步', [row('用户「喜欢跑步」')])).toHaveLength(1)
+  })
+  it.each([
+    ['用户喜欢跑步，但不喜欢游泳', '用户喜欢跑步', 0],
+    ['用户喜欢跑步，不再熬夜', '用户喜欢跑步', 0],
+    ['用户不喜欢跑步', '用户喜欢跑步，但不喜欢游泳', 1],
+    ['用户喜欢跑步', '用户不喜欢跑步，但喜欢游泳', 1],
+  ])('正反与主題都只看首子句：%s / %s → %i', (fresh, old, count) => {
+    expect(findContradicted(fresh, [row(old)])).toHaveLength(count)
+  })
+})
+
 describe('renderMemorySystem', () => {
   it('占位符全部替换', () => {
     const sys = renderMemorySystem({ text: '我周末要去漫展', recent: '用户：…', existing: '（无）' })
@@ -105,10 +170,31 @@ describe('renderMemorySystem', () => {
       expect(sys).not.toContain(ph)
     }
     expect(sys).toContain('我周末要去漫展')
+    expect(sys).toContain('否定要原样保留')
+    expect(sys).toContain('过去的事写清楚是过去')
+    expect(sys).toContain('别人的事不记')
+    expect(sys).toContain('confidence 不超过 0.5')
+  })
+
+  it('只替换原始模板一次，保留用户的 $&、$1 和 {{recent}} 原文', () => {
+    const sys = renderMemorySystem({ text: '$& {{recent}}', recent: '$1 {{existing}}', existing: '$& {{text}}' })
+    expect(sys).toContain('- 最新讯息：$& {{recent}}')
+    expect(sys).toContain('- 最近 6 则对话（只用来理解上下文，不要从阿澈说的话里撷取）：$1 {{existing}}')
+    expect(sys).toContain('- 已存在的记忆：$& {{text}}')
+  })
+
+  it('user 讯息固定简短，不再重复 text', () => {
+    expect(memoryPromptUser()).toBe('请按规则撷取上面这则最新讯息的记忆，只输出 JSON。')
   })
 })
 
 describe('extractMemories（mock LLM/DB）', () => {
+  it('实际 LLM 呼叫只在 system 填最新讯息，user 使用短指令', async () => {
+    await extractMemories('u1', '$& {{recent}}')
+    const opts = vi.mocked(llmJson).mock.calls[0]![0]
+    expect(opts.system).toContain('- 最新讯息：$& {{recent}}')
+    expect(opts.messages).toEqual([{ role: 'user', content: '请按规则撷取上面这则最新讯息的记忆，只输出 JSON。' }])
+  })
   it('新记忆写入并返回条数', async () => {
     vi.mocked(llmJson).mockResolvedValueOnce({
       memories: [
