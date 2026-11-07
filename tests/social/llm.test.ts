@@ -186,3 +186,21 @@ it('shares timeout budget with the SDK JSON fallback', async () => {
   expect(sdkMock.complete).toHaveBeenLastCalledWith(expect.anything(), { timeout: 19300 })
   vi.restoreAllMocks()
 })
+
+it('bounds JSON retry raw text without accumulating previous retries', async () => {
+  const { buildJsonRetryMessages } = await import('../../server/lib/llm/index.js')
+  const original = [{ role: 'user' as const, content: 'JSON' }]
+  const result = buildJsonRetryMessages(original, 'x'.repeat(2000), '找不到 JSON')
+  expect(result).toHaveLength(original.length + 2)
+  expect(result[1]?.content.length).toBeLessThanOrEqual(401)
+  expect(original).toHaveLength(1)
+  expect(buildJsonRetryMessages(original, 'short', 'schema')[1]?.content).toBe('short')
+})
+
+it('keeps repeated JSON retries bounded and based on the original messages', async () => {
+  const { calls } = fakeClient(['x'.repeat(2000), 'y'.repeat(3000), '{"name":"ok","score":1}'])
+  await llmJson({ ...base, schema })
+  expect(calls.map(c => c.messages.length)).toEqual([2, 4, 4])
+  expect(calls[1]?.messages[2]?.content.length).toBeLessThanOrEqual(401)
+  expect(calls[2]?.messages[2]?.content).toBe('y'.repeat(400) + '…')
+})
