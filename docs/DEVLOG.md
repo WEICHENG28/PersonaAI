@@ -296,6 +296,15 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-11-07｜M-2 最新訊息查詢、記憶編輯與定期擷取修正｜AI 協助｜分支 opt/M-2-query-fixes
+- **做了什麼**：記憶查詢改 created_at 降序、精準 limit(6)，回 prompt 前複製並 reverse 成正序；檔案查詢先過濾 role=user，再降序取 PROFILE_USER_LINES_LIMIT（60）並 reverse。editMemory 改寫正確的 user_memory 表，保留 user_id／id／deleted_at 篩選。
+- **為什麼這樣做**：原本 ascending + 大 limit 只會看到舊訊息；聊天上下文的 user 數會穩定在約 10，無法觸發每 6 則擷取。新增 countUserChatMessages 以 exact/head 計全量、只算本用戶 role=user/kind=chat，friendChat 以此判斷。
+- **nudge**：記憶擷取、全量計數與檔案擷取全部包在 !isNudge，避免主動接話的佔位文字進入記憶。
+- **改了哪些檔案**：server/friend/{memory,profile,chat}.ts、tests/friend/{memory,profile,chat,nudge}.test.ts 與 A 線本紀錄。從 main 獨立開分支，未帶入 #134 或修改 M-1 的程式／測試檔。
+- **驗證**：六項新增回歸測試先失敗再實作；獨立審查發現 count 可能延後回覆，另補慢計數 RED→GREEN 測試，將計數至檔案擷取整段交給 runInBackground。覆蓋最新六則正序、500 則交錯訊息中的最新 60 則 user、正確記憶表與持有者篩選、count/head 與角色／kind／用戶隔離、視窗 10 但全量 12 仍擷取，以及 nudge 不擷取／不計數。完整測試與型別結果見 PR。
+- **踩到的坑／注意事項**：DB mock 新增篩選、降序、limit 與 count/head 行為，避免測試依賴舊資料排序。一般聊天額外有一次背景全量 count 查詢；計數 Promise 由背景工作保留，慢計數不阻塞主回覆，失敗用固定警告且跳過本輪檔案擷取。本次不改自動擷取覆蓋已確認檔案的規則（M-3）。
+- **還沒做完／待辦**：保留 Draft PR 等待人工審查；未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件；未開始 M-3。
+
 ### 2026-11-07｜X-2 檔案、記憶、回報與趣味 prompt 要求簡體輸出｜AI 協助｜分支 opt/X-2-prompt-simplified
 - **做了什麼**：在四份 prompt 的「只输出 JSON」之前加入計畫指定的固定文案，要求所有輸出使用簡體、將用戶輸入的繁體轉成簡體；檔案 intro 範例「20 字內」改為「20 字内」。
 - **為什麼這樣做**：模型可能照抄用戶的繁體原文；在各輸出契約前明確指定語言，涵蓋檔案、記憶、回報與趣味內容。
