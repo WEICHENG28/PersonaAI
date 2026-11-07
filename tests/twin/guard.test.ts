@@ -376,3 +376,16 @@ describe('guardText', () => {
     expect(h.llm).not.toHaveBeenCalled()
   })
 })
+
+it.each([anShareable, null])('reuses explicitly supplied shareable including null', async shareable => {
+  const h = harness()
+  await h.guardText('今天去爬山', OWNER, { shareable })
+  expect(h.getShareable).not.toHaveBeenCalled()
+  expect(h.llm).toHaveBeenCalled()
+})
+it('loads shareable for legacy calls and empty options', async () => {
+  const h = harness()
+  await h.guardText('今天去爬山', OWNER)
+  await h.guardText('今天去看展', OWNER, {})
+  expect(h.getShareable).toHaveBeenCalledTimes(2)
+})

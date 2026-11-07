@@ -843,6 +843,15 @@
 
 ## C：分身與大廳線（Jerry）
 
+### 2026-11-07｜L-3 分身背景工作與守門重用檔案｜AI 協助｜分支 opt/L-3-twin-background
+- **做了什麼**：routes/twin 的本人發言後異常檢查改 runInBackground；種子自動回應使用 scheduleInBackground。延遲與 callback 共用同一個交給 waitUntil 的 Promise，callback 可回 Promise，必須 await 完成後才 resolve；同步 throw／非同步 reject 用固定警告後安全結束。
+- **為什麼這樣做**：Vercel 回覆後可能凍結裸 void／setTimeout 工作。計畫的 try run finally 範例會提早 resolve，依使用者明確指示改 await。requestHuman 原本的排程 callback 也會丟棄 respond 的 Promise，這次一併最小修改回傳它，才能追蹤完整生命週期。
+- **守門**：GuardTextFn 與 contracts/twin.guardText 新增 optional opts.shareable；值非 undefined（包含 null）就重用，不再讀取。twinReply 傳入已讀取的 shareable，改寫後重檢仍用同份檔案；舊兩參數與空 opts 保持讀取行為。
+- **改了哪些檔案**：server/routes/twin.ts、server/twin/{guard,twin,requestHuman}.ts、server/contracts/twin.ts（共用簽名，新增 optional）、server/lib/background.ts（B 線）、tests/twin/{guard,twin-reply,request-human,twin-routes-bg}.test.ts、本紀錄。從最新 main 獨立開分支，未合入 #134／#136，未修改它們的程式／測試檔。
+- **驗證**：先觀察九項新／變更測試失敗再實作；fake timers 與假的 Vercel request context 收集 waitUntil Promise，驗證 delay 前不跑、async run pending 時背景 Promise 不先完成、同步／非同步失敗、seed callback 回傳 Promise。另測 guard 重用非空與 null 檔案、舊介面相容，以及 twinReply 傳檔案。完整測試與型別結果見 PR。
+- **踩到的坑／注意事項**：只把 setTimeout 外層包 Promise 不夠，callback 也必須回傳內部非同步工作；延遲時間與背景工作仍共用 Vercel 函式生命週期，這不是持久化排程，也不延長 60s 上限。
+- **還沒做完／待辦**：保留 Draft PR 等待人工審查；未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件；未開始下一個任務。
+
 ### 2026-10-31｜分身品質修正（鬼打牆、日誌洗版）｜Jerry（AI 協助）｜PR #88
 - **做了什麼**：照「全線檢查結果」與 B9 的回報修 C 線兩件事（大廳 C9／C10 在 PR #87）。
   - **分身鬼打牆**：`TWIN_RECENT_LIMIT` 改成 `CONFIG.MAX_ROUNDS × 2`（32 則，整場都在 Prompt 裡）；Prompt 5 精簡並加上「不重複句子與問題、每則帶新東西、檔案沒寫的誠實說沒有固定的再講偏好、多數訊息用沒問過的具體問題收尾」，保留隱私與不替本人約定；Prompt 裡另外列出「你已经问过的问题」。程式端新增 `server/twin/repeat.ts`：新訊息整則或其中一句和自己這場說過的話幾乎一樣（去標點後相同、整句包含、字元二元組相似度 ≥ 0.75），或 6 字以上的片段在自己最近 3 則裡已出現 2 次（口頭禪），就帶著「換個新內容」重新產生一次；第二次還重複的句子拿掉（剩不到 4 字就照用）。

@@ -17,3 +17,14 @@ export function runInBackground(task: Promise<unknown>): void {
     // 拿不到 context 就當一般背景工作
   }
 }
+
+/** 延迟与异步执行全程属于同一个 waitUntil 任务。失败仅记录固定警告。 */
+export function scheduleInBackground(ms: number, run: () => void | Promise<void>): void {
+  runInBackground(new Promise<void>(resolve => {
+    setTimeout(async () => {
+      try { await run() }
+      catch { console.warn('延迟背景任务执行失败') }
+      finally { resolve() }
+    }, ms)
+  }))
+}

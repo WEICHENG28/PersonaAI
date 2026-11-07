@@ -64,7 +64,7 @@ export interface RequestHumanDeps {
   /** C3 結束對話：closerUserId 的分身禮貌收尾。 */
   endConversation(conversationId: string, reason: 'declined', closerUserId: string): Promise<void>
   writeLog(entry: AgentLogInput): Promise<void>
-  schedule(ms: number, run: () => void): void
+  schedule(ms: number, run: () => void | Promise<void>): void
   now(): Date
   seedAutoResponse: HumanResponse
 }
@@ -116,7 +116,7 @@ async function requestHuman(deps: RequestHumanDeps, running: Set<string>, conver
 /** 種子用戶沒有真人會回應：SEED_RESPONSE_DELAY_MS 後自動回應；失敗只記錄。 */
 function scheduleSeedResponse(deps: RequestHumanDeps, notificationId: string, seedUserId: string): void {
   deps.schedule(SEED_RESPONSE_DELAY_MS, () => {
-    respond(deps, notificationId, seedUserId, deps.seedAutoResponse, true).catch((err: unknown) => {
+    return respond(deps, notificationId, seedUserId, deps.seedAutoResponse, true).then(() => undefined).catch((err: unknown) => {
       console.error('[twin] 种子用户自动回应请求真人失败', notificationId, err)
     })
   })
