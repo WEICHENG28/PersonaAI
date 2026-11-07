@@ -26,6 +26,28 @@
 
 ## 共用與決策
 
+### 2026-11-07｜學校平台（llmapi.paratera.com）探測結果（P0-1 實跑）｜Jerry（Claude 協助）
+- **怎麼量**：`scripts/llm-probe.ts`，從 Jerry 的電腦連平台。第一輪 13 個聊天模型＋2 個 embedding，每組 3 次、一次一個請求（357 個請求）；第二輪挑 5 個候選，每組 2 次、同時 12 個請求（92 個請求）。提示詞是一句打招呼，只適合比較模型之間的快慢；實際 prompt 有幾千字，首字時間會更長。後端搬到巴黎（X-3）後，每次呼叫約再多 0.25s 網路延遲。
+- **平台**：`/v1/models` 共 80 個模型。計畫裡的 `DeepSeek-V4-Flash`、`DeepSeek-V4-Pro` 不存在，實際名稱是 `DeepSeek-V4.1-Flash`、`DeepSeek-V4-Flash-0731`、`DeepSeek-V4-Pro-0813`。
+- **關閉思考的參數**：`thinking: {type: 'disabled'}` 對 Qwen3.8-Flash、Qwen3.6-Flash、GLM-5.3-Flash、DeepSeek-V4-Pro-0813 都有效；`enable_thinking: false` 只對 Qwen 有效（DeepSeek-V4-Pro 仍會思考，GLM-5.3-Flash 也還是會）。Kimi-K2.6、GLM-4-FlashX 本來就不思考。GLM-5.3-FlashX 回 400「该模型始终思考，不支持关闭思考」。
+
+| 模型（關閉思考後） | 逐一：p50 首字／總時間 | 並行 12：p50 總時間 | JSON | 結論 |
+|---|---|---|---|---|
+| Kimi-K2.6（不用參數） | 0.53s／0.6～0.9s | 0.7～1.2s | 全部 ok | 候選：阿澈、分身 |
+| Qwen3.8-Flash | 0.49～0.54s／0.5～0.6s | 0.5～4.0s（排隊時波動大） | 全部 ok | 候選：守門、記憶擷取、阿澈對照組 |
+| Qwen3.8-Max | 0.73s／0.9～1.2s | 0.8～4.4s | 全部 ok | 候選：任務解析、挑人、評審 |
+| GLM-4-FlashX（不用參數） | 0.26～0.42s／0.3～0.5s | 0.3s（最穩） | 全部 ok | 最快，舊一代；可當 FAST 對照組 |
+| DeepSeek-V4-Pro-0813 | 1.05s／1.2～2.1s | 1.4～1.5s | 全部 ok | 備案 |
+| DeepSeek-V4.1-Flash | 2/3 請求超過 30s 被中斷 | — | — | 排除：不穩定 |
+| GLM-5.3-FlashX | 不能關閉思考 | — | — | 排除 |
+| MiniMax-M2.7 | 串流 0.6s 出字但 3～4s 才結束，非串流有大量 reasoning | — | — | 排除：思考可能混在正文 |
+| GLM-5-Turbo、Kimi-K3、MiniMax-M3、Qwen3.6-Flash（預設） | 3～10s | — | — | 排除：太慢或預設思考過長 |
+
+- **Embedding**：GLM-Embedding-3 指定 `dimensions:1024` 後確實回 1024 維（約 1.1～1.2s）；GLM-Embedding-2 也是 1024 維（0.3s）。照計畫用 GLM-Embedding-3。
+- **錯誤率**：第一輪 9.5%，全部來自 GLM-5.3-FlashX（參數被拒）和 DeepSeek-V4.1-Flash（逾時）；第二輪候選模型同時 12 個請求，0%。
+- **暫定設定**（自然度等 E-3 盲測定案）：`MODEL_CHAT=Kimi-K2.6`、`MODEL_REASON=Qwen3.8-Max`、`MODEL_FAST=Qwen3.8-Flash`、`MODEL_EMBED=GLM-Embedding-3`；`LLM_MODEL_PARAMS={"Qwen3.8-Max":{"thinking":{"type":"disabled"}},"Qwen3.8-Flash":{"thinking":{"type":"disabled"}}}`。
+- **限制**：平台沒有 `text-embedding-3-small`，所以 P0-5 重算向量之前，正式站不能整個換到學校平台。P0-3 還沒做之前，Qwen 系列會用預設的思考模式（Qwen3.8-Max 非串流約 7.5s），暫時不要把它設成 `MODEL_REASON`。
+
 ### 2026-11-07｜X-3 巴黎部署、聊天載入並行與 X-1 初始化競態修正｜AI 協助｜分支 opt/X-3-paris-chat-load
 - **做了什麼**：依使用者已確認的 Supabase 巴黎位置，`vercel.json` 設定 `regions: ["cdg1"]`。設定讀取獨立並行；intro 與任務回報用 `Promise.allSettled` 並行，兩者結束後再讀聊天記錄。聊天尚未載入時，兩個社交 hook 接收 null，不向後端查詢；成功載入（含送出流程的恢復 GET）後才傳真實計數。
 - **為什麼這樣做**：減少載入時的串行等待與先查 0、再查 N 的重複請求。通知重複請求的根因是掛載立即 GET，加上 Realtime 首次 system status ok 又觸發 GET；改由首次訂閱就緒負責初始讀取，後續事件／重連照常刷新，連線失敗立即讀取並啟用原本 15 秒輪詢；訂閱 2 秒未就緒也會備援讀取。遲到的連線事件仍會補讀，避免漏掉連線空窗期的通知。
@@ -366,6 +388,14 @@
 ---
 
 ## B：社交 Agent 線（Peter）
+
+### 2026-11-07｜P0-1 LLM 平台探測腳本｜Peter（AI 協助）｜分支 opt/P0-1-llm-probe
+- **做了什麼**：新增獨立 CLI，對每個聊天模型的 default／Qwen 關 thinking／GLM 關 thinking 三種變體重複量測普通非串流、串流與 json_object；embedding 請求 1024 維並記錄實際長度。Markdown 報告依模型、模式與變體彙整 TTFT、總延遲、成功率、錯誤率、reasoning 字數、tokens 與維度。
+- **為什麼這樣做**：先建立可重複、可比較的模型能力基準，再由使用者實測選平台。JSON 能力檢查為獨立請求，透過額外的 `requestKind` 標記，不混入普通文本的成功率、延遲或 completion tokens；reasoning p50 依審查要求統計所有有回應的請求（包含失敗及 JSON 檢查），用 `responseReceived` 區分模型回應與純傳輸失敗，避免漏掉只輸出思考的模型。所有請求共享有界並行池，SDK 與每次請求都關閉自動重試；總時間限制維持 30 秒，輸出上限改為共用常數 1024 tokens，HELP 同步。
+- **改了哪些檔案**：`scripts/llm-probe.ts`、`scripts/probe/lib.ts`、`tests/social/llm-probe.test.ts`、本紀錄。
+- **驗證**：先觀察缺模組與 JSON 錯誤分類的失敗測試，再實作；21 項 mock 測試覆蓋百分位數、三種變體、並行上限、TTFT、串流中斷、JSON 拒絕／無效、實際 embedding 維度、錯誤脫敏及報告檔案；`--help` 在讀設定或建立 client 之前返回。獨立唯讀審查後修正 SDK 日誌、串流 abort 及統計問題；本次使用者審查修正另先觀察 5 項失敗再轉綠，驗證 1024-token 請求與 HELP、串流及非串流 length 無正文時保留思考字數和最後完成原因、報告截斷數、失敗回應的 reasoning p50、全部失敗仍寫報告且 exitCode 為 1。空串流成功回應也納入 reasoning 分母，另有 RED→GREEN 回歸案例。完整測試與型別檢查結果見 PR。
+- **踩到的坑／注意事項**：新增 `finishReason` 記錄完成原因；串流保留最後一個非空值。`length` 且無正文時固定錯誤為「思考用完 max_tokens，未输出正文」，失敗仍保留 reasoningChars，報告新增 length 截斷數。全部請求失敗時，先寫完報告，再設 exitCode=1 並印「全部请求失败，请检查报告中的错误」。JSON 的 HTTP 400 記 rejected，非物件 JSON 記 invalid，傳輸失敗記 skipped。未回傳 usage 時 tokens 為空。報告不保存模型正文；錯誤與整份報告脫敏，固定 SDK `logLevel: 'off'`，串流結束後檢查 signal 及完成原因。同一分鐘重跑會覆蓋同名報告。沒有 P0-1 Issue，因此 PR 不填假的 Closes 編號。
+- **還沒做完／待辦**：依計畫，真實平台量測交給使用者：設定 `.env.local` 的 `LLM_BASE_URL`、`LLM_API_KEY`，執行計畫 P0-1 的模型清單指令，再把摘要補到「共用與決策」。本次未讀取或修改 `.env.local`、未呼叫真實模型、未寫入 Supabase；平台相容性、實際速度與 embedding 是否為 1024 維尚未實測。
 
 ### 2026-11-07｜中國大陸可用：字型不擋畫面、Rive 執行檔自帶、香港主機部署工具｜Peter（AI 協助）
 - **原因**：大陸打不開／很慢有四個：`vercel.app` 被擋、瀏覽器直接連 Supabase 不穩、Google Fonts 被擋（原本會白屏數秒）、Rive 的 wasm 從 unpkg.com 下載。
