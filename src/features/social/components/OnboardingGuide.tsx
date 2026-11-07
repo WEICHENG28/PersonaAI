@@ -4,7 +4,8 @@ import { Button, Chip } from '@components/ui/Button'
 import { Modal } from '@components/ui/Modal'
 import { useDemoStore } from '@store/useDemoStore'
 import { isHttpMode } from '@lib/api/friend'
-import { getOnboarding, joinLobbyNow, quickProfile, startFirstTask, type OnboardingView } from '@lib/api/social'
+import { joinLobbyNow, quickProfile, startFirstTask, type OnboardingView } from '@lib/api/social'
+import { loadOnboardingAfterMessages } from '../messageLoaders'
 
 const POLL_MS = 15_000
 
@@ -33,7 +34,7 @@ function writeFlag(key: string, on: boolean) {
  * 用法：const guide = useOnboardingGuide(用户说了几句, (taskId) => 打开任务确认卡)；画面放 {guide.node}，guide.active 时可隐藏其他提示。
  * 擁有者：B（放在 A 的 FriendPage）。
  */
-export function useOnboardingGuide(userMessageCount: number, onTaskCreated: (taskId: string) => void): { node: ReactNode; active: boolean } {
+export function useOnboardingGuide(userMessageCount: number | null, onTaskCreated: (taskId: string) => void): { node: ReactNode; active: boolean } {
   const user = useDemoStore((s) => s.user)
   const navigate = useNavigate()
   const [view, setView] = useState<OnboardingView | null>(null)
@@ -45,11 +46,11 @@ export function useOnboardingGuide(userMessageCount: number, onTaskCreated: (tas
 
   const load = useCallback(() => {
     if (!isHttpMode || !user || hidden) return
-    getOnboarding().then(setView).catch(() => {})
-  }, [user, hidden])
+    loadOnboardingAfterMessages(userMessageCount)?.then(setView).catch(() => {})
+  }, [user, hidden, userMessageCount])
 
   // 每多说一句就重新看进度
-  useEffect(load, [load, userMessageCount])
+  useEffect(load, [load])
 
   // 等任务结果时定时更新（结果是 worker 在后台跑出来的）
   const waiting = view?.current === 'task' || view?.current === 'result'

@@ -13,6 +13,7 @@ export const MEMORY_PROMPT_SYSTEM = `从用户「最新这一则讯息」撷取�
 - 最近 6 则对话：{{recent}}
 - 已存在的记忆：{{existing}}
 
+- 所有输出用简体中文，每个字都用简体；用户用繁体字写的内容，也要转成简体再写（例如「攝影」写成「摄影」）。
 只输出 JSON：
 {"memories": [{"content": "用户计划周末去漫展", "confidence": 0.9}]}
 没有可记的就输出 {"memories": []}`

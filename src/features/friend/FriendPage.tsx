@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ChatBubble } from '@components/ui/ChatBubble'
 import { Button, Chip } from '@components/ui/Button'
@@ -13,6 +13,8 @@ import { LoadingDots } from '@components/ui/LoadingDots'
 import { TaskConfirmCard } from '@features/social/components/TaskConfirmCard'
 import { useLobbyInvite } from '@features/social/components/LobbyInvite'
 import { useOnboardingGuide } from '@features/social/components/OnboardingGuide'
+import { reconcileChatFailure, shouldScheduleNudge } from './chatFailure'
+import { initializeFriendPage } from './chatInitialization'
 import {
   isHttpMode,
   callFriendIntro,
@@ -43,44 +45,43 @@ export function FriendPage() {
   // http 模式：后端建的待确认任务 ID（显示 B 的 TaskConfirmCard）；工作日志面板开关用后端 dev_mode
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null)
   const [httpDevMode, setHttpDevMode] = useState(false)
+  const [messagesLoaded, setMessagesLoaded] = useState(false)
+  const sendSeq = useRef(0)
+  const sendInFlight = useRef(false)
+  const unconfirmedSend = useRef(false)
 
   // 消息数量用于自动滚动（mock 或 http 模式均适用）
   const msgCount = isHttpMode ? httpMessages.length : s.friendMessages.length
   // 聊夠了、對外檔案也夠完整 → 邀請一鍵加入大廳（B 的元件）
-  const lobbyInvite = useLobbyInvite(httpMessages.filter((m) => m.role === 'user').length)
+  const userMessageCount = messagesLoaded ? httpMessages.filter((m) => m.role === 'user').length : null
+  const lobbyInvite = useLobbyInvite(userMessageCount)
   // 新手任务第 4 步建好任务后，用同一张任务确认卡确认
-  const guide = useOnboardingGuide(httpMessages.filter((m) => m.role === 'user').length, (taskId) => setPendingTaskId(taskId))
+  const guide = useOnboardingGuide(userMessageCount, (taskId) => setPendingTaskId(taskId))
   const chatRef = useAutoScrollBottom<HTMLDivElement>(msgCount)
 
   // http 模式：挂载时拉消息 + 首次见面
   //（每次导到这页都重跑：从铃铛「阿澈有事想跟你说」点进来时，location.key 会变）
   useEffect(() => {
     if (!isHttpMode) return
-    const init = async () => {
-      try {
-        await callFriendIntro()   // 幂等，intro_done 时直接 ok
-      } catch { /* 非致命 */ }
-      // 有任务回报就让阿澈先说（铃铛的通知也会变已读）；失败不影响聊天
-      try {
-        await deliverReports()
-      } catch { /* 非致命 */ }
-      try {
-        const msgs = await getFriendMessages()
-        setHttpMessages(msgs)
-      } catch (e) {
-        console.error('[FriendPage] loadMessages', e)
-      }
-      try {
-        const settings = await fetchSettings()
-        setHttpDevMode(settings?.dev_mode ?? false)
-      } catch { /* 面板默认不显示 */ }
-    }
-    void init()
+    let active = true
+    setMessagesLoaded(false)
+    void initializeFriendPage({
+      callFriendIntro, deliverReports, getFriendMessages, fetchSettings,
+      readSendSeq: () => sendSeq.current,
+      isSending: () => sendInFlight.current,
+      hasUnconfirmedSend: () => unconfirmedSend.current,
+      isActive: () => active,
+      onMessages: (msgs) => { setHttpMessages(msgs); setMessagesLoaded(true) },
+      onSettings: (settings) => setHttpDevMode(settings?.dev_mode ?? false),
+      onMessagesError: (error) => console.error('[FriendPage] loadMessages', error),
+    })
+    return () => { active = false }
   }, [location.key])
 
   const send = useCallback(async () => {
     const text = draft.trim()
     if (!text) return
+    sendSeq.current += 1
     setDraft('')
 
     if (!isHttpMode) {
@@ -89,6 +90,8 @@ export function FriendPage() {
     }
 
     // http 模式：乐观添加用户消息，再打 API
+    sendInFlight.current = true
+    unconfirmedSend.current = true
     const tempId = `tmp-${Date.now()}`
     setHttpMessages((prev) => [
       ...prev,
@@ -108,7 +111,9 @@ export function FriendPage() {
       const result = await callFriendChat(text)
       // 拉最新消息（包含 AI 回复）
       const msgs = await getFriendMessages()
+      unconfirmedSend.current = false
       setHttpMessages(msgs)
+      setMessagesLoaded(true)
       // task_intent：后端已建真任务（pending_confirm），显示 B 的确认卡
       if (result.taskId) {
         setPendingTaskId(result.taskId)
@@ -116,9 +121,18 @@ export function FriendPage() {
       }
     } catch (e: unknown) {
       setHttpError(e instanceof Error ? e.message : '阿澈刚刚恍神了，再说一次？')
-      // 移除乐观消息
-      setHttpMessages((prev) => prev.filter((m) => m.id !== tempId))
+      // 后端可能已经保存用户消息；重读失败时保留原文并标记，避免用户误以为没送出。
+      let serverMessages: FriendMessage[] | null = null
+      try {
+        serverMessages = await getFriendMessages()
+      } catch { /* 无法确认保存状态，保留乐观消息 */ }
+      setHttpMessages((prev) => reconcileChatFailure(prev, tempId, serverMessages))
+      if (serverMessages !== null) {
+        unconfirmedSend.current = false
+        setMessagesLoaded(true)
+      }
     } finally {
+      sendInFlight.current = false
       setHttpTyping(false)
     }
   }, [draft, s])
@@ -130,13 +144,7 @@ export function FriendPage() {
   // 分頁在背景（document.visibilityState !== 'visible'）时不发。
   // 后端也有同样的防重复挡（meta.nudge 检查），双保险。
   useEffect(() => {
-    if (!isHttpMode || httpMessages.length === 0) return
-    const lastMsg = httpMessages[httpMessages.length - 1]
-    if (!lastMsg || lastMsg.role !== 'friend') return // 最后一则是用户，不 nudge
-    // 最后一条 user 讯息之后已经有过 nudge → 这段沉默已经接过话
-    const lastUserIdx = httpMessages.map((m) => m.role).lastIndexOf('user')
-    const afterUser = httpMessages.slice(lastUserIdx + 1)
-    if (afterUser.some((m) => m.meta?.nudge === true)) return
+    if (!isHttpMode || !shouldScheduleNudge({ messages: httpMessages, httpError })) return
     // 分頁在背景不发（等回到前景、effect 重跑时再计时）
     if (document.visibilityState !== 'visible') return
     const timer = setTimeout(async () => {
@@ -152,7 +160,7 @@ export function FriendPage() {
     }, 75_000) // 75 秒（60–90s 范围内）
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [httpMessages])
+  }, [httpMessages, httpError])
 
   // 任務卡先關掉（再想想／點旁邊）：任務留著等確認，用通知告訴用戶去哪裡找
   const taskLater = (taskId: string) => {

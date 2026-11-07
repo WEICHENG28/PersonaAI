@@ -48,6 +48,15 @@
 - **暫定設定**（自然度等 E-3 盲測定案）：`MODEL_CHAT=Kimi-K2.6`、`MODEL_REASON=Qwen3.8-Max`、`MODEL_FAST=Qwen3.8-Flash`、`MODEL_EMBED=GLM-Embedding-3`；`LLM_MODEL_PARAMS={"Qwen3.8-Max":{"thinking":{"type":"disabled"}},"Qwen3.8-Flash":{"thinking":{"type":"disabled"}}}`。
 - **限制**：平台沒有 `text-embedding-3-small`，所以 P0-5 重算向量之前，正式站不能整個換到學校平台。P0-3 還沒做之前，Qwen 系列會用預設的思考模式（Qwen3.8-Max 非串流約 7.5s），暫時不要把它設成 `MODEL_REASON`。
 
+### 2026-11-07｜X-3 巴黎部署、聊天載入並行與 X-1 初始化競態修正｜AI 協助｜分支 opt/X-3-paris-chat-load
+- **做了什麼**：依使用者已確認的 Supabase 巴黎位置，`vercel.json` 設定 `regions: ["cdg1"]`。設定讀取獨立並行；intro 與任務回報用 `Promise.allSettled` 並行，兩者結束後再讀聊天記錄。聊天尚未載入時，兩個社交 hook 接收 null，不向後端查詢；成功載入（含送出流程的恢復 GET）後才傳真實計數。
+- **為什麼這樣做**：減少載入時的串行等待與先查 0、再查 N 的重複請求。通知重複請求的根因是掛載立即 GET，加上 Realtime 首次 system status ok 又觸發 GET；改由首次訂閱就緒負責初始讀取，後續事件／重連照常刷新，連線失敗立即讀取並啟用原本 15 秒輪詢；訂閱 2 秒未就緒也會備援讀取。遲到的連線事件仍會補讀，避免漏掉連線空窗期的通知。
+- **X-1 HIGH**：用 `sendSeq` 比對 init GET 發出時與回來時的版本，GET 發出時若仍有送出中／伺服器狀態未確認的本機訊息，也不覆蓋它們。送出及自身歷史 GET 已完成後才發出的 init GET 可以採用，讓稍後投遞的任務回報仍會顯示。effect 清理後不再套用 init 結果，保留 X-1 的錯誤文案與失敗標記。
+- **改了哪些檔案**：`vercel.json`、`src/features/friend/{FriendPage.tsx,chatInitialization.ts}`、`src/features/social/components/{LobbyInvite.tsx,OnboardingGuide.tsx}`、`src/features/social/messageLoaders.ts`、`src/features/twin/components/{useNotifications.ts,notificationFeed.ts}`、`tests/friend/chat-initialization.test.ts`、`tests/social/message-loaders.test.ts`、`tests/twin/notification-feed.test.ts`、本紀錄。未新增套件或修改契約／資料表。
+- **驗證**：先觀察三組缺少模組的失敗，再實作；另以 RED→GREEN 修正「init 開始時送出已在進行」的覆蓋案例。19 項新增測試覆蓋載入順序、錯誤處理、序號保護與清理、null／0／N 請求閘門、通知首次讀取、斷線／逾時備援、後續事件及 effect 重播。獨立審查指出初始化開始版本保護過嚴，會漏掉成功送出後新投遞的回報；補上兩項失敗測試再修正，也驗證未確認的失敗本機訊息仍保留。完整測試、型別與建置結果見 PR。
+- **踩到的坑／注意事項**：只在 GET 發出前記下 sendSeq 不足以涵蓋此時已開始但未完成的送出，所以也檢查進行中／未確認狀態；不能只因 init 開始版本較舊就丟掉之後的新 GET。通知的首次讀取改為訂閱就緒後執行；連線失敗會立即讀取，無任何訂閱狀態則最多等 2 秒後啟動 GET。請求數下降只指正常載入，真實通知變更／重連仍會重讀。
+- **還沒做完／待辦**：獨立審查留有 1 項 Minor：同頁重入後 init GET 失敗、但 nudge 之後成功讀回歷史時，未同步把 messagesLoaded 設回 true，社交進度需再次送出或進頁才恢復；依審查流程暫列待辦。預期 `/friend` 請求從 10～11 支降至約 7 支、訊息顯示少一次串行往返，仍須合併部署後確認 cdg1 並黑箱量測。開始時實際遠端 main 為 b124407，PR #124 仍為 Open；未自行合併 X-2。未呼叫真實模型、不寫 Supabase、不改 PR #122。
+
 ### 2026-10-31｜通知面板動畫修復 + nudge 無限發修復｜Vincent（AI 協助）｜PR a/friend-quality
 - **做了什麼**：
   1. **通知鈴鐺面板動畫 bug**：打開面板時先出現在錯誤位置再跳到正確位置（flicker）。原因是 `pages.css` 新增的 `@keyframes toast-in`（app-toast 用，帶 `translate: -50%`）覆蓋了 `layout.css` 同名的通知面板 keyframes（帶 `translate: 0 12px`），CSS 同名 keyframes 後者覆蓋前者。修法：app-toast 改名為 `app-toast-in`，不再撞名。
@@ -245,6 +254,22 @@
 ---
 
 ## A：AI 朋友線（Vincent）
+
+### 2026-11-07｜X-2 檔案、記憶、回報與趣味 prompt 要求簡體輸出｜AI 協助｜分支 opt/X-2-prompt-simplified
+- **做了什麼**：在四份 prompt 的「只输出 JSON」之前加入計畫指定的固定文案，要求所有輸出使用簡體、將用戶輸入的繁體轉成簡體；檔案 intro 範例「20 字內」改為「20 字内」。
+- **為什麼這樣做**：模型可能照抄用戶的繁體原文；在各輸出契約前明確指定語言，涵蓋檔案、記憶、回報與趣味內容。
+- **改了哪些檔案**：`server/prompts/02_memory.ts`、`03_profile.ts`、`08_report.ts`、`12_fun.ts`、新增 `tests/friend/prompt-simplified.test.ts`、本紀錄。
+- **驗證**：5 項測試先全部失敗，再轉綠；驗證四份匯出的 prompt 包含完整固定文案且位於 JSON 輸出指示之前，檔案 prompt 不再含「內」。完整測試結果見 PR。
+- **踩到的坑／注意事項**：固定文案中的「攝影」是計畫指定的轉換示例，逐字保留。沒有修改「例如昆虫、看展」或其他規則，也沒有修改 schema 或渲染函式。
+- **還沒做完／待辦**：既有資料庫的繁體檔案不會自動變成簡體，需用戶重新產生或由有權限的人處理。未呼叫真實模型，實際生成效果尚未實測；本次只做 X-2，不開始 X-3，不修改 PR #122。
+
+### 2026-11-07｜X-1 阿澈聊天失敗時保留用戶訊息、失敗後不 nudge｜AI 協助｜分支 opt/X-1-chat-failure
+- **做了什麼**：送出失敗後重新讀取聊天記錄；GET 成功時整份採用伺服器結果，GET 也失敗時保留樂觀訊息，只在本次暫存訊息的 meta 加上 `failed: true`。`httpError` 非 null 時不排 nudge 計時器，錯誤變更也會清除既有計時器。
+- **為什麼這樣做**：POST 失敗不代表後端沒有保存用戶原文；先對齊伺服器，再在無法確認時保留原文，避免用戶誤以為沒送出而重打。沿用原本的錯誤提示文字、位置、成功流程及 75 秒／可見性／每段沉默最多一次規則。
+- **改了哪些檔案**：`src/features/friend/FriendPage.tsx`、新增 `src/features/friend/chatFailure.ts`、新增 `tests/friend/chat-failure.test.ts`、本紀錄。
+- **驗證**：先觀察缺少恢復模組的失敗測試再實作；9 項純函式測試涵蓋已保存／未保存／空歷史、雙重失敗保留原文與 metadata 且不修改輸入、錯誤阻擋 nudge、清除錯誤恢復資格、最後一則 user 與既有 nudge 的規則。前端型別檢查通過，完整測試結果見 PR。
+- **踩到的坑／注意事項**：GET 成功但回傳空陣列仍須採用，不能誤當成 GET 失敗；恢復讀取失敗不覆蓋原本 POST 錯誤。`failed` 只作狀態標記，本次不新增 UI 樣式或更動文案。
+- **還沒做完／待辦**：獨立審查指出一項既有 HIGH：首次載入與送出重疊時，較早發出的初始化 GET 回應仍可能覆蓋樂觀訊息，甚至覆蓋失敗恢復結果。計畫明定 X-1 只動 catch 與 nudge，不改初始化流程，因此未在此擴充初始化版本保護；須另行決定處理。部署後的真實失敗情境仍需黑箱驗證。本次不做 X-2／X-3，不改 PR #122，不呼叫真實模型、不寫 Supabase。
 
 ### 2026-10-31｜AI 朋友頁空狀態改 loading 動畫｜Vincent（AI 協助）｜分支 a/friend-empty-loading
 - **做了什麼**：朋友頁聊天區沒有訊息時，不再顯示「和阿澈打个招呼吧」提示文字，改為三點脈衝 loading 動畫（`<LoadingDots>`，與「我的任務」/「歷史」頁同款）；`friend.empty` 換成 `friend.loading`（aria-label 用）。http 與 mock 兩種模式都改。
