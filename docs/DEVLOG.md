@@ -314,6 +314,15 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-11-07｜M-4 檔案興趣過濾與 avoidance 型別｜AI 協助｜分支 opt/M-4-profile-avoidance
+- **做了什麼**：檔案 prompt 增加他人、過去、不確定及單次經歷不算興趣的規則，移除 avoidance 的特定事物範例，保留 X-2 簡體輸出規則。renderer 改用一次 regex／函式替換，原樣保留輸入的 `$&`、`$1` 與 `{{previous}}`。新增 `dropNegatedInterests`，沿用 shared/negation，按子句判斷；只在 AI 草稿與 force 重建寫入前過濾，回傳和 embedding 也使用過濾結果。
+- **為什麼這樣做**：模型可能把明確否定的事物寫成興趣；寫入前再做確定性檢查。任一提及子句為正面或完全沒提到就保留，所有提及都是否定才移除，興趣本身是否定句也移除。
+- **手動與 M-5 邊界**：依使用者決定，`PUT /profile/shareable` 完全以使用者手填／確認為準，不用舊聊天過濾；已補「聊天不喜歡游泳，手填游泳仍存入」路由測試。已確認且非 force 的背景擷取仍只更新內部檔案。
+- **改了哪些檔案**：server/friend/profile.ts、server/prompts/03_profile.ts、shared/types.ts、tests/friend/profile-avoidance.test.ts、本紀錄。shared/types.ts 的 `AgentProfile.avoidance?: string[]` 為三線已明確同意的共用修改，需其他成員 review；未修改 B／C 線實作。
+- **型別與隱私檢查**：盤點模型 schema、friend profile、friend contracts、social planner／runnerDeps、friend／seed fixtures、twin seed 與 scripts/seed 的讀寫；optional 欄位相容舊資料。完整 AgentProfile 只供本人內部規劃使用；對外契約、profile API、大廳候選、分身 style 及卡片都使用既有 shareable／style 投影。以內部 avoidance 標記測試 GET／POST profile、shareable／style 契約及卡片輸入均未包含該欄位或內容；完整呼叫端清單見 PR。
+- **驗證**：先觀察新 helper／prompt／renderer／AI 寫入測試失敗，以及 optional 型別 fixture 編譯失敗，再實作轉綠；新增 26 項測試，完整 1,050 項通過，前後端型別檢查及 build 通過。LLM、Supabase 皆 mock，沒有安裝套件或操作真實平台。
+- **限制／待辦**：`我以前喜欢游泳，现在不喜欢了` 依字面子句規則保留游泳：明確提及游泳的第一子句為正向，第二子句省略主題；不推論跨子句指代或時間先後。過去／他人／不確定／單次經歷另由 prompt 約束，真實模型效果待人工驗證。回滾使用 revert；只完成 M-4，保留 Draft PR 等待審查。
+
 ### 2026-11-07｜M-3 記憶去重分正反、否定／過去／他人／不確定 prompt｜AI 協助｜分支 opt/M-3-memory-polarity
 - **做了什麼／為什麼**：isDuplicateMemory 簽名不變，先用 M-1 的 isNegated 比較正反，異向不算重複，同向保留原本 ≥2 字包含去重。memoryTopicKey 去掉開頭「用户」，取第一個「，,。；;、」之前的子句，連續移除開頭的「最近、开始、一直、现在、其实、真的、还是、也、都、本来」，再由 shared/negation.ts 的 conditionKeyword 取得主題，保留既有標點／空白整理並移除尾端「了」「的」。findContradicted 仍要求 key 完全相同且正反相反，不用 includes；「跑步」與「跑步机」不互刪。不另建否定詞表，也不修改共用工具。
 - **本機實測補正／邊界**：使用者回報真實模型輸出「用户最近开始喜欢跑步，每天晚上跑三公里」與「用户不喜欢跑步，觉得太累且坚持不下去」未能互相取代；首版整句 key 過嚴。這次以原樣輸出作回歸資料，另驗「对爬山没兴趣」可對上「喜欢爬山」、「喜欢街拍，周末常出去拍摄」只取「街拍」。主題與正反現在都取相同首子句，避免「喜欢跑步，但不喜欢游泳」誤刪同向跑步記憶；標點在前綴處理前整理，以保留引號包住前綴的既有行為。過去式先不處理：「用户以前常打篮球，现在不打了」不會因此刪掉「用户喜欢打篮球」；這是首子句／共用規則的字面正規化，不是時態或完整語意推理。

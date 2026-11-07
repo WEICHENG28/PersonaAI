@@ -26,6 +26,8 @@ export interface TraitScore { score: number; confidence: number; evidence: strin
 export interface AgentProfile {
   big_five: Record<'O' | 'C' | 'E' | 'A' | 'N', TraitScore>
   values: string[]
+  /** 僅供內部社交 Agent 使用，不加入對外檔案。 */
+  avoidance?: string[]
   style: StyleProfile
 }
 export interface Preferences { personality: 'similar' | 'complementary'; conditions: string[] }
