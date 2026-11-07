@@ -26,6 +26,28 @@
 
 ## 共用與決策
 
+### 2026-11-07｜學校平台（llmapi.paratera.com）探測結果（P0-1 實跑）｜Jerry（Claude 協助）
+- **怎麼量**：`scripts/llm-probe.ts`，從 Jerry 的電腦連平台。第一輪 13 個聊天模型＋2 個 embedding，每組 3 次、一次一個請求（357 個請求）；第二輪挑 5 個候選，每組 2 次、同時 12 個請求（92 個請求）。提示詞是一句打招呼，只適合比較模型之間的快慢；實際 prompt 有幾千字，首字時間會更長。後端搬到巴黎（X-3）後，每次呼叫約再多 0.25s 網路延遲。
+- **平台**：`/v1/models` 共 80 個模型。計畫裡的 `DeepSeek-V4-Flash`、`DeepSeek-V4-Pro` 不存在，實際名稱是 `DeepSeek-V4.1-Flash`、`DeepSeek-V4-Flash-0731`、`DeepSeek-V4-Pro-0813`。
+- **關閉思考的參數**：`thinking: {type: 'disabled'}` 對 Qwen3.8-Flash、Qwen3.6-Flash、GLM-5.3-Flash、DeepSeek-V4-Pro-0813 都有效；`enable_thinking: false` 只對 Qwen 有效（DeepSeek-V4-Pro 仍會思考，GLM-5.3-Flash 也還是會）。Kimi-K2.6、GLM-4-FlashX 本來就不思考。GLM-5.3-FlashX 回 400「该模型始终思考，不支持关闭思考」。
+
+| 模型（關閉思考後） | 逐一：p50 首字／總時間 | 並行 12：p50 總時間 | JSON | 結論 |
+|---|---|---|---|---|
+| Kimi-K2.6（不用參數） | 0.53s／0.6～0.9s | 0.7～1.2s | 全部 ok | 候選：阿澈、分身 |
+| Qwen3.8-Flash | 0.49～0.54s／0.5～0.6s | 0.5～4.0s（排隊時波動大） | 全部 ok | 候選：守門、記憶擷取、阿澈對照組 |
+| Qwen3.8-Max | 0.73s／0.9～1.2s | 0.8～4.4s | 全部 ok | 候選：任務解析、挑人、評審 |
+| GLM-4-FlashX（不用參數） | 0.26～0.42s／0.3～0.5s | 0.3s（最穩） | 全部 ok | 最快，舊一代；可當 FAST 對照組 |
+| DeepSeek-V4-Pro-0813 | 1.05s／1.2～2.1s | 1.4～1.5s | 全部 ok | 備案 |
+| DeepSeek-V4.1-Flash | 2/3 請求超過 30s 被中斷 | — | — | 排除：不穩定 |
+| GLM-5.3-FlashX | 不能關閉思考 | — | — | 排除 |
+| MiniMax-M2.7 | 串流 0.6s 出字但 3～4s 才結束，非串流有大量 reasoning | — | — | 排除：思考可能混在正文 |
+| GLM-5-Turbo、Kimi-K3、MiniMax-M3、Qwen3.6-Flash（預設） | 3～10s | — | — | 排除：太慢或預設思考過長 |
+
+- **Embedding**：GLM-Embedding-3 指定 `dimensions:1024` 後確實回 1024 維（約 1.1～1.2s）；GLM-Embedding-2 也是 1024 維（0.3s）。照計畫用 GLM-Embedding-3。
+- **錯誤率**：第一輪 9.5%，全部來自 GLM-5.3-FlashX（參數被拒）和 DeepSeek-V4.1-Flash（逾時）；第二輪候選模型同時 12 個請求，0%。
+- **暫定設定**（自然度等 E-3 盲測定案）：`MODEL_CHAT=Kimi-K2.6`、`MODEL_REASON=Qwen3.8-Max`、`MODEL_FAST=Qwen3.8-Flash`、`MODEL_EMBED=GLM-Embedding-3`；`LLM_MODEL_PARAMS={"Qwen3.8-Max":{"thinking":{"type":"disabled"}},"Qwen3.8-Flash":{"thinking":{"type":"disabled"}}}`。
+- **限制**：平台沒有 `text-embedding-3-small`，所以 P0-5 重算向量之前，正式站不能整個換到學校平台。P0-3 還沒做之前，Qwen 系列會用預設的思考模式（Qwen3.8-Max 非串流約 7.5s），暫時不要把它設成 `MODEL_REASON`。
+
 ### 2026-10-31｜通知面板動畫修復 + nudge 無限發修復｜Vincent（AI 協助）｜PR a/friend-quality
 - **做了什麼**：
   1. **通知鈴鐺面板動畫 bug**：打開面板時先出現在錯誤位置再跳到正確位置（flicker）。原因是 `pages.css` 新增的 `@keyframes toast-in`（app-toast 用，帶 `translate: -50%`）覆蓋了 `layout.css` 同名的通知面板 keyframes（帶 `translate: 0 12px`），CSS 同名 keyframes 後者覆蓋前者。修法：app-toast 改名為 `app-toast-in`，不再撞名。
