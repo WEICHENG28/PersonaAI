@@ -230,7 +230,7 @@
 - **改了哪些檔案**：`src/features/friend/FriendPage.tsx`、新增 `src/features/friend/chatFailure.ts`、新增 `tests/friend/chat-failure.test.ts`、本紀錄。
 - **驗證**：先觀察缺少恢復模組的失敗測試再實作；9 項純函式測試涵蓋已保存／未保存／空歷史、雙重失敗保留原文與 metadata 且不修改輸入、錯誤阻擋 nudge、清除錯誤恢復資格、最後一則 user 與既有 nudge 的規則。前端型別檢查通過，完整測試結果見 PR。
 - **踩到的坑／注意事項**：GET 成功但回傳空陣列仍須採用，不能誤當成 GET 失敗；恢復讀取失敗不覆蓋原本 POST 錯誤。`failed` 只作狀態標記，本次不新增 UI 樣式或更動文案。
-- **還沒做完／待辦**：部署後的真實失敗情境需由黑箱測試再驗證。本次只做 X-1，不做 X-2／X-3，不改 PR #122，不呼叫真實模型、不寫 Supabase。
+- **還沒做完／待辦**：獨立審查指出一項既有 HIGH：首次載入與送出重疊時，較早發出的初始化 GET 回應仍可能覆蓋樂觀訊息，甚至覆蓋失敗恢復結果。計畫明定 X-1 只動 catch 與 nudge，不改初始化流程，因此未在此擴充初始化版本保護；須另行決定處理。部署後的真實失敗情境仍需黑箱驗證。本次不做 X-2／X-3，不改 PR #122，不呼叫真實模型、不寫 Supabase。
 
 ### 2026-10-31｜AI 朋友頁空狀態改 loading 動畫｜Vincent（AI 協助）｜分支 a/friend-empty-loading
 - **做了什麼**：朋友頁聊天區沒有訊息時，不再顯示「和阿澈打个招呼吧」提示文字，改為三點脈衝 loading 動畫（`<LoadingDots>`，與「我的任務」/「歷史」頁同款）；`friend.empty` 換成 `friend.loading`（aria-label 用）。http 與 mock 兩種模式都改。
