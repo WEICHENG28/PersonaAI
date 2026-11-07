@@ -342,6 +342,14 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-07｜P0-1 LLM 平台探測腳本｜Peter（AI 協助）｜分支 opt/P0-1-llm-probe
+- **做了什麼**：新增獨立 CLI，對每個聊天模型的 default／Qwen 關 thinking／GLM 關 thinking 三種變體重複量測普通非串流、串流與 json_object；embedding 請求 1024 維並記錄實際長度。Markdown 報告依模型、模式與變體彙整 TTFT、總延遲、成功率、錯誤率、reasoning 字數、tokens 與維度。
+- **為什麼這樣做**：先建立可重複、可比較的模型能力基準，再由使用者實測選平台。JSON 能力檢查為獨立請求，不混入普通文本延遲；所有請求共享有界並行池，SDK 與每次請求都關閉自動重試，避免掩蓋平台錯誤率及增加額度消耗。每次請求含串流總時間限制 30 秒、輸出最多 256 tokens。
+- **改了哪些檔案**：`scripts/llm-probe.ts`、`scripts/probe/lib.ts`、`tests/social/llm-probe.test.ts`、本紀錄。
+- **驗證**：先觀察缺模組與 JSON 錯誤分類的失敗測試，再實作；15 項 mock 測試覆蓋百分位數、三種變體、並行上限、TTFT、串流中斷、JSON 拒絕／無效、實際 embedding 維度、錯誤脫敏及報告檔案；`--help` 在讀設定或建立 client 之前返回。完整測試與型別檢查結果見 PR。
+- **踩到的坑／注意事項**：JSON 請求的 HTTP 400 記 rejected；成功回應的非物件 JSON 記 invalid；連線或其他 HTTP 失敗記 skipped 並保留脫敏錯誤。未回傳 usage 時 tokens 為空，不用 0 偽裝量測值。報告不保存模型正文；錯誤先移除已知 key／URL，整份報告再脫敏一次。同一分鐘重跑會覆蓋同名報告。沒有 P0-1 Issue，因此 PR 不填假的 Closes 編號。
+- **還沒做完／待辦**：依計畫，真實平台量測交給使用者：設定 `.env.local` 的 `LLM_BASE_URL`、`LLM_API_KEY`，執行計畫 P0-1 的模型清單指令，再把摘要補到「共用與決策」。本次未讀取或修改 `.env.local`、未呼叫真實模型、未寫入 Supabase；平台相容性、實際速度與 embedding 是否為 1024 維尚未實測。
+
 ### 2026-11-07｜中國大陸可用：字型不擋畫面、Rive 執行檔自帶、香港主機部署工具｜Peter（AI 協助）
 - **原因**：大陸打不開／很慢有四個：`vercel.app` 被擋、瀏覽器直接連 Supabase 不穩、Google Fonts 被擋（原本會白屏數秒）、Rive 的 wasm 從 unpkg.com 下載。
 - **字型**（`index.html`，A 的共用檔）：改成 `preload` 後才套用，連不上就一直用系統字型，不再擋畫面。
