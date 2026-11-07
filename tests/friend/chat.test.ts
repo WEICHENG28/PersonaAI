@@ -31,7 +31,8 @@ vi.mock('../../server/lib/llm', () => ({
     task_intent: false,
   })),
 }))
-vi.mock('../../server/social/task', () => ({
+vi.mock('../../server/social/task', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../server/social/task')>(),
   createTaskFromText: vi.fn(async () => ({
     id: 'task-1', restatement: '帮你找 3 位喜欢登山的运动伙伴', status: 'pending_confirm',
   })),
@@ -49,7 +50,10 @@ vi.mock('../../server/friend/profile', () => ({
 }))
 import { countUserChatMessages, extractProfile } from '../../server/friend/profile'
 
-vi.mock('../../server/social/usage', () => ({ assertWithinDailyLimit: vi.fn(async () => {}) }))
+vi.mock('../../server/social/usage', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../server/social/usage')>(),
+  assertWithinDailyLimit: vi.fn(async () => {}),
+}))
 import { assertWithinDailyLimit } from '../../server/social/usage'
 import { listMemories } from '../../server/friend/memory'
 
@@ -169,7 +173,7 @@ describe('friendChat 主流程（mock）', () => {
     }
   })
 
-  it('records reply metrics and phase timings while retaining taskId in the response log', async () => {
+  it('records reply metrics and phase timings with taskPending in the response log', async () => {
     const metric = { tag: 'friend.reply', role: 'chat' as const, model: 'mock', lane: 'fg' as const,
       stream: false, ok: true, attempts: 1, queueMs: 0, ttftMs: null, totalMs: 2,
       promptTokens: 3, completionTokens: 2 }
@@ -179,7 +183,7 @@ describe('friendChat 主流程（mock）', () => {
     })
     await friendChat('u1', '帮我找人')
     const log = vi.mocked(writeLog).mock.calls.map(([entry]) => entry).find(entry => entry.action === '回应用户')!
-    expect(log.detail).toMatchObject({ taskId: 'task-1', llm: metric })
+    expect(log.detail).toMatchObject({ taskPending: true, llm: metric })
     const timing = log.detail!.timing as Record<string, number>
     for (const key of ['db.read', 'llm', 'db.write', 'totalMs']) expect(timing[key]).toBeGreaterThanOrEqual(0)
     expect(vi.mocked(llmJson).mock.calls[0]![0].tag).toBe('friend.reply')
@@ -202,7 +206,9 @@ describe('friendChat 主流程（mock）', () => {
       task_intent: true,
     } as never)
     const out = await friendChat('u1', '帮我找 3 个喜欢登山的人聊聊')
-    expect(out.taskId).toBe('task-1')
+    expect(out.taskId).toBeNull()
+    expect(out.taskPending).toBe(true)
+    expect(out.messages).toHaveLength(2)
     expect(createTaskFromText).toHaveBeenCalledWith('u1', '帮我找 3 个喜欢登山的人聊聊')
     expect(tables['friend_messages']!.list.at(-1)).toMatchObject({ kind: 'task_card', meta: { taskId: 'task-1' } })
   })
@@ -247,6 +253,16 @@ describe('friendChat 主流程（mock）', () => {
     expect(tables['ai_friends']!.list).toHaveLength(1)
     expect(tables['ai_friends']!.list[0]).toMatchObject({ story_stage: 0, intro_done: false })
   })
+})
+
+it('createTaskFromText 永远 pending 也不阻塞聊天回复', async () => {
+  vi.mocked(llmJson).mockResolvedValueOnce({ reply: '好，我去找', shared_event_id: null, task_intent: true } as never)
+  vi.mocked(createTaskFromText).mockImplementationOnce(() => new Promise(() => {}))
+  let result: Awaited<ReturnType<typeof friendChat>> | undefined
+  void friendChat('u1', '帮我找登山伙伴').then(value => { result = value })
+  await vi.waitFor(() => expect(result).toBeDefined(), { timeout: 200 })
+  expect(result).toMatchObject({ taskPending: true, taskId: null })
+  expect(result!.messages).toHaveLength(2)
 })
 
 describe('friendIntro', () => {

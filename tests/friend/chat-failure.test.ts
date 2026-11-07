@@ -46,6 +46,11 @@ describe('nudge after a failed send', () => {
     expect(shouldScheduleNudge({ messages, httpError: null })).toBe(true)
   })
 
+  it('does not schedule nudge while a task card is pending, resumes afterward', () => {
+    expect(shouldScheduleNudge({ messages, httpError: null, taskPending: true })).toBe(false)
+    expect(shouldScheduleNudge({ messages, httpError: null, taskPending: false })).toBe(true)
+  })
+
   it('does not schedule for an empty history or when the user spoke last', () => {
     expect(shouldScheduleNudge({ messages: [], httpError: null })).toBe(false)
     expect(shouldScheduleNudge({ messages: [message('user-1', 'user')], httpError: null })).toBe(false)

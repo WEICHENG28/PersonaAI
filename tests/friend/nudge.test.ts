@@ -51,7 +51,8 @@ vi.mock('../../server/lib/llm', () => ({
   llmJson: (...args: unknown[]) => llmJsonMock(...args),
 }))
 vi.mock('../../server/lib/log', () => ({ writeLog: vi.fn(async () => {}) }))
-vi.mock('../../server/social/task', () => ({
+vi.mock('../../server/social/task', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../server/social/task')>(),
   createTaskFromText: vi.fn(async (_userId: string, text: string) => {
     insertedTaskCalls.push(`task:${text}`)
     return { id: 'task-1', restatement: text }
@@ -133,7 +134,8 @@ describe('Nudge 防重复（后端）', () => {
     messages.push({ role: 'friend', content: '嗨' })
 
     const r = await friendChat('u1', '帮我找 3 个喜欢登山的人聊聊')
-    expect(r.taskId).toBe('task-1')
+    expect(r.taskId).toBeNull()
+    expect(r.taskPending).toBe(true)
     expect(insertedTaskCalls).toContain('task:帮我找 3 个喜欢登山的人聊聊')
   })
 })

@@ -6,6 +6,7 @@ interface FriendInitializationDeps {
   getFriendMessages(): Promise<FriendMessage[]>
   fetchSettings(): Promise<UserSettings | null>
   readSendSeq(): number
+  readMessageVersion?(): number
   isSending(): boolean
   hasUnconfirmedSend(): boolean
   isActive(): boolean
@@ -15,7 +16,7 @@ interface FriendInitializationDeps {
   onMessagesError(error: unknown): void
 }
 
-/** GET 发出时有待确认的本机消息，或之后又开始送出时，不覆盖聊天列表。 */
+/** GET 发出时有待确认的本机消息，或之后又开始送出时，不覆盖聊天列表。轮询更新另由讯息版本保护。 */
 export function shouldApplyInitMessages(requestSeq: number, currentSeq: number, blockedAtRead = false): boolean {
   return requestSeq === currentSeq && !blockedAtRead
 }
@@ -27,11 +28,13 @@ export async function initializeFriendPage(deps: FriendInitializationDeps): Prom
   await Promise.allSettled([deps.callFriendIntro(), deps.deliverReports()])
   if (deps.isActive()) {
     const seq = deps.readSendSeq()
+    const messageVersion = deps.readMessageVersion?.()
     const blockedAtRead = deps.isSending() || deps.hasUnconfirmedSend()
     try {
       const messages = await deps.getFriendMessages()
       if (deps.isActive()) {
-        if (shouldApplyInitMessages(seq, deps.readSendSeq(), blockedAtRead)) deps.onMessages(messages)
+        if (shouldApplyInitMessages(seq, deps.readSendSeq(), blockedAtRead)
+          && messageVersion === deps.readMessageVersion?.()) deps.onMessages(messages)
         else deps.onStaleMessages?.(messages)
       }
     } catch (error) {
