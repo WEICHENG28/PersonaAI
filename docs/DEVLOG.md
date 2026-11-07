@@ -26,6 +26,15 @@
 
 ## 共用與決策
 
+### 2026-11-07｜P0-5 平台設定範例、向量重算工具與 health 保護｜AI 協助｜分支 opt/P0-5-platform-switch
+- **做了什麼**：.env.example 依 P0-1 暫定 Kimi-K2.6／Qwen3.8-Max／Qwen3.8-Flash／GLM-Embedding-3（1024 維），Qwen thinking.type=disabled，待 E-3 定案；網址與金鑰留空。重算工具提供分頁讀取、可控並行、維度／有限數字檢查與逐筆失敗續跑；預設 dry-run 只讀清單，不呼叫模型、不寫入，--apply 才重算並以 pgvector 字串保存。
+- **為什麼這樣做**：新平台 embedding 與既有向量不相容，提供人工維護工具；本 PR 只交付工具與範例，不切換實際環境。抽出既有 admin 驗證，公開 deepHealth 僅回 env/suspicious，完整檢查須 admin token，結果／進行中的 Promise 快取 60 秒，避免重複探測。
+- **附帶修改**：embed(text, lane?) 預設 fg；profile 兩處 embedding 用 bg 並記錄實際 metric 道別。health 離線解析 LLM_MODEL_PARAMS，拒絕非物件與模型值非物件，與既有設定驗證一致；不回傳原文。full health 的連線錯誤也改固定類別。
+- **改了哪些檔案**：.env.example、scripts/reembed{,-lib}.ts、server/{health,app}.ts、server/routes/admin.ts、server/lib/adminAuth.ts、server/lib/llm/index.ts、server/friend/profile.ts、tests/social/{health,reembed,llm-lanes,platform-env-example}.test.ts、tests/friend/profile.test.ts、本紀錄。
+- **驗證**：先觀察缺少重算模組、health 防護、embedding lane 的失敗，再實作。獨立審查指出 suspicious 未檢查模型值非物件，另以兩項 RED→GREEN 修正。測試涵蓋 dry-run 不 embed/save、apply 每筆儲存、維度錯誤／非有限向量／平台與保存錯誤續跑、並行上限、公開 health 不連線、token、快取、錯誤遮蔽與範例設定；完整測試結果見 PR。
+- **踩到的坑／注意事項**：full health 快取僅作用於單個服務實例；重算不是交易，部分失敗需人工重跑，全部成功前不要讓新舊向量混用。embedding 維持原本 timeout/retry，不因 bg 改變。dry-run 由使用者執行時仍會讀資料庫，但不呼叫模型或寫入；本次完全未執行腳本。
+- **還沒做完／待辦**：使用者依 P0-1 確認 GLM-Embedding-3 為 1024 維，設定私有環境、確認無 worker 後自行 dry-run／apply，再同步 Vercel 並 redeploy、通知隊友。未讀 .env.local、未連 DB／真實模型、未安裝套件；保留 Draft PR 等待人工審查。
+
 ### 2026-11-07｜P0-4 前景／背景並行道與 JSON 重試瘦身｜AI 協助｜分支 opt/P0-4-llm-lanes
 - **做了什麼**：LLM 排程使用 fg／bg 兩個等待佇列，總上限 3、背景上限 1，有空位優先前景；喚醒前先預留名額，成功或失敗均釋放。記憶、檔案及言行異常呼叫標 bg；metric 使用 `opts.lane ?? 'fg'`，成功／失敗均反映實際道別。
 - **為什麼這樣做**：避免背景工作佔滿名額；JSON 重試僅附前 400 字加省略號，每次從原始訊息重建，避免錯誤輸出累積。

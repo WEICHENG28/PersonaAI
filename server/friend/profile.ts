@@ -131,7 +131,7 @@ export async function extractProfile(userId: string): Promise<ShareableView> {
   // 4. embedding（失败不致命：大厅会退回关键字排序）
   let embeddingNote = '已更新'
   try {
-    const vector = await embed(shareableToText(out.shareable_profile))
+    const vector = await embed(shareableToText(out.shareable_profile), 'bg')
     await db.from('user_profiles').update({ embedding: vector }).eq('user_id', userId)
   } catch (err) {
     embeddingNote = '向量更新失败（大厅暂用关键字排序）'
@@ -186,7 +186,7 @@ export async function updateShareable(
   if (error) throw new ProfileError(`保存档案失败：${error.message}`)
 
   try {
-    const vector = await embed(shareableToText(next))
+    const vector = await embed(shareableToText(next), 'bg')
     await db.from('user_profiles').update({ embedding: vector }).eq('user_id', userId)
   } catch (err) {
     console.error('[profile] embed 失败（确认保存不受影响）', err)

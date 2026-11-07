@@ -4,6 +4,7 @@ import { accountRoutes } from './routes/account.js'
 import { friendRoutes } from './routes/friend.js'
 import { socialRoutes } from './routes/social.js'
 import { twinRoutes } from './routes/twin.js'
+import { isAdminRequest } from './lib/adminAuth.js'
 import { deepHealth } from './health.js'
 import { adminRoutes } from './routes/admin.js'
 import { rateLimitMiddleware } from './lib/rateLimit.js'
@@ -22,7 +23,7 @@ app.use('*', rateLimitMiddleware())
 app.get('/health', (c) => c.json({ ok: true, data: { status: 'ok' } }))
 
 // 部署檢查：環境變數有沒有設、資料庫與 AI 連不連得上（不回任何值）
-app.get('/health/deep', async (c) => c.json({ ok: true, data: await deepHealth() }))
+app.get('/health/deep', async (c) => c.json({ ok: true, data: await deepHealth({ full: isAdminRequest(c) }) }))
 
 app.route('/', accountRoutes)
 app.route('/', friendRoutes)

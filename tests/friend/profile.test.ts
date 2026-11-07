@@ -200,7 +200,7 @@ describe('extractProfile（mock LLM/DB）', () => {
     const view = await extractProfile('u1')
     expect(view.exists).toBe(true)
     expect(view.shareable?.interests).toContain('动漫')
-    expect(embed).toHaveBeenCalled()
+    expect(embed).toHaveBeenCalledWith(expect.any(String), 'bg')
     expect(writeLog).toHaveBeenCalled()
     const row = tables['user_profiles']!.list[0]
     expect(row).toMatchObject({ user_id: 'u1', card: null })
@@ -277,7 +277,7 @@ describe('getShareableView / updateShareable', () => {
     })
     expect(view.confirmed).toBe(true)
     expect(tables['user_profiles']!.list[0]).toMatchObject({ shareable_confirmed: true, card: null })
-    expect(embed).toHaveBeenCalled()
+    expect(embed).toHaveBeenCalledWith(expect.any(String), 'bg')
   })
 
   it('updateShareable：繁体兴趣统一转简体（「攝影」→「摄影」，与种子用户可比对）', async () => {

@@ -1,6 +1,6 @@
 // 管理員 API：看檢舉、停用／恢復帳號（防濫用）、新手漏斗。完整的管理後台頁面之後再做，現在用工具（curl 等）呼叫。
 // 要帶 Authorization: Bearer <ADMIN_SECRET>（Vercel 環境變數）；沒設 ADMIN_SECRET 就全部拒絕。擁有者：B。
-import { Hono, type Context } from 'hono'
+import { Hono } from 'hono'
 import { z } from 'zod'
 import { getServiceClient } from '../lib/supabase.js'
 import { REPORT_ACTION } from '../social/safety.js'
@@ -8,15 +8,12 @@ import { buildFunnel, loadOnboardingState } from '../social/onboarding.js'
 import { recentErrors } from '../lib/alerts.js'
 import { deepHealth } from '../health.js'
 
+import { isAdminRequest } from '../lib/adminAuth.js'
+
 export const adminRoutes = new Hono()
 
-function isAdmin(c: Context): boolean {
-  const secret = process.env.ADMIN_SECRET
-  return Boolean(secret && secret.length >= 16 && c.req.header('Authorization') === `Bearer ${secret}`)
-}
-
 adminRoutes.use('/admin/*', async (c, next) => {
-  if (!isAdmin(c)) return c.json({ ok: false, error: '没有权限' }, 401)
+  if (!isAdminRequest(c)) return c.json({ ok: false, error: '没有权限' }, 401)
   await next()
 })
 
@@ -125,7 +122,7 @@ adminRoutes.get('/admin/overview', async (c) => {
     count(db.from('agent_tasks').select('id', head).gte('created_at', day)),
     count(db.from('agent_logs').select('id', head).eq('agent', 'guard').eq('action', REPORT_ACTION).gte('created_at', week)),
     db.from('friend_messages').select('user_id').eq('role', 'user').gte('created_at', day).limit(5000),
-    deepHealth(),
+    deepHealth({ full: true }),
   ])
   if (activeRows.error) throw activeRows.error
   return c.json({
