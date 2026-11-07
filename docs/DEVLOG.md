@@ -296,6 +296,16 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-11-07｜M-5 背景擷取保留已確認的對外檔案｜AI 協助｜分支 opt/M-5-keep-confirmed
+- **做了什麼**：extractProfile 新增 optional opts.force；非 force 且上一版 shareable_confirmed===true，只 update agent_profile／updated_at，不改 shareable_profile／shareable_confirmed／card／embedding，也不重新 embed。回傳上一版 shareable、confirmed:true、exists:true；日誌固定為「已确认的对外档案不自动覆盖，只更新说话风格」。
+- **為什麼這樣做**：避免用戶進大廳後，背景擷取因新資訊覆蓋已確認檔案、清卡片並撤回確認，讓人默默從大廳消失。force、未確認草稿與沒有上一版都沿用原流程。
+- **呼叫端核對**：POST /api/profile/extract 改 force:true；server/friend/chat.ts 背景擷取與 server/social/lobbyInviteDeps.ts 補擷取均維持不傳 opts。前端 src/lib/api/friend.ts 的 requestExtractProfile 只由 ProfilePage 的手動生成／重新撷取按鈕呼叫，無自動觸發；不改前端與請求本體。
+- **邊界情況**：已確認但不完整、尚未進大廳且訊息門檻足夠時，非 force 補擷取只更新內部檔案，不會補齊對外檔案，邀請會一直停在 not_yet；這次依要求不修，需用戶主動重新生成或編輯確認。
+- **改了哪些檔案**：server/friend/profile.ts、server/routes/friend.ts、tests/friend/profile.test.ts、tests/friend/profile-test-fixtures.ts、本紀錄。測試原檔399行，既有夾具原樣移出後測試維持371行；沒有改 shared/types.ts、前端、chat 或 lobbyInviteDeps。
+- **驗證**：先觀察已確認回傳／payload 與手動路由 force 的失敗，再實作；測試精確比對兩欄 payload、固定日誌、embed 0次、保留卡片與向量、force／草稿舊路徑及無 body 的手動 POST。另模擬30則訊息及五次背景擷取，確認已確認對外檔案仍可讀。獨立 TypeScript 唯讀審查未發現重要問題；完整測試與 build 結果見 PR。
+- **踩到的坑／注意事項**：已確認後的新興趣或否定資訊不會自動改公開檔案，使用者需手動更新；force 路徑完全保留原本確認與重算行為。沒有回填既有資料。
+- **還沒做完／待辦**：保留 Draft PR 等待人工審查；未讀 .env.local、不連真實模型或資料庫、不寫 Supabase、不 npm install，未做下一個任務。
+
 ### 2026-11-07｜L-1 阿澈查詢並行、背景日誌與 POST 訊息回傳｜AI 協助｜分支 opt/L-1-friend-parallel
 - **做了什麼**：用量與朋友狀態並行；用戶 INSERT RETURNING、歷史及記憶讀取並行，再以 mergeHistory 按 id 去重／時間排序／截斷，確保上下文含本次輸入。POST 直接回傳本輪已儲存的 user／friend（有任務時含 task_card），前端套用 applyChatResult，舊格式才 GET；taskPending 預留 optional 欄位，本次不做 L-2。
 - **依序等待對照**：既有用戶的一般聊天（非 nudge、無 task_intent）：無事件為 7→3 批，有事件為 8→4 批。批次按關鍵路徑計、平行 SQL 算一批；改後分別為 [用量＋朋友狀態]、[用戶寫入＋歷史＋記憶]、回覆寫入，有事件再更新狀態。前景 SQL 總數分別 7→6、8→7，僅日誌移出前景，其餘是並行而非刪查詢；既有背景 count／記憶／檔案擷取不計入此表。
