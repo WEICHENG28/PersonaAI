@@ -13,7 +13,7 @@ import type { LlmMetric } from '../lib/llm/metrics.js'
 import { runInBackground } from '../lib/background.js'
 import { assertAllowed, maskBlocked } from '../lib/moderation.js'
 import { assertWithinDailyLimit } from '../social/usage.js'
-import { createTaskFromText } from '../../server/social/task.js'
+import { createTaskCard } from './taskCard.js'
 import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend.js'
 import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona.js'
 import { extractMemories, listMemories } from './memory.js'
@@ -114,7 +114,7 @@ export async function friendIntro(userId: string): Promise<void> {
   })
 }
 
-/** 主流程：POST /api/friend/chat。回傳給前端的訊息（含 task_card）。
+/** 主流程：POST /api/friend/chat。回傳本回合訊息，任務卡由背景建立。
  *  mode='nudge'：用户沉默后阿澈主动接话，不保存用户消息，text 可为空。
  *  防重复：最后一次 user 讯息之后若已有 meta.nudge=true 的讯息，直接返回不呼叫 LLM
  *  （使用者每次沉默最多 1 次；分頁開多個也不會重複發）。
@@ -228,28 +228,10 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   const messages: FriendMessageRow[] = [...(userMessage ? [userMessage] : []), savedReply.data as FriendMessageRow]
 
   timer.mark('db.write')
-  // 5. task_intent → B 的 createTaskFromText + task_card 消息
-  //    nudge 模式不处理 task_intent（LLM 可能误判，且 nudge 不该建任务）
-  let taskId: string | null = null
-  if (reply.task_intent && !isNudge) {
-    try {
-      // 用户同意「要不要我帮你找人」时，body.text 可能只是「好啊」，所以优先用模型整理好的完整说法
-      const task = await createTaskFromText(userId, reply.task_text?.trim() || body.text)
-      taskId = task.id
-      const card = await db.from('friend_messages').insert({
-        user_id: userId,
-        role: 'friend',
-        kind: 'task_card',
-        content: task.restatement ?? body.text,
-        meta: { taskId: task.id },
-      }).select(MESSAGE_COLUMNS).single()
-      if (card.error) throw new FriendChatError('保存任务卡失败')
-      if (card.data) messages.push(card.data as FriendMessageRow)
-    } catch (err) {
-      // B 的解析失败不中断聊天，只写日志
-      console.error('[friend] createTask failed', err)
-      await writeLog({ user_id: userId, agent: 'friend', action: '交办任务失败', reason: String(err) })
-    }
+  // 5. 任务卡交给背景建立；nudge 不建任务。用户仅说「好啊」时优先用完整 task_text。
+  const taskPending = reply.task_intent && !isNudge
+  if (taskPending) {
+    runInBackground(createTaskCard(userId, reply.task_text?.trim() || body.text))
   }
 
   // 7. 写日志
@@ -259,7 +241,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     agent: 'friend',
     action: '回应用户',
     reason: reply.shared_event_id ? `分享事件 ${reply.shared_event_id}` : '接住用户的话题',
-    detail: { ...(taskId ? { taskId } : {}),
+    detail: { taskPending,
       timing: { ...timer.spans(), 'db.read': Math.round(readMs), 'db.write': Math.round(writeMs), totalMs: timer.totalMs() }, llm: replyMetric },
   }))
 
@@ -287,7 +269,7 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
     })())
   }
 
-  return { reply: maskBlocked(reply.reply), taskId, sharedEventId: reply.shared_event_id, messages, taskPending: false }
+  return { reply: maskBlocked(reply.reply), taskId: null, sharedEventId: reply.shared_event_id, messages, taskPending }
 }
 
 /** 取聊天记录（前端拉一次用；Realtime 由前端订阅，A 线后续接）。 */

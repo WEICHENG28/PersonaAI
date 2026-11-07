@@ -2,8 +2,8 @@
  * A4：用户档案撷取与确认。拥有者：A。
  * extractProfile：用户讯息（最新 60 则 role user）＋上一版 → Prompt 3（MODEL_REASON）
  *   → 写 user_profiles.shareable_profile／agent_profile
- *   → shareable 内容有变时 shareable_confirmed 归 false、card 清 null（让 C 重产卡片）
- *   → embed(shareableToText) 写 embedding。
+ *   → 已确认且非 force 只更新 agent_profile；否则沿用草稿更新与确认流程。
+ *   → 仅草稿／force 路径 embed(shareableToText) 写 embedding。
  * API：GET /api/profile（只回 shareable 与确认状态）、PUT /api/profile/shareable、POST /api/profile/extract。
  */
 import { z } from 'zod'
@@ -77,7 +77,7 @@ export async function getProfileRow(userId: string): Promise<ProfileRow | null> 
 }
 
 /** 撷取并写回。回传给前端的结果（不含 Big Five）。 */
-export async function extractProfile(userId: string): Promise<ShareableView> {
+export async function extractProfile(userId: string, opts?: { force?: boolean }): Promise<ShareableView> {
   const db = getServiceClient()
 
   // 1. 用户说过的话（最新 60 则，只取 role user）＋上一版
@@ -115,6 +115,20 @@ export async function extractProfile(userId: string): Promise<ShareableView> {
     temperature: 0.2,
     schema: profileExtractSchema,
   })
+
+  // 已确认的对外档案只允许用户主动重新生成；背景更新内部档案，不动公开资料。
+  if (!opts?.force && previousRow?.shareable_confirmed === true) {
+    const { error } = await db.from('user_profiles').update({
+      agent_profile: out.agent_profile,
+      updated_at: new Date().toISOString(),
+    }).eq('user_id', userId)
+    if (error) throw new ProfileError(`写入档案失败：${error.message}`)
+    await writeLog({
+      user_id: userId, agent: 'friend', action: '撷取用户档案',
+      reason: '已确认的对外档案不自动覆盖，只更新说话风格',
+    })
+    return { shareable: previousRow.shareable_profile, confirmed: true, exists: true }
+  }
 
   // 3. 写入 shareable／agent；内容有变 → confirmed 归 false
   const changed = shareableChanged(previousRow?.shareable_profile ?? null, out.shareable_profile)

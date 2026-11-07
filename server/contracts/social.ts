@@ -5,7 +5,8 @@ import { getAgentStore } from '../social/agentStore.js'
 import { createSingleTargetTask as createSingle } from '../social/task.js'
 
 /** B1：解析一句話任務，建立 pending_confirm 任務。 */
-export { createTaskFromText } from '../social/task.js'
+export { createTaskFromText, TaskError } from '../social/task.js'
+export { UsageLimitError } from '../social/usage.js'
 
 /** B2：搜尋大廳，回傳排序後的候選人。 */
 export { searchLobby } from '../social/lobby.js'

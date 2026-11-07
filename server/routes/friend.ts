@@ -224,7 +224,7 @@ friendRoutes.post('/profile/extract', async (c) => {
   if (isAuthFailure(authed)) return authed
   try {
     const userId = await appUserId(authed)
-    const data = await extractProfile(userId)
+    const data = await extractProfile(userId, { force: true })
     return c.json({ ok: true, data })
   } catch (err) {
     console.error('[friend] profile extract', err)

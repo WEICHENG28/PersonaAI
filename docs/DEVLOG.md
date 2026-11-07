@@ -304,6 +304,25 @@
 - **驗證**：先觀察缺少 memoryState 的失敗再實作；8 項離線測試涵蓋 HTTP 載入、不用 demo rows、mock 不發請求、載入失敗不顯示空狀態、edit/delete/not-like-me 成功與失敗、不可變列表及四個 API 方法／路徑。完整測試與 build 見 PR。
 - **審查**：主代理完成自我檢查；獨立 TypeScript 唯讀審查恢復後完成，未發現阻擋問題，另重跑 8 項記憶測試與型別檢查通過。同步最新 main 的 L-1／UI 更新，DEVLOG 衝突保留雙方紀錄，整合後全套 869 測試與 production build 通過。
 - **還沒做完／待辦**：需人工審查 Draft PR；未呼叫真實平台、不讀 .env.local、不連真實資料庫／寫 Supabase、不安裝套件。未修改後端或 store，未部署。
+
+### 2026-11-07｜L-2 建任務改背景、前端輪詢任務卡｜AI 協助｜分支 opt/L-2-task-background
+- **做了什麼／為什麼**：抽出 createTaskCard，task_intent 且非 nudge 時交給 runInBackground；POST 先回 taskPending:true、taskId:null 與本回合 user／friend 兩則訊息，不等待社交任務解析。預期回覆約快 2 秒，任務卡約 2～4 秒後出現；這是待本機量測的預期，沒有真實平台延遲數據。
+- **失敗行為**：成功寫 task_card 後回 taskId；建任務或存卡失敗時寫日誌，插入 role:friend、kind:chat、meta:{task_failed:true}。已確認為給用戶看的 TaskError／UsageLimitError／BlockedContentError 沿用 message，其他固定顯示「刚刚没帮你把任务建好，你再说一次想找什么样的人？」；日誌或失敗訊息再次寫入失敗只 console.error，不 throw。
+- **前端**：用本回合阿澈回覆的伺服器 created_at 作 sinceIso，保留 PostgreSQL 微秒，每 2 秒 GET，最多 30 秒。忽略舊卡與單次 GET 失敗；找到卡片或 task_failed 後只按 id 合併，保留新訊息與樂觀送出；只有 task_card 設 pendingTaskId。多個輪詢共用已認領結果，避免兩個任務都收到同一張卡後提前停止；輪詢更新訊息版本，使晚到的初始化快照改走合併。卸載後停止後續 GET 並丟棄在途結果；輪詢期間不排 nudge，結束後恢復原規則。mock 模式沿用原流程。
+- **超時／限制**：30 秒超時靜默停止輪詢，不顯示錯誤、不替換聊天；背景任務仍可能完成，較晚的卡片會在下次載入聊天紀錄時顯示。使用現有 Vercel waitUntil，未改 B 線任務逾時／重試策略：任務 LLM 沿用預設 3 次 × 20 秒加 800／1600ms 退避，最壞約 62.4 秒，尚未計入前景回覆、排隊與 DB，仍可能超過部署 60 秒上限而中斷；本 PR 不保證慢模型時卡片一定完成。本次未部署或實際量測。
+- **改了哪些檔案**：server/friend/{chat,taskCard}.ts、src/features/friend/{FriendPage.tsx,chatState.ts,chatFailure.ts,chatInitialization.ts,useTaskCardPolling.ts}、tests/friend/{chat,nudge,chat-state,chat-failure,task-card,task-card-polling}.test.ts、本紀錄。共用 server/contracts/social.ts 僅補 TaskError／UsageLimitError re-export，讓 A 透過 B 契約辨識用戶可見錯誤；未改 server/social/task.ts、shared/types.ts、套件或環境檔。FriendPage 333 行，輪詢生命週期獨立在 hook。
+- **驗證／待辦**：先看到永久 pending 會卡住回覆、taskPending／onTaskPending／nudge 的失敗，再實作；fake timers 測第三次找到、超時、取消、單次失敗、在途 GET 卡住與卸載，並測成功／用戶錯誤／二次寫入失敗不 throw。獨立審查發現重疊任務重複認領、晚到初始化蓋卡兩項競態，均以 RED→GREEN 修正，並補微秒邊界測試。LLM／Supabase 全 mock；同步 main 後 npm test 895/895、前後端 tsc 與 npm run build 通過（仍有大型 bundle 警告）。真實延遲交 Claude 本機量測；回滾用 revert，停在本任務 Draft PR。
+
+### 2026-11-07｜M-5 背景擷取保留已確認的對外檔案｜AI 協助｜分支 opt/M-5-keep-confirmed
+- **做了什麼**：extractProfile 新增 optional opts.force；非 force 且上一版 shareable_confirmed===true，只 update agent_profile／updated_at，不改 shareable_profile／shareable_confirmed／card／embedding，也不重新 embed。回傳上一版 shareable、confirmed:true、exists:true；日誌固定為「已确认的对外档案不自动覆盖，只更新说话风格」。
+- **為什麼這樣做**：避免用戶進大廳後，背景擷取因新資訊覆蓋已確認檔案、清卡片並撤回確認，讓人默默從大廳消失。force、未確認草稿與沒有上一版都沿用原流程。
+- **呼叫端核對**：POST /api/profile/extract 改 force:true；server/friend/chat.ts 背景擷取與 server/social/lobbyInviteDeps.ts 補擷取均維持不傳 opts。前端 src/lib/api/friend.ts 的 requestExtractProfile 只由 ProfilePage 的手動生成／重新撷取按鈕呼叫，無自動觸發；不改前端與請求本體。
+- **邊界情況**：已確認但不完整、尚未進大廳且訊息門檻足夠時，非 force 補擷取只更新內部檔案，不會補齊對外檔案，邀請會一直停在 not_yet；這次依要求不修，需用戶主動重新生成或編輯確認。
+- **改了哪些檔案**：server/friend/profile.ts、server/routes/friend.ts、tests/friend/profile.test.ts、tests/friend/profile-test-fixtures.ts、本紀錄。測試原檔399行，既有夾具原樣移出後測試維持371行；沒有改 shared/types.ts、前端、chat 或 lobbyInviteDeps。
+- **驗證**：先觀察已確認回傳／payload 與手動路由 force 的失敗，再實作；測試精確比對兩欄 payload、固定日誌、embed 0次、保留卡片與向量、force／草稿舊路徑及無 body 的手動 POST。另模擬30則訊息及五次背景擷取，確認已確認對外檔案仍可讀。獨立 TypeScript 唯讀審查未發現重要問題；完整測試與 build 結果見 PR。
+- **踩到的坑／注意事項**：已確認後的新興趣或否定資訊不會自動改公開檔案，使用者需手動更新；force 路徑完全保留原本確認與重算行為。沒有回填既有資料。
+- **還沒做完／待辦**：保留 Draft PR 等待人工審查；未讀 .env.local、不連真實模型或資料庫、不寫 Supabase、不 npm install，未做下一個任務。
+
 ### 2026-11-07｜L-1 阿澈查詢並行、背景日誌與 POST 訊息回傳｜AI 協助｜分支 opt/L-1-friend-parallel
 - **做了什麼**：用量與朋友狀態並行；用戶 INSERT RETURNING、歷史及記憶讀取並行，再以 mergeHistory 按 id 去重／時間排序／截斷，確保上下文含本次輸入。POST 直接回傳本輪已儲存的 user／friend（有任務時含 task_card），前端套用 applyChatResult，舊格式才 GET；taskPending 預留 optional 欄位，本次不做 L-2。
 - **依序等待對照**：既有用戶的一般聊天（非 nudge、無 task_intent）：無事件為 7→3 批，有事件為 8→4 批。批次按關鍵路徑計、平行 SQL 算一批；改後分別為 [用量＋朋友狀態]、[用戶寫入＋歷史＋記憶]、回覆寫入，有事件再更新狀態。前景 SQL 總數分別 7→6、8→7，僅日誌移出前景，其餘是並行而非刪查詢；既有背景 count／記憶／檔案擷取不計入此表。
