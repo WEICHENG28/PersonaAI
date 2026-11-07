@@ -134,3 +134,36 @@ describe('searchLobby', () => {
     expect(result.every((r) => r.shareable.interests.some((i) => i.includes('登山')))).toBe(true)
   })
 })
+
+it('does not reward negative conditions and penalizes matching interests', async () => {
+  const { keywordBonus } = await import('../../server/social/lobby.js')
+  expect(matchesKeyword(['不喜欢昆虫'], ['昆虫'])).toBe(false)
+  expect(matchesKeyword(['喜欢登山'], ['登山'])).toBe(true)
+  expect(keywordBonus(['不喜欢昆虫'], ['昆虫'])).toBeLessThan(0)
+  expect(keywordBonus(['喜欢登山'], ['登山'])).toBe(0.1)
+  expect(keywordBonus(['不喜欢'], ['昆虫'])).toBe(0)
+  expect(rankCandidates([entry('insects', ['昆虫'], null), entry('hiking', ['登山'], null)], null, ['不喜欢昆虫'])[0]?.user_id).toBe('hiking')
+})
+
+it('penalizes a topic preceding trailing negation', async () => {
+  const { keywordBonus } = await import('../../server/social/lobby.js')
+  expect(keywordBonus(['对昆虫不感兴趣'], ['昆虫'])).toBe(-0.1)
+})
+
+it.each([
+  { conditions: ['不喜欢昆虫'], expected: '交友' },
+  { conditions: ['喜欢登山', '不喜欢昆虫'], expected: '喜欢登山，交友' },
+])('embeds only positive conditions and excludes negated interests: $conditions', async ({ conditions, expected }) => {
+  const provider = fakeEmbed([1, 0])
+  setLobbySource(async () => [entry('insects', ['昆虫'], [1, 0]), entry('hiking', ['登山'], [0, 1])])
+  const result = await searchLobby('me', { conditions })
+  expect(provider).toHaveBeenCalledWith(expect.objectContaining({ input: expected }))
+  expect(result.map(r => r.user_id)).toEqual(['hiking'])
+})
+it.each([true, false])('excludes negative interest matches even with explicit query text, vectors=%s', async vectors => {
+  const provider = fakeEmbed([1, 0])
+  setLobbySource(async () => [entry('insects', ['昆虫'], vectors ? [1, 0] : null), entry('hiking', ['登山'], vectors ? [0, 1] : null)])
+  const result = await searchLobby('me', { text: '寻找朋友', conditions: ['不喜欢昆虫'], limit: 5 })
+  expect(result.map(r => r.user_id)).toEqual(['hiking'])
+  if (vectors) expect(provider).toHaveBeenCalledWith(expect.objectContaining({ input: '寻找朋友' }))
+})

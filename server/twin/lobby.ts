@@ -2,6 +2,7 @@
 // 候選人與相似度來自 B 的 searchLobby（contracts/social），查詢文字用「我的興趣＋想找的人」，所以 AI 預估是「我和對方合不合」。
 // 卡片內容來自 user_profiles.card；為 null（或格式不對）時用 Prompt 10 產生並快取。
 // AI 預估只回文字等級（很可能合得來／可以聊聊看／差異較大），不回相似度數字、向量或對外檔案以外的資料。
+import { conditionKeyword } from '../../shared/negation.js'
 import { z } from 'zod'
 import type { AgentTask, LobbyCandidate, LobbyQuery, Purpose, ShareableProfile, StartConversationInput } from '../../shared/types.js'
 import type { LlmJsonOptions } from '../lib/llm/index.js'
@@ -129,12 +130,15 @@ export function myQueryText(me: ShareableProfile): string {
 
 /** 興趣關鍵字：雙向包含（「登山」對上「爱登山」），也看一句話介紹。 */
 export function matchesQuery(profile: ShareableProfile, q: string): boolean {
-  const key = q.toLowerCase()
+  const { key: keyword, negated } = conditionKeyword(q)
+  const key = keyword.toLowerCase()
+  if (!key) return false
   const hit = (s: string) => {
     const v = s.toLowerCase()
     return v.includes(key) || (v.length > 0 && key.includes(v))
   }
-  return profile.interests.some(hit) || profile.intro.toLowerCase().includes(key)
+  const matched = profile.interests.some(hit) || profile.intro.toLowerCase().includes(key)
+  return negated ? !matched : matched
 }
 
 /** 名字（帳號 ID）包含搜尋字就算，不分大小寫。 */
