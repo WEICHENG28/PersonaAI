@@ -3,24 +3,11 @@
  * shareableChanged / shouldExtractProfile、contracts 读库（LLM/DB 全 mock）。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { tables, makeTable, failTable, validExtract } from './profile-test-fixtures'
+import * as profileModule from '../../server/friend/profile'
+vi.mock('../../server/lib/auth', () => ({ requireAuth: vi.fn(async () => ({ authId: 'auth-u1' })), isAuthFailure: () => false }))
 
 // ── mock Supabase：按表分 chain（同 chat.test / memory.test 手法） ──
-const tables: Record<string, TableMock> = {}
-
-interface TableMock {
-  list: Record<string, unknown>[]
-  select: ReturnType<typeof vi.fn>
-  eq: ReturnType<typeof vi.fn>
-  is: ReturnType<typeof vi.fn>
-  order: ReturnType<typeof vi.fn>
-  limit: ReturnType<typeof vi.fn>
-  maybeSingle: ReturnType<typeof vi.fn>
-  single: ReturnType<typeof vi.fn>
-  insert: ReturnType<typeof vi.fn>
-  update: ReturnType<typeof vi.fn>
-  upsert: ReturnType<typeof vi.fn>
-}
-
 vi.mock('../../server/lib/supabase', () => ({
   getServiceClient: () => ({
     from: (name: string) => tables[name]?.self ?? failTable(name),
@@ -44,67 +31,6 @@ import {
 } from '../../server/friend/profile'
 import { renderProfileSystem, profileExtractSchema } from '../../server/prompts/03_profile'
 import { getShareableProfile, getAgentProfile, getStyleProfile } from '../../server/contracts/friend'
-
-function validExtract() {
-  return {
-    shareable_profile: {
-      intro: '喜欢看展的二次元',
-      interests: ['动漫', '看展'],
-      chat_style: '句子不长，先回应情绪',
-      looking_for: '可以一起逛展的朋友',
-    },
-    agent_profile: {
-      big_five: {
-        O: { score: 72, confidence: 0.6, evidence: '多次提到尝试新活动' },
-        C: { score: 50, confidence: 0.1, evidence: '' },
-        E: { score: 38, confidence: 0.3, evidence: '偶尔提到小圈子' },
-        A: { score: 70, confidence: 0.5, evidence: '对朋友的事情表现出关心' },
-        N: { score: 45, confidence: 0.2, evidence: '' },
-      },
-      values: ['真诚'],
-      style: { sentence_length: 'short', tone: '温和', emoji_level: 1, formality: 'casual' },
-    },
-  }
-}
-
-function makeTable(name: string): TableMock {
-  let filters: [string, unknown][] = []
-  let descending = false
-  let head = false
-  const filtered = () => t.list.filter(row => filters.every(([key, value]) => row[key] === value))
-  const t: TableMock = {
-    list: [],
-    select: vi.fn((_columns: string, opts?: { count?: string; head?: boolean }) => { filters = []; descending = false; head = opts?.head ?? false; return t.self }),
-    eq: vi.fn((key: string, value: unknown) => { filters.push([key, value]); return t.self }),
-    is: vi.fn(() => t.self),
-    order: vi.fn((_key: string, opts?: { ascending: boolean }) => { descending = opts?.ascending === false; return t.self }),
-    limit: vi.fn(async (n: number) => { const rows = name === 'friend_messages' ? filtered() : [...t.list]; return { data: (descending ? [...rows].reverse() : rows).slice(0, n), error: null } }),
-    maybeSingle: vi.fn(async () => ({ data: t.list[0] ?? null, error: null })),
-    single: vi.fn(async () =>
-      t.list[0] ? { data: t.list[0], error: null } : { data: null, error: { code: 'PGRST116', message: 'no rows' } },
-    ),
-    insert: vi.fn((row: Record<string, unknown> | Record<string, unknown>[]) => {
-      t.list.push(...(Array.isArray(row) ? row : [row]))
-      return { select: () => ({ single: t.single }) }
-    }),
-    upsert: vi.fn((row: Record<string, unknown>) => {
-      t.list.length = 0
-      t.list.push(row)
-      return { error: null }
-    }),
-    update: vi.fn((patch: Record<string, unknown>) => {
-      Object.assign(t.list[0] ?? {}, patch)
-      return t.self
-    }),
-  }
-  Object.assign(t, { self: t, then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: head ? null : filtered(), count: filtered().length, error: null }).then(resolve) })
-  tables[name] = t
-  return t
-}
-
-function failTable(name: string) {
-  throw new Error(`测试未 mock 表 ${name}`)
-}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -227,9 +153,7 @@ describe('extractProfile（mock LLM/DB）', () => {
     })
     vi.mocked(llmJson).mockResolvedValueOnce(same as never)
     const view = await extractProfile('u1')
-    // view 回的 confirmed 恒为 false（表示「这次生成后需确认」），
-    // 但库中内容没变时不应把已确认的行归 false
-    expect(view.confirmed).toBe(false)
+    expect(view.confirmed).toBe(true)
     expect(tables['user_profiles']!.list[0]).toMatchObject({ shareable_confirmed: true })
   })
 
@@ -396,4 +320,52 @@ it('counts all user chat messages scoped to this user with count/head', async ()
     { user_id: 'u1', role: 'user', kind: 'task_card' })
   expect(await countUserChatMessages('u1')).toBe(12)
   expect(tables.friend_messages!.select).toHaveBeenCalledWith('id', { count: 'exact', head: true })
+})
+
+it.each([
+  { confirmed: true, force: false, preserve: true },
+  { confirmed: true, force: true, preserve: false },
+  { confirmed: false, force: false, preserve: false },
+])('respects confirmation and force: %j', async ({ confirmed, force, preserve }) => {
+  const original = { user_id: 'u1', shareable_profile: { ...validExtract().shareable_profile, intro: '旧的对外介绍' },
+    shareable_confirmed: confirmed, card: { headline: '原卡片' }, embedding: [9, 8], agent_profile: null }
+  const table = tables.user_profiles!
+  table.list.push(structuredClone(original))
+  const result = await extractProfile('u1', { force })
+  if (preserve) {
+    expect(table.upsert).not.toHaveBeenCalled()
+    expect(table.update).toHaveBeenCalledTimes(1)
+    expect(table.update.mock.calls[0]![0]).toEqual({ agent_profile: validExtract().agent_profile, updated_at: expect.any(String) })
+    expect(table.eq).toHaveBeenCalledWith('user_id', 'u1')
+    expect(embed).not.toHaveBeenCalled()
+    expect(table.list[0]).toMatchObject({ shareable_profile: original.shareable_profile, shareable_confirmed: true, card: original.card, embedding: original.embedding })
+    expect(result).toEqual({ shareable: original.shareable_profile, confirmed: true, exists: true })
+    expect(writeLog).toHaveBeenCalledWith(expect.objectContaining({ reason: '已确认的对外档案不自动覆盖，只更新说话风格' }))
+  } else {
+    expect(table.upsert).toHaveBeenCalledWith(expect.objectContaining({ shareable_profile: validExtract().shareable_profile, shareable_confirmed: false, card: null }), { onConflict: 'user_id' })
+    expect(embed).toHaveBeenCalledWith(expect.any(String), 'bg')
+    expect(result.confirmed).toBe(false)
+  }
+})
+it('manual POST profile/extract opts into force without a request body', async () => {
+  makeTable('users').list.push({ id: 'u1', auth_id: 'auth-u1' })
+  const spy = vi.spyOn(profileModule, 'extractProfile').mockResolvedValue({ shareable: null, confirmed: false, exists: true })
+  try {
+    const { friendRoutes } = await import('../../server/routes/friend.js')
+    const response = await friendRoutes.request('/profile/extract', { method: 'POST' })
+    expect(response.status).toBe(200)
+    expect(spy).toHaveBeenCalledWith('u1', { force: true })
+  } finally { spy.mockRestore() }
+})
+
+it('preserves the confirmed public profile after 30 messages and five background extractions', async () => {
+  const shareable = { ...validExtract().shareable_profile, intro: '已确认的介绍' }
+  tables.user_profiles!.list.push({ user_id: 'u1', shareable_profile: shareable, shareable_confirmed: true, card: { headline: 'old' }, embedding: [1], agent_profile: null })
+  for (let n = 1; n <= 30; n++) {
+    tables.friend_messages!.list.push({ user_id: 'u1', role: 'user', kind: 'chat', content: `新消息${n}` })
+    if (n % 6 === 0) await extractProfile('u1')
+  }
+  expect(await getShareableView('u1')).toEqual({ shareable, confirmed: true, exists: true })
+  expect(tables.user_profiles!.update).toHaveBeenCalledTimes(5)
+  expect(tables.user_profiles!.upsert).not.toHaveBeenCalled(); expect(embed).not.toHaveBeenCalled()
 })
