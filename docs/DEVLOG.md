@@ -296,6 +296,15 @@
 
 ## A：AI 朋友線（Vincent）
 
+### 2026-11-07｜X-5 記憶頁接上後端｜AI 協助｜分支 opt/X-5-memory-http
+- **做了什麼**：MemoriesSection 的 http 模式載入 listMemories，編輯採後端回傳的 MemoryRow 更新；刪除與「这不太像我」分別呼叫 DELETE／POST，成功後才移除本地列表項目。mock 仍讀 store，刪除仍走 s.deleteMemory，沒有改 useDemoStore。
+- **為什麼這樣做**：原頁面 http 模式也讀假資料，正式站永遠顯示空記憶；編輯後還原地修改 store，刪除不打後端。本次將載入、顯示狀態與不可變列表更新抽出，操作失敗保留列表及編輯內容；載入失敗顯示簡體固定錯誤，不冒充「还没有记忆」。
+- **介面**：保留既有 Card／mem-list／mem／mem-del／textarea 樣式；只補載入／錯誤狀態與同樣式的「不像我」動作。載入結果與操作以世代檢查避免卸載後套用，操作期間停用其他動作。
+- **改了哪些檔案**：src/features/friend/{ProfilePage.tsx,MemoriesSection.tsx,memoryState.ts,FunLabelsSection.tsx}、src/lib/api/friend.ts、tests/friend/memory-http.test.ts、本紀錄。ProfilePage 原 570 行，抽出記憶後仍超過單檔限制，因此將自足 FunLabelsSection 原樣移出（已核對函式內容，未改行為／樣式）；現 367 行。
+- **驗證**：先觀察缺少 memoryState 的失敗再實作；8 項離線測試涵蓋 HTTP 載入、不用 demo rows、mock 不發請求、載入失敗不顯示空狀態、edit/delete/not-like-me 成功與失敗、不可變列表及四個 API 方法／路徑。完整測試與 build 見 PR。
+- **審查**：已嘗試獨立 TypeScript 審查，但代理因額度限制未完成；改由主代理逐項自我檢查資料來源、操作成功後更新、失敗保留、卸載保護、API 路徑及純搬移差異，未聲稱完成獨立審查。
+- **還沒做完／待辦**：需人工審查 Draft PR；未呼叫真實平台、不讀 .env.local、不連真實資料庫／寫 Supabase、不安裝套件。未修改後端或 store，未部署。
+
 ### 2026-11-07｜M-2 最新訊息查詢、記憶編輯與定期擷取修正｜AI 協助｜分支 opt/M-2-query-fixes
 - **做了什麼**：記憶查詢改 created_at 降序、精準 limit(6)，回 prompt 前複製並 reverse 成正序；檔案查詢先過濾 role=user，再降序取 PROFILE_USER_LINES_LIMIT（60）並 reverse。editMemory 改寫正確的 user_memory 表，保留 user_id／id／deleted_at 篩選。
 - **為什麼這樣做**：原本 ascending + 大 limit 只會看到舊訊息；聊天上下文的 user 數會穩定在約 10，無法觸發每 6 則擷取。新增 countUserChatMessages 以 exact/head 計全量、只算本用戶 role=user/kind=chat，friendChat 以此判斷。
