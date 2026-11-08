@@ -1,6 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { setLlmClient } from '../../server/lib/llm/index.js'
+<<<<<<< HEAD
 import { NATURALNESS_RUBRIC_SYSTEM, averageScore, judgeMemory, judgeReply, judgeUserMessage, naturalnessScoreSchema } from '../../scripts/eval/judge.js'
+=======
+import { NATURALNESS_RUBRIC_SYSTEM, averageScore, judgeReply, judgeUserMessage, naturalnessScoreSchema } from '../../scripts/eval/judge.js'
+>>>>>>> origin/main
 
 beforeAll(() => {
   Object.assign(process.env, {
@@ -49,6 +53,7 @@ describe('自然度評審', () => {
     expect(judgeUserMessage(input)).toContain('恭喜，终于可以松口气了。')
   })
 
+<<<<<<< HEAD
   it('可以指定評審模型（和受測的 MODEL_REASON 不同）；記憶語義檢查也一樣', async () => {
     const models: string[] = []
     setLlmClient({
@@ -67,6 +72,8 @@ describe('自然度評審', () => {
     expect(check.wrong).toBe(true)
   })
 
+=======
+>>>>>>> origin/main
   it('分數超出 1～5 不通過 schema', () => {
     expect(naturalnessScoreSchema.safeParse({ catch: 6, not_interview: 4, no_copy: 4, persona: 4, length: 4, reason: 'x' }).success).toBe(false)
   })
