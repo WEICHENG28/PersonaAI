@@ -530,7 +530,8 @@
 - `scripts/eval/report.ts`（summarize、suiteStats、toBlindPairs、csvEscape、buildConfig）、`suites.ts`（判定與跑法，依賴可注入）、`compare.ts`（兩次結果配對成 blind-pairs.csv＋blind-key.json，`winRate` 算新版勝率）。
 - **小改共用程式**：`server/lib/llm/index.ts` 的選項加 `model?`（只有評測用：評審要用和受測不同的模型；正式流程不傳、行為不變）；`server/friend/profile.ts` 抽出 `extractProfileCandidates`（純重構，profile 測試不改全過）。
 - **改了哪些檔案**：`scripts/eval/{run,report,suites,compare,judge}.ts`、`server/lib/llm/index.ts`、`server/friend/profile.ts`、`tests/eval/{report,suites,judge}.test.ts`。
-- **驗證**：`tsc -b`、vitest 1093/1093；`run.ts --help` 不讀設定、不打平台。沒有實際跑評測（要用額度，由人跑）。
+- **審查後修正**：錯誤訊息存檔／印出前遮掉金鑰、網址、主機名（`redactSecrets`）；分身盲測改成整場對話一起比（第二則以後兩版前文不同，逐則比不公平）；出錯時的 LLM 次數也排除評審。
+- **驗證**：`tsc -b`、vitest 1095/1095；`run.ts --help` 不讀設定、不打平台。沒有實際跑評測（要用額度，由人跑）。
 
 ---
 

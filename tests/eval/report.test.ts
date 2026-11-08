@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildConfig, csvEscape, percentile, summarize, suiteStats, toBlindPairs, type EvalRow } from '../../scripts/eval/report.js'
-import { parseArgs } from '../../scripts/eval/run.js'
+import { parseArgs, redactSecrets } from '../../scripts/eval/run.js'
 import { winRate } from '../../scripts/eval/compare.js'
 
 const score = { catch: 4, not_interview: 4, no_copy: 5, persona: 4, length: 3, reason: 'x' }
@@ -59,6 +59,17 @@ describe('盲測對照', () => {
     expect(Object.keys(pairs.key)).toHaveLength(1)
   })
 
+  it('分身題整場一起比（逐則比前文不同不公平）；整場有一則出錯就不比', () => {
+    const twin = (out: string, turn: number, over: Partial<EvalRow> = {}) =>
+      row({ suite: 'twin', scenarioId: 't1', turn, output: out, context: turn === 0 ? '（开场话题：周末）' : 'x', ...over })
+    const pairs = toBlindPairs([twin('A0', 0), twin('A1', 1)], [twin('B1', 1), twin('B0', 0)], 3)
+    expect(Object.keys(pairs.key)).toHaveLength(1)
+    expect(pairs.csv).toContain('甲：A0\n乙：A1')
+    expect(pairs.csv).toContain('甲：B0\n乙：B1')
+    expect(pairs.csv).toContain('（开场话题：周末）')
+    expect(Object.keys(toBlindPairs([twin('A0', 0), twin('', 1, { error: 'x' })], [twin('B0', 0), twin('B1', 1)], 3).key)).toHaveLength(0)
+  })
+
   it('勝率：pick 1／2 對照答案算新版（B）贏幾次', () => {
     expect(winRate([{ pairId: 'p001', pick: '1' }, { pairId: 'p002', pick: '2' }, { pairId: 'p003', pick: '' }], { p001: 'B', p002: 'B', p003: 'A' })).toEqual({ bWins: 1, total: 2, rate: 0.5 })
   })
@@ -75,6 +86,16 @@ describe('CSV 與設定檔', () => {
     const text = JSON.stringify(config)
     expect(text).not.toMatch(/http|key|LLM_API/i)
     expect(config.models.chat).toBe('Kimi-K2.6')
+  })
+})
+
+describe('錯誤訊息遮蔽', () => {
+  it('金鑰、網址、主機名都換成 [redacted]', () => {
+    const env = { LLM_API_KEY: 'sk-secret-123', LLM_BASE_URL: 'https://llmapi.example.com/v1' }
+    const msg = redactSecrets('401 for https://llmapi.example.com/v1/chat key=sk-secret-123 host llmapi.example.com', env)
+    expect(msg).not.toMatch(/sk-secret|llmapi\.example\.com/)
+    expect(msg).toContain('[redacted]')
+    expect(redactSecrets('普通错误', {})).toBe('普通错误')
   })
 })
 

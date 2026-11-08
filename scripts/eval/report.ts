@@ -97,28 +97,57 @@ function seeded(seed: number) {
   }
 }
 
-const rowKey = (r: EvalRow) => `${r.suite}|${r.scenarioId}|${r.repeat}|${r.turn ?? ''}`
+interface BlindItem {
+  key: string
+  scenario: string
+  context: string
+  output: string
+}
 
 /**
- * 盲測對照：同一題同一次（阿澈、分身）的兩版回覆，隨機決定誰放 reply_1。
+ * 可以拿來比的單位：阿澈題是一則回覆（同樣的上下文）；分身題是一整場對話
+ * （第二則以後兩版的前文已經不同，逐則比不公平，所以整場一起比）。整場有任何一則出錯就不比。
+ */
+export function blindItems(rows: readonly EvalRow[]): BlindItem[] {
+  const items: BlindItem[] = rows
+    .filter(r => r.suite === 'friend' && !r.error)
+    .map(r => ({ key: `friend|${r.scenarioId}|${r.repeat}`, scenario: r.scenarioId, context: r.context ?? '', output: r.output }))
+  const twins = new Map<string, EvalRow[]>()
+  for (const r of rows.filter(x => x.suite === 'twin')) {
+    const k = `twin|${r.scenarioId}|${r.repeat}`
+    twins.set(k, [...(twins.get(k) ?? []), r])
+  }
+  for (const [k, list] of twins) {
+    if (list.some(r => r.error)) continue
+    const sorted = [...list].sort((x, y) => (x.turn ?? 0) - (y.turn ?? 0))
+    items.push({
+      key: k,
+      scenario: sorted[0]!.scenarioId,
+      context: sorted[0]!.context ?? '',
+      output: sorted.map(r => `${(r.turn ?? 0) % 2 === 0 ? '甲' : '乙'}：${r.output}`).join('\n'),
+    })
+  }
+  return items
+}
+
+/**
+ * 盲測對照：同一題同一次的兩版，隨機決定誰放 reply_1。
  * 同一個 seed 結果固定。key 記錄每一對的 reply_1 是 A 還是 B（標完再對答案）。
  */
 export function toBlindPairs(a: readonly EvalRow[], b: readonly EvalRow[], seed: number): { csv: string; key: Record<string, 'A' | 'B'> } {
   const rand = seeded(seed)
-  const bByKey = new Map(b.filter(r => !r.error).map(r => [rowKey(r), r]))
+  const bByKey = new Map(blindItems(b).map(i => [i.key, i]))
   const lines = ['pair_id,scenario_id,context,reply_1,reply_2,pick,notes']
   const key: Record<string, 'A' | 'B'> = {}
   let n = 0
-  for (const ra of a) {
-    if (ra.error || (ra.suite !== 'friend' && ra.suite !== 'twin')) continue
-    const rb = bByKey.get(rowKey(ra))
-    if (!rb) continue
+  for (const ia of blindItems(a)) {
+    const ib = bByKey.get(ia.key)
+    if (!ib) continue
     const pairId = `p${String(++n).padStart(3, '0')}`
     const aFirst = rand() < 0.5
     key[pairId] = aFirst ? 'A' : 'B'
-    const [r1, r2] = aFirst ? [ra.output, rb.output] : [rb.output, ra.output]
-    const scenario = `${ra.scenarioId}${ra.turn !== undefined ? `#${ra.turn}` : ''}`
-    lines.push([pairId, scenario, ra.context ?? '', r1, r2, '', ''].map(csvEscape).join(','))
+    const [r1, r2] = aFirst ? [ia.output, ib.output] : [ib.output, ia.output]
+    lines.push([pairId, ia.scenario, ia.context, r1, r2, '', ''].map(csvEscape).join(','))
   }
   return { csv: lines.join('\n') + '\n', key }
 }

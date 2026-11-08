@@ -89,7 +89,6 @@ export async function getProfileRow(userId: string): Promise<ProfileRow | null> 
   return (data as ProfileRow | null) ?? null
 }
 
-/** 撷取并写回。回传给前端的结果（不含 Big Five）。 */
 /**
  * 只做「從用戶說過的話產生檔案」，不讀寫資料庫（E-3：評測工具直接呼叫）。
  * userLines：時間正序的用戶原話；previous：上一版檔案的 JSON 文字（沒有就是「（没有上一版）」）。
@@ -111,6 +110,7 @@ export async function extractProfileCandidates(input: { userLines: string[]; pre
   })
 }
 
+/** 撷取并写回。回传给前端的结果（不含 Big Five）。 */
 export async function extractProfile(userId: string, opts?: { force?: boolean }): Promise<ShareableView> {
   const db = getServiceClient()
 

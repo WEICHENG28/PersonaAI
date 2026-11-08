@@ -53,6 +53,21 @@ export function stamp(d = new Date()): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`
 }
 
+/** 錯誤訊息可能帶平台回應：存檔、印出前把金鑰、網址、主機名換掉。 */
+export function redactSecrets(text: string, env: NodeJS.ProcessEnv = process.env): string {
+  const secrets: string[] = []
+  if (env.LLM_API_KEY) secrets.push(env.LLM_API_KEY)
+  if (env.LLM_BASE_URL) {
+    secrets.push(env.LLM_BASE_URL)
+    try {
+      secrets.push(new URL(env.LLM_BASE_URL).host)
+    } catch {
+      /* 網址格式不對就只換整串 */
+    }
+  }
+  return secrets.filter(s => s.length >= 4).sort((a, b) => b.length - a.length).reduce((out, s) => out.split(s).join('[redacted]'), text)
+}
+
 type Partial = Omit<EvalRow, 'repeat' | 'model' | 'ttftMs' | 'totalMs' | 'completionTokens' | 'llmCalls'>
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -114,7 +129,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         })
       }
     } catch (err) {
-      rows.push({ suite, scenarioId, repeat, model, output: '', pass: null, ttftMs: null, totalMs: Math.round(performance.now() - t0), completionTokens: null, llmCalls: metrics.length - from, error: err instanceof Error ? err.message.slice(0, 200) : String(err) })
+      const llmCalls = metrics.slice(from).filter(m => !m.tag.startsWith('eval.')).length
+      rows.push({ suite, scenarioId, repeat, model, output: '', pass: null, ttftMs: null, totalMs: Math.round(performance.now() - t0), completionTokens: null, llmCalls, error: redactSecrets(err instanceof Error ? err.message : String(err)).slice(0, 200) })
     }
     console.log(`[eval] ${suite}/${scenarioId}#${repeat} ${rows.at(-1)?.error ? '出错' : '完成'}`)
   }
@@ -174,7 +190,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch(err => {
-    console.error(err instanceof Error ? err.message : err)
+    console.error(redactSecrets(err instanceof Error ? err.message : String(err)))
     process.exitCode = 1
   })
 }
