@@ -26,6 +26,19 @@
 
 ## 共用與決策
 
+### 2026-11-08｜評測流程與模型選定方法（E-3）｜Peter（AI 協助）
+- **跑評測**（會用到學校平台額度，只由人跑）：`npx tsx scripts/eval/run.ts --suite memory,profile,friend,twin --label baseline`；換模型加 `--model-chat X --model-fast Y --model-reason Z --judge-model W`；`--repeat 2` 每題跑兩次。結果在 `.local/eval/`（不進 git）。
+- **盲測**：`npx tsx scripts/eval/compare.ts .local/eval/<舊版> .local/eval/<新版>`，在新版資料夾的 blind-pairs.csv 的 pick 欄填 1 或 2，標完再看 blind-key.json。
+- **什麼時候跑**：N 系列開始前先跑 `--label baseline`；N、B 系列每個 PR 合併後再跑一次並做盲測。
+- **模型選定流程**：
+  1. chat 候選取 3～4 個：TTFT p50 < 1.5s、成功率 100%、可以關掉 thinking。
+  2. 每個候選跑 `--suite friend,twin --repeat 2`，選評審平均最高、而且總延遲 p50 ≤ 4s 的。
+  3. fast：memory 題組 100% 通過的模型中最快的。
+  4. reason：profile 題組 100% 通過、而且評審一次 ≤ 15s。
+  5. 定案後另開 PR 更新 `.env.example`，再同步 Vercel 並通知 A、B、C。
+
+---
+
 ### 2026-11-07｜L-4 登入驗證與用戶 id 記憶體快取｜AI 協助｜分支 opt/L-4-auth-cache
 - **做了什麼**：新增無套件的 Map TTL 快取，各最多 500 筆並按插入順序淘汰，時鐘可注入。JWT 僅以 SHA-256 作 key；只有 getUser 驗證成功且非 banned 才快取，期限為 60 秒與 exp 剩餘時間的較短者。authId → users.id 僅成功查到才快取 5 分鐘，空值與錯誤不快取。
 - **為什麼這樣做**：三條線共用用戶 id 查詢，減少香港／台灣到巴黎的重複等待；同一登入者使用相同 JWT 且兩種快取皆命中時，60 秒內第二支以後的 API 預期少兩次資料庫／Auth 來回。冷啟動、換 token、到期或容量淘汰仍需查詢；實際效果由 Claude 在本機量測。
@@ -511,6 +524,15 @@
 ---
 
 ## B：社交 Agent 線（Peter）
+
+### 2026-11-08｜E-3 評測執行器、盲測對照、模型選定流程｜Peter（AI 協助）｜分支 opt/E-3-eval-runner
+- **做了什麼**：`scripts/eval/run.ts`（CLI，會真的呼叫平台，只給人跑）依題組跑：記憶用 `extractMemoryCandidates`（規則比對＋評審語義檢查，兩者都過才算通過）、檔案用新的 `extractProfileCandidates`（再過 `dropNegatedInterests`，和正式流程一樣）、阿澈用 `generateFriendReply`（新用戶、第一個事件）、分身用 `createTwinReply`＋記憶體 TwinStore（守門只套規則），最後一則加 `CLOSING_INSTRUCTION`。每則回覆用 `judgeReply` 打 5 項分數，算問號結尾、照抄（阿澈對示範句，B-1 前是空的；分身對自己這場說過的話）。用 `setLlmMetricSink` 收延遲、tokens、LLM 次數（不含評審）。輸出 `.local/eval/<label>-<時間>/` 的 results.jsonl、summary.md、config.json（只有模型名）。
+- `scripts/eval/report.ts`（summarize、suiteStats、toBlindPairs、csvEscape、buildConfig）、`suites.ts`（判定與跑法，依賴可注入）、`compare.ts`（兩次結果配對成 blind-pairs.csv＋blind-key.json，`winRate` 算新版勝率）。
+- **小改共用程式**：`server/lib/llm/index.ts` 的選項加 `model?`（只有評測用：評審要用和受測不同的模型；正式流程不傳、行為不變）；`server/friend/profile.ts` 抽出 `extractProfileCandidates`（純重構，profile 測試不改全過）。
+- **改了哪些檔案**：`scripts/eval/{run,report,suites,compare,judge}.ts`、`server/lib/llm/index.ts`、`server/friend/profile.ts`、`tests/eval/{report,suites,judge}.test.ts`。
+- **驗證**：`tsc -b`、vitest 1093/1093；`run.ts --help` 不讀設定、不打平台。沒有實際跑評測（要用額度，由人跑）。
+
+---
 
 ### 2026-11-08｜E-1 抽出阿澈生成與記憶擷取純函式、評測指標、評審量表｜Peter（AI 協助）｜分支 opt/E-1-reply-eval
 - **做了什麼**：新增 `server/friend/reply.ts`（`FriendTurnContext`、`buildFriendPrompt`、`generateFriendReply`），`chat.ts` 改呼叫它；`memory.ts` 抽出 `extractMemoryCandidates({userText, recent, existing})`（不碰資料庫），`extractMemories` 改呼叫它。新增 `scripts/eval/metrics.ts`（`endsWithQuestion`、`questionRatio`、`maxBigramSimilarity`，重用分身的 `bigramSimilarity`）與 `scripts/eval/judge.ts`（固定文案的自然度量表、`naturalnessScoreSchema`、`judgeReply`，用 reason 模型、溫度 0）。

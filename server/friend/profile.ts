@@ -90,6 +90,27 @@ export async function getProfileRow(userId: string): Promise<ProfileRow | null> 
 }
 
 /** 撷取并写回。回传给前端的结果（不含 Big Five）。 */
+/**
+ * 只做「從用戶說過的話產生檔案」，不讀寫資料庫（E-3：評測工具直接呼叫）。
+ * userLines：時間正序的用戶原話；previous：上一版檔案的 JSON 文字（沒有就是「（没有上一版）」）。
+ */
+export async function extractProfileCandidates(input: { userLines: string[]; previous?: string }) {
+  const { userLines } = input
+  return llmJson({
+    lane: 'bg',
+    timeoutMs: CONFIG.LLM_BG_TIMEOUT_MS,
+    maxAttempts: 2,
+    role: 'reason',
+    system: renderProfileSystem({
+      userLines: userLines.length ? userLines.map((l, i) => `${i + 1}. ${l}`).join('\n') : '（用户还没说过话）',
+      previous: input.previous ?? '（没有上一版）',
+    }),
+    messages: [{ role: 'user', content: `请更新这位用户的档案（共 ${userLines.length} 则用户讯息）。` }],
+    temperature: 0.2,
+    schema: profileExtractSchema,
+  })
+}
+
 export async function extractProfile(userId: string, opts?: { force?: boolean }): Promise<ShareableView> {
   const db = getServiceClient()
 
@@ -115,19 +136,7 @@ export async function extractProfile(userId: string, opts?: { force?: boolean })
     : '（没有上一版）'
 
   // 2. Prompt 3（MODEL_REASON）
-  const out = await llmJson({
-    lane: 'bg',
-    timeoutMs: CONFIG.LLM_BG_TIMEOUT_MS,
-    maxAttempts: 2,
-    role: 'reason',
-    system: renderProfileSystem({
-      userLines: userLines.length ? userLines.map((l, i) => `${i + 1}. ${l}`).join('\n') : '（用户还没说过话）',
-      previous: previousText,
-    }),
-    messages: [{ role: 'user', content: `请更新这位用户的档案（共 ${userLines.length} 则用户讯息）。` }],
-    temperature: 0.2,
-    schema: profileExtractSchema,
-  })
+  const out = await extractProfileCandidates({ userLines, previous: previousText })
 
   // 已确认的对外档案只允许用户主动重新生成；背景更新内部档案，不动公开资料。
   if (!opts?.force && previousRow?.shareable_confirmed === true) {
