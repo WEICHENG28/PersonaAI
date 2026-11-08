@@ -107,12 +107,36 @@ export class MemoryError extends Error {
  * 撷取后先软删相反旧记忆，再批次新增；失败会尝试还原本轮删除并抛错（非事务）。
  * 回传实际写入的条数。
  */
+export interface RecentLine {
+  role: string
+  content: string
+}
+
+/**
+ * 只做「從這則訊息撷取記憶候選」，不讀寫資料庫（E-1：評測工具直接呼叫）。
+ * recent：時間正序的最近對話；existing：已存在的記憶內容。
+ */
+export async function extractMemoryCandidates(input: { userText: string; recent: RecentLine[]; existing: string[] }): Promise<ExtractedMemories['memories']> {
+  const recentText = input.recent.map(m => `${m.role === 'user' ? '用户' : '阿澈'}：${m.content}`).join('\n')
+  const existingText = input.existing.length ? input.existing.map(c => `- ${c}`).join('\n') : '（无）'
+  const out = await llmJson({
+    lane: 'bg',
+    timeoutMs: CONFIG.LLM_BG_TIMEOUT_MS,
+    maxAttempts: 2,
+    role: 'fast',
+    system: renderMemorySystem({ text: input.userText, recent: recentText, existing: existingText }),
+    messages: [{ role: 'user', content: memoryPromptUser() }],
+    temperature: 0,
+    schema: extractedMemoriesSchema,
+  })
+  return out.memories
+}
+
 export async function extractMemories(userId: string, userText: string): Promise<number> {
   const db = getServiceClient()
 
   // 现有记忆（未删除）给去重 + prompt
   const existing = await listMemories(userId)
-  const existingText = existing.length ? existing.map((m) => `- ${m.content}`).join('\n') : '（无）'
 
   // 最近 6 则对话
   const { data: recentRows } = await db
@@ -121,23 +145,10 @@ export async function extractMemories(userId: string, userText: string): Promise
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(RECENT_WINDOW)
-  const recent = [...(recentRows ?? [])]
-    .reverse()
-    .map((m: { role: string; content: string }) => `${m.role === 'user' ? '用户' : '阿澈'}：${m.content}`)
-    .join('\n')
+  const recent = [...((recentRows ?? []) as RecentLine[])].reverse()
+  const memories = await extractMemoryCandidates({ userText, recent, existing: existing.map(m => m.content) })
 
-  const out = await llmJson({
-    lane: 'bg',
-    timeoutMs: CONFIG.LLM_BG_TIMEOUT_MS,
-    maxAttempts: 2,
-    role: 'fast',
-    system: renderMemorySystem({ text: userText, recent, existing: existingText }),
-    messages: [{ role: 'user', content: memoryPromptUser() }],
-    temperature: 0,
-    schema: extractedMemoriesSchema,
-  })
-
-  return persistMemories(userId, existing, out.memories)
+  return persistMemories(userId, existing, memories)
 }
 
 /** 寫入階段獨立處理補償與最新資料去重，維持擷取函式精簡。 */
