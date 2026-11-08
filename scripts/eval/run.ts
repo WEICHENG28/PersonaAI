@@ -183,8 +183,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const models = { chat: modelFor('chat'), fast: modelFor('fast'), reason: modelFor('reason'), judge: judgeModel ?? modelFor('reason') }
   await writeFile(join(outDir, 'results.jsonl'), rows.map(r => JSON.stringify(r)).join('\n') + '\n', 'utf-8')
   await writeFile(join(outDir, 'summary.md'), `# 评测：${args.label}\n\n${summarize(rows)}\n`, 'utf-8')
-  await writeFile(join(outDir, 'config.json'), JSON.stringify(buildConfig({ label: args.label, suites: args.suites, repeat: args.repeat, models, startedAt }), null, 2), 'utf-8')
-  console.log(`\n完成，结果在 ${outDir}\n`)
+  await writeFile(join(outDir, 'config.json'), JSON.stringify(buildConfig({ label: args.label, suites: args.suites, repeat: args.repeat, models, startedAt, modelParamsSet: Boolean(process.env.LLM_MODEL_PARAMS) }), null, 2), 'utf-8')
+  console.log(`\n完成，结果在 ${outDir}（LLM_MODEL_PARAMS ${process.env.LLM_MODEL_PARAMS ? '有' : '没有'}设定）\n`)
   console.log(summarize(rows))
 }
 

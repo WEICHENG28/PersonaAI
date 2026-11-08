@@ -153,6 +153,7 @@ export function toBlindPairs(a: readonly EvalRow[], b: readonly EvalRow[], seed:
 }
 
 /** config.json：只放模型名稱與參數，絕不放金鑰、網址。 */
-export function buildConfig(input: { label: string; suites: string[]; repeat: number; models: Record<string, string>; startedAt: string }) {
-  return { label: input.label, suites: input.suites, repeat: input.repeat, models: input.models, startedAt: input.startedAt }
+export function buildConfig(input: { label: string; suites: string[]; repeat: number; models: Record<string, string>; startedAt: string; modelParamsSet?: boolean }) {
+  // modelParamsSet：有沒有設 LLM_MODEL_PARAMS（例如關掉思考），只記有沒有、不記內容
+  return { label: input.label, suites: input.suites, repeat: input.repeat, models: input.models, modelParamsSet: input.modelParamsSet ?? false, startedAt: input.startedAt }
 }
