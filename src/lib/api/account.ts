@@ -3,6 +3,8 @@
 import { supabase } from '../supabase'
 
 const LAST_NAME_KEY = 'personaai:lastName'
+/** 這個瀏覽器上次用的游客名字（游客分頁預填，打同名就回到原游客帳號）。 */
+const LAST_GUEST_KEY = 'personaai:lastGuestName'
 
 /** 游客帳號保留幾天（和後端 CONFIG.GUEST_KEEP_DAYS 一樣；改的話兩邊一起改）。 */
 export const GUEST_KEEP_DAYS = 3
@@ -18,6 +20,22 @@ export function lastUsedName(): string | null {
     return localStorage.getItem(LAST_NAME_KEY)
   } catch {
     return null
+  }
+}
+
+export function lastGuestName(): string | null {
+  try {
+    return localStorage.getItem(LAST_GUEST_KEY)
+  } catch {
+    return null
+  }
+}
+
+function rememberGuestName(name: string): void {
+  try {
+    localStorage.setItem(LAST_GUEST_KEY, name)
+  } catch {
+    /* 存不了不影響 */
   }
 }
 
@@ -56,7 +74,8 @@ async function signIn(data: LoginData): Promise<{ displayName: string; created: 
     console.error('[account] verifyOtp failed', error.message)
     throw new Error('登录失败，请再试一次')
   }
-  if (!data.guest) rememberName(data.displayName)
+  if (data.guest) rememberGuestName(data.displayName)
+  else rememberName(data.displayName)
   return { displayName: data.displayName, created: data.created, guest: data.guest }
 }
 
