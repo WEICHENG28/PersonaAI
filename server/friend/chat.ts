@@ -5,7 +5,6 @@
  */
 import { z } from 'zod'
 import { getServiceClient } from '../lib/supabase.js'
-import { llmJson } from '../lib/llm/index.js'
 import { CONFIG } from '../lib/config.js'
 import { writeLog } from '../lib/log.js'
 import { startTimer } from '../lib/timing.js'
@@ -14,7 +13,7 @@ import { runInBackground } from '../lib/background.js'
 import { assertAllowed, maskBlocked } from '../lib/moderation.js'
 import { assertWithinDailyLimit } from '../social/usage.js'
 import { createTaskCard } from './taskCard.js'
-import { friendReplySchema, renderFriendSystem } from '../prompts/01_friend.js'
+import { generateFriendReply } from './reply.js'
 import { ACHE, EVENTS, LIFE_UPDATES, getLifeUpdate, pickNextEvent } from './persona.js'
 import { extractMemories, listMemories } from './memory.js'
 import { countUserChatMessages, extractProfile, shouldExtractProfile } from './profile.js'
@@ -182,35 +181,21 @@ export async function friendChat(userId: string, text: string, mode?: 'nudge') {
   }
   const [userMessage, { history, memoriesText }] = await Promise.all([insertUser(), readContext()])
   const recent = mergeHistory(history, userMessage, CONFIG.FRIEND_HISTORY_LIMIT)
-  const recentText = recent.map(m => `${m.role === 'user' ? '用户' : '阿澈'}：${m.content}`).join('\n')
   const lifeState = friend.life_state ?? getLifeUpdate(friend.story_stage)
   const lifeText = `${lifeState.mood}；${lifeState.doing}`
   const nextEvent = pickNextEvent(friend.story_stage, friend.shared_event_ids)
   timer.mark('context')
 
-  // 3. 呼叫 Prompt 1
-  const system = renderFriendSystem({
+  // 3. 呼叫 Prompt 1（组 prompt 与呼叫模型在 reply.ts，评测工具也用同一份）
+  const reply = await generateFriendReply({
     lifeState: lifeText,
-    eventText: nextEvent?.line ?? '无',
-    recallMemory: '无',
+    eventText: nextEvent?.line ?? null,
+    recallMemory: null,
     memories: memoriesText,
-    crisisResource: CONFIG.CRISIS_RESOURCE,
-  })
-  // nudge 模式：告诉 LLM 这是主动接话，不是用户发来的消息
-  const userContent = isNudge
-    ? `[mode: nudge] 用户停止回复了一段时间，现在请阿澈主动接话，分享一件和最近话题相关的事或问一个轻松的问题。上下文：\n${recentText || '（还没有聊天记录）'}`
-    : recentText || body.text
-  const reply = await llmJson({
-    role: 'chat',
-    tag: 'friend.reply',
-    timeoutMs: CONFIG.LLM_FG_TIMEOUT_MS,
-    maxAttempts: CONFIG.LLM_FG_MAX_RETRIES + 1,
-    onMetric: (metric) => { replyMetric = metric },
-    system,
-    messages: [{ role: 'user', content: userContent }],
-    temperature: 0.8,
-    schema: friendReplySchema,
-  })
+    history: recent,
+    isNudge,
+    userText: body.text,
+  }, { onMetric: (metric) => { replyMetric = metric } })
   timer.mark('llm')
 
   // 4. 存回复；shared_event_id 记入 ai_friends；nudge 讯息标 meta.nudge=true（防重复用）

@@ -512,6 +512,15 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-08｜E-1 抽出阿澈生成與記憶擷取純函式、評測指標、評審量表｜Peter（AI 協助）｜分支 opt/E-1-reply-eval
+- **做了什麼**：新增 `server/friend/reply.ts`（`FriendTurnContext`、`buildFriendPrompt`、`generateFriendReply`），`chat.ts` 改呼叫它；`memory.ts` 抽出 `extractMemoryCandidates({userText, recent, existing})`（不碰資料庫），`extractMemories` 改呼叫它。新增 `scripts/eval/metrics.ts`（`endsWithQuestion`、`questionRatio`、`maxBigramSimilarity`，重用分身的 `bigramSimilarity`）與 `scripts/eval/judge.ts`（固定文案的自然度量表、`naturalnessScoreSchema`、`judgeReply`，用 reason 模型、溫度 0）。
+- **為什麼**：評測工具（E-3）要和正式流程用同一套生成邏輯；後面 N、S、B 系列都改 reply.ts。
+- **純重構**：prompt 仍是「整段對話壓成一則 user 訊息」的舊格式（N-1 才改）；`chat.test.ts`、`memory.test.ts` 等既有測試一行沒改全部通過。`buildFriendPrompt` 測試直接比對原本的 system 與 user 內容。
+- **改了哪些檔案**：`server/friend/{reply,chat,memory}.ts`、`scripts/eval/{metrics,judge}.ts`、`tests/friend/reply.test.ts`、`tests/eval/{metrics,judge}.test.ts`。
+- **驗證**：`tsc -b`、vitest 1066/1066。不打 LLM、不碰 Supabase。
+
+---
+
 ### 2026-11-08｜游客打同名就回到原游客帳號｜Peter（AI 協助）
 - **問題**：游客登出、換瀏覽器或用無痕視窗後，打原本的名字會被說「已經有人用了」，回不去自己的帳號。
 - **改法**（Peter 決定，不用回來碼）：游客分頁自己打的名字若是「還沒設密碼的游客帳號」，就直接回到那個帳號（3 天刪除前都可以）；設了密碼的正式帳號、舊的只有名字的帳號、示範用戶照樣擋下。游客分頁會預填這個瀏覽器上次的游客名字。登入頁提醒「别人输入同样的名字也进得去，想保护记录请到设置设密码」。
