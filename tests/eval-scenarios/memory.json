@@ -93,7 +93,7 @@
     "userText": "我可能会试试游泳，还没决定，也不知道自己喜不喜欢。",
     "recent": [],
     "existing": [],
-    "expect": {"maxCount": 0}
+    "expect": {"mustNotContain": ["用户喜欢游泳", "用户会游泳", "用户在学游泳"], "maxCount": 1}
   },
   {
     "id": "memory-uncertain-02",
@@ -109,7 +109,7 @@
     "userText": "也许以后会养植物，不过现在还没想好。",
     "recent": [],
     "existing": [],
-    "expect": {"maxCount": 0}
+    "expect": {"mustNotContain": ["用户养植物", "用户喜欢养植物", "用户在养植物"], "maxCount": 1}
   },
   {
     "id": "memory-hypothetical-01",

@@ -26,6 +26,21 @@
 
 ## 共用與決策
 
+### 2026-11-08｜評測基準線（baseline，學校平台、LLM_MODEL_PARAMS 有設）｜Peter（AI 協助）
+模型：chat＝Kimi-K2.6、fast＝Qwen3.8-Flash、reason＝Qwen3.8-Max（評審也用 reason）。每題跑 1 次，非串流。結果在 Peter 電腦 `.local/eval/baseline-20261108-1241`、`baseline-memory-20261108-1252`。
+
+| 題組 | 數量 | 通過率 | 評審平均 | catch | not_interview | no_copy | persona | length | 問號結尾 | p50／p95 總時間 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| memory | 16 | 100%（修正 2 題預期後） | — | — | — | — | — | — | — | 0.9s／8.4s |
+| profile | 4 | 100% | — | — | — | — | — | — | — | 6.0s／9.2s |
+| friend | 22 | 100%（找人意圖） | 3.55 | 3.86 | 3.09 | 4.64 | 2.95 | 3.23 | 64% | 2.7s／7.0s |
+| twin | 56 則 | — | 3.78 | 3.77 | 3.23 | 4.20 | 3.89 | 3.82 | 84% | 4.0s／6.1s |
+
+- **N 系列要改善的**：阿澈問號結尾 64%（目標 ≤ 35%）、分身 84%（目標 ≤ 50%）；阿澈 persona 2.95、not_interview 3.09、length 3.23 偏低。實際看回覆：太長、每一則都在提「周末看展」（事件每輪都給，對應診斷 C7）。
+- 評審目標：friend、twin 都要 ≥ 基準＋0.5 且 ≥ 3.8。
+
+---
+
 ### 2026-11-08｜評測流程與模型選定方法（E-3）｜Peter（AI 協助）
 - **跑評測**（會用到學校平台額度，只由人跑）：`npx tsx scripts/eval/run.ts --suite memory,profile,friend,twin --label baseline`；換模型加 `--model-chat X --model-fast Y --model-reason Z --judge-model W`；`--repeat 2` 每題跑兩次。結果在 `.local/eval/`（不進 git）。
 - **盲測**：`npx tsx scripts/eval/compare.ts .local/eval/<舊版> .local/eval/<新版>`，在新版資料夾的 blind-pairs.csv 的 pick 欄填 1 或 2，標完再看 blind-key.json。
@@ -530,6 +545,7 @@
 - `scripts/eval/report.ts`（summarize、suiteStats、toBlindPairs、csvEscape、buildConfig）、`suites.ts`（判定與跑法，依賴可注入）、`compare.ts`（兩次結果配對成 blind-pairs.csv＋blind-key.json，`winRate` 算新版勝率）。
 - **小改共用程式**：`server/lib/llm/index.ts` 的選項加 `model?`（只有評測用：評審要用和受測不同的模型；正式流程不傳、行為不變）；`server/friend/profile.ts` 抽出 `extractProfileCandidates`（純重構，profile 測試不改全過）。
 - **改了哪些檔案**：`scripts/eval/{run,report,suites,compare,judge}.ts`、`server/lib/llm/index.ts`、`server/friend/profile.ts`、`tests/eval/{report,suites,judge}.test.ts`。
+- **題庫修正**：跑 baseline 發現 memory-uncertain-01、03 要求「一條都不能記」，和 M-3 規則（不確定的記成「用户在考虑……」、信心 ≤ 0.5）衝突，模型其實照規則做。改成「不能記成確定的喜好」（mustNotContain＋maxCount 1）；重跑記憶題 16/16 通過。
 - **審查後修正**：錯誤訊息存檔／印出前遮掉金鑰、網址、主機名（`redactSecrets`）；分身盲測改成整場對話一起比（第二則以後兩版前文不同，逐則比不公平）；出錯時的 LLM 次數也排除評審。
 - **驗證**：`tsc -b`、vitest 1095/1095；`run.ts --help` 不讀設定、不打平台。沒有實際跑評測（要用額度，由人跑）。
 
