@@ -25,6 +25,8 @@ export interface LlmTextOptions {
   temperature?: number
   tag?: string
   onMetric?: (metric: LlmMetric) => void
+  /** 指定模型（只給評測工具用：評審要用和受測不同的模型）；正式流程不傳，照 role 對應的 MODEL_*。 */
+  model?: string
 }
 
 export interface LlmJsonOptions<T> extends LlmTextOptions {
@@ -96,7 +98,7 @@ function backoff(attempt: number, maxAttempts = MAX_ATTEMPTS): Promise<void> {
 
 export async function llmText(opts: LlmTextOptions): Promise<string> {
   return withLlmMetric({ ...opts, tag: opts.tag ?? 'llm.text' }, async metric => {
-    const model = metric.model = modelFor(opts.role)
+    const model = metric.model = opts.model ?? modelFor(opts.role)
     let reason = ''
     const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -118,7 +120,7 @@ export async function llmText(opts: LlmTextOptions): Promise<string> {
 
 export async function llmJson<T>(opts: LlmJsonOptions<T>): Promise<T> {
   return withLlmMetric({ ...opts, tag: opts.tag ?? 'llm.json' }, async metric => {
-    const model = metric.model = modelFor(opts.role)
+    const model = metric.model = opts.model ?? modelFor(opts.role)
     let messages = opts.messages
     let reason = ''
     const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS

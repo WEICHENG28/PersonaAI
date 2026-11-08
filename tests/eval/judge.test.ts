@@ -1,6 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { setLlmClient } from '../../server/lib/llm/index.js'
+<<<<<<< HEAD
+import { NATURALNESS_RUBRIC_SYSTEM, averageScore, judgeMemory, judgeReply, judgeUserMessage, naturalnessScoreSchema } from '../../scripts/eval/judge.js'
+=======
 import { NATURALNESS_RUBRIC_SYSTEM, averageScore, judgeReply, judgeUserMessage, naturalnessScoreSchema } from '../../scripts/eval/judge.js'
+>>>>>>> origin/main
 
 beforeAll(() => {
   Object.assign(process.env, {
@@ -49,6 +53,27 @@ describe('自然度評審', () => {
     expect(judgeUserMessage(input)).toContain('恭喜，终于可以松口气了。')
   })
 
+<<<<<<< HEAD
+  it('可以指定評審模型（和受測的 MODEL_REASON 不同）；記憶語義檢查也一樣', async () => {
+    const models: string[] = []
+    setLlmClient({
+      chat: vi.fn(async (req) => {
+        models.push(req.model)
+        return req.messages.some(m => m.content.includes('记下的记忆'))
+          ? '{"wrong":true,"reason":"把不喜欢记成喜欢"}'
+          : '{"catch":4,"not_interview":4,"no_copy":4,"persona":4,"length":4,"reason":"x"}'
+      }),
+      embed: vi.fn(async () => [1, 2, 3, 4]),
+    })
+    await judgeReply(input, { model: 'judge-x' })
+    const check = await judgeMemory({ userText: '我不喜欢昆虫', memories: ['用户很喜欢昆虫'] }, { model: 'judge-x' })
+    await judgeReply(input)
+    expect(models).toEqual(['judge-x', 'judge-x', 'reason-model'])
+    expect(check.wrong).toBe(true)
+  })
+
+=======
+>>>>>>> origin/main
   it('分數超出 1～5 不通過 schema', () => {
     expect(naturalnessScoreSchema.safeParse({ catch: 6, not_interview: 4, no_copy: 4, persona: 4, length: 4, reason: 'x' }).success).toBe(false)
   })
