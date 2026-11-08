@@ -1,9 +1,11 @@
 // E-1 評測指標（純函式，不打模型）：問號結尾、問號比例、和參考句的最高相似度（照抄偵測）。
 import { bigramSimilarity, normalizeForRepeat } from '../../server/twin/repeat.js'
 
-/** 結尾的 emoji、空白、收尾標點（。！～）不算，看最後一個實際的句尾是不是問號。 */
+/** 結尾的 emoji（含膚色）、微信表情「[捂脸]」、空白、收尾標點和括號引號不算，看最後一個實際的句尾是不是問號。 */
 export function endsWithQuestion(text: string): boolean {
-  const trimmed = text.replace(/[\s\p{Extended_Pictographic}‍️。.!！~～…]+$/gu, '')
+  const trimmed = text
+    .replace(/(\[[^\[\]\s]{1,6}\]\s*)+$/u, '')
+    .replace(/[\s\p{Extended_Pictographic}\p{Emoji_Modifier}‍️。.!！~～…）)」』"'”’]+$/gu, '')
   return /[？?]$/.test(trimmed)
 }
 

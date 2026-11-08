@@ -103,10 +103,6 @@ export class MemoryError extends Error {
   }
 }
 
-/**
- * 撷取后先软删相反旧记忆，再批次新增；失败会尝试还原本轮删除并抛错（非事务）。
- * 回传实际写入的条数。
- */
 export interface RecentLine {
   role: string
   content: string
@@ -132,6 +128,10 @@ export async function extractMemoryCandidates(input: { userText: string; recent:
   return out.memories
 }
 
+/**
+ * 撷取后先软删相反旧记忆，再批次新增；失败会尝试还原本轮删除并抛错（非事务）。
+ * 回传实际写入的条数。
+ */
 export async function extractMemories(userId: string, userText: string): Promise<number> {
   const db = getServiceClient()
 

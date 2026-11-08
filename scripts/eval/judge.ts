@@ -37,7 +37,8 @@ export interface JudgeInput {
 }
 
 export function renderJudgeSystem(persona: string): string {
-  return NATURALNESS_RUBRIC_SYSTEM.replace('{{persona}}', persona)
+  // 用函式取代：人設文字裡的 $& 之類不會被當成取代語法
+  return NATURALNESS_RUBRIC_SYSTEM.replace('{{persona}}', () => persona)
 }
 
 export function judgeUserMessage(input: JudgeInput): string {

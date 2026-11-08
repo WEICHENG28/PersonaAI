@@ -8,6 +8,10 @@ describe('評測指標', () => {
     expect(endsWithQuestion('好呀。')).toBe(false)
     expect(endsWithQuestion('你觉得呢？～')).toBe(true)
     expect(endsWithQuestion('')).toBe(false)
+    expect(endsWithQuestion('你呢？👍🏻')).toBe(true)
+    expect(endsWithQuestion('（真的吗？）')).toBe(true)
+    expect(endsWithQuestion('你呢？[捂脸]')).toBe(true)
+    expect(endsWithQuestion('好吧[捂脸]')).toBe(false)
   })
 
   it('問號比例', () => {
