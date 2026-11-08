@@ -1,0 +1,130 @@
+[
+  {
+    "id": "memory-negation-01",
+    "kind": "memory",
+    "userText": "我不喜欢昆虫，看到虫子就想绕开。",
+    "recent": [],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户喜欢昆虫", "对昆虫感兴趣"]}
+  },
+  {
+    "id": "memory-negation-02",
+    "kind": "memory",
+    "userText": "我对爬山没兴趣，平时喜欢画画。",
+    "recent": [],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户喜欢爬山", "用户喜欢登山", "对爬山感兴趣"], "mustContain": ["画画"]}
+  },
+  {
+    "id": "memory-negation-03",
+    "kind": "memory",
+    "userText": "我怕狗，不想参加带狗的活动。",
+    "recent": [],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户喜欢狗", "用户喜欢养狗", "用户想参加带狗的活动"]}
+  },
+  {
+    "id": "memory-negation-04",
+    "kind": "memory",
+    "userText": "我不吃辣，点菜的时候只选清淡的。",
+    "recent": [],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户喜欢吃辣", "用户爱吃辣"], "mustContain": ["清淡"]}
+  },
+  {
+    "id": "memory-negation-05",
+    "kind": "memory",
+    "userText": "我不再熬夜了，最近都尽量早点睡。",
+    "recent": ["用户：以前经常打游戏到很晚。"],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户喜欢熬夜", "用户经常熬夜"]}
+  },
+  {
+    "id": "memory-past-01",
+    "kind": "memory",
+    "userText": "我以前喜欢滑板，现在已经不玩了。",
+    "recent": [],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户现在喜欢滑板", "用户经常玩滑板", "用户喜欢滑板"]}
+  },
+  {
+    "id": "memory-past-02",
+    "kind": "memory",
+    "userText": "我小时候学过钢琴，毕业后就没再练了。",
+    "recent": [],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户经常练钢琴", "用户现在正在学钢琴", "用户喜欢弹钢琴"]}
+  },
+  {
+    "id": "memory-past-03",
+    "kind": "memory",
+    "userText": "我去年准备过考试，那段时间每天刷题，现在已经考完了。",
+    "recent": [],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户正在备考", "用户每天刷题", "用户在准备考试"]}
+  },
+  {
+    "id": "memory-other-01",
+    "kind": "memory",
+    "userText": "我室友超爱猫，最近总给我看猫的视频。",
+    "recent": [],
+    "existing": [],
+    "expect": {"maxCount": 0}
+  },
+  {
+    "id": "memory-other-02",
+    "kind": "memory",
+    "userText": "我同事周末经常骑车，这只是他的习惯，我还没试过。",
+    "recent": [],
+    "existing": [],
+    "expect": {"maxCount": 0}
+  },
+  {
+    "id": "memory-other-03",
+    "kind": "memory",
+    "userText": "我家里人喜欢做烘焙，我只是帮忙洗碗。",
+    "recent": [],
+    "existing": [],
+    "expect": {"mustNotContain": ["用户喜欢烘焙", "用户擅长烘焙"], "maxCount": 0}
+  },
+  {
+    "id": "memory-uncertain-01",
+    "kind": "memory",
+    "userText": "我可能会试试游泳，还没决定，也不知道自己喜不喜欢。",
+    "recent": [],
+    "existing": [],
+    "expect": {"maxCount": 0}
+  },
+  {
+    "id": "memory-uncertain-02",
+    "kind": "memory",
+    "userText": "说不定我适合打羽毛球吧，只是随口猜一下。",
+    "recent": [],
+    "existing": [],
+    "expect": {"maxCount": 0}
+  },
+  {
+    "id": "memory-uncertain-03",
+    "kind": "memory",
+    "userText": "也许以后会养植物，不过现在还没想好。",
+    "recent": [],
+    "existing": [],
+    "expect": {"maxCount": 0}
+  },
+  {
+    "id": "memory-hypothetical-01",
+    "kind": "memory",
+    "userText": "开个玩笑，要是我能隐身，就天天去看演唱会。",
+    "recent": [],
+    "existing": [],
+    "expect": {"maxCount": 0}
+  },
+  {
+    "id": "memory-hypothetical-02",
+    "kind": "memory",
+    "userText": "假如不用上班，我大概会每天睡到中午，这只是个假设。",
+    "recent": [],
+    "existing": [],
+    "expect": {"maxCount": 0}
+  }
+]
