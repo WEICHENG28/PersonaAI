@@ -116,6 +116,29 @@ describe('游客', () => {
     expect(calls.issued).toHaveLength(1)
   })
 
+  it('游客打同一個名字就回到原本的游客帳號（換瀏覽器、登出後也行），不會另外建一個', async () => {
+    const { deps, calls, accounts } = fakeDeps()
+    const first = await enterAsGuest({ name: '阿花', random: false }, deps)
+    expect(first).toMatchObject({ ok: true, created: true, guest: true })
+    const again = await enterAsGuest({ name: '阿花', random: false }, deps)
+    expect(again).toMatchObject({ ok: true, created: false, guest: true, displayName: '阿花' })
+    expect(accounts).toHaveLength(1)
+    expect(calls.issued).toEqual([accounts[0]!.email, accounts[0]!.email])
+  })
+
+  it('游客設了密碼之後，就不能再只打名字進去', async () => {
+    const { deps } = fakeDeps()
+    await enterAsGuest({ name: '阿花', random: false }, deps)
+    await setAccountPassword('auth-1', { password: 'hua12345' }, deps)
+    expect(await enterAsGuest({ name: '阿花', random: false }, deps)).toMatchObject({ ok: false, code: 'exists' })
+  })
+
+  it('舊的只有名字（非游客）的帳號，游客分頁也進不去', async () => {
+    const { deps, calls } = fakeDeps([{ authId: 'a2', email: 'a2@x', name: '老王', hasPassword: false, guest: false }])
+    expect(await enterAsGuest({ name: '老王', random: false }, deps)).toMatchObject({ ok: false, code: 'exists' })
+    expect(calls.issued).toEqual([])
+  })
+
   it('游客設名字＋密碼變成正式帳號，之後能用名字＋密碼登入', async () => {
     const { deps } = fakeDeps()
     const g = await enterAsGuest({ name: '星星' }, deps)

@@ -6,7 +6,7 @@ import { ShuffleIcon } from '@components/ui/Icons'
 import { useDemoStore } from '@store/useDemoStore'
 import { t } from '@i18n/t'
 import { currentUser, isHttpMode, initProfile } from '@lib/api/friend'
-import { GUEST_KEEP_DAYS, enterAsGuest, lastUsedName, loginAccount, registerAccount } from '@lib/api/account'
+import { GUEST_KEEP_DAYS, enterAsGuest, lastUsedName, loginAccount, registerAccount, lastGuestName } from '@lib/api/account'
 import { randomName } from './randomName'
 
 type Mode = 'guest' | 'login' | 'register'
@@ -34,9 +34,11 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [remembered] = useState(() => (isHttpMode ? lastUsedName() : null))
   const [mode, setMode] = useState<Mode>(remembered ? 'login' : 'guest')
-  // 游客名字：随机预填；没改过＝随机（后端保证不重复），改过＝用这个名字（有人用了会请他换）
-  const [guestName, setGuestName] = useState(() => randomName())
-  const [guestTyped, setGuestTyped] = useState(false)
+  // 游客名字：这个浏览器上次当过游客就预填那个名字（打同名会回到原游客帐号）；否则随机预填。
+  // 没改过的随机名字＝后端保证不重复；自己打的（或上次的）＝同名游客就回到那个帐号，正式帐号的名字会被挡下
+  const [lastGuest] = useState(() => (isHttpMode ? lastGuestName() : null))
+  const [guestName, setGuestName] = useState(() => lastGuest ?? randomName())
+  const [guestTyped, setGuestTyped] = useState(Boolean(lastGuest))
   const [name, setName] = useState(() => remembered ?? '')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
@@ -166,7 +168,7 @@ export function LoginPage() {
               </label>
               {isHttpMode && (
                 <p style={hintStyle}>
-                  不用密码，马上体验完整流程。游客记录保留 {GUEST_KEEP_DAYS} 天，想留下来到「设置」设一个密码就好。
+                  不用密码，马上体验完整流程。游客记录保留 {GUEST_KEEP_DAYS} 天，期间换浏览器或登出后输入同样的名字就能回来；别人输入同样的名字也进得去，想保护记录请到「设置」设一个密码。
                 </p>
               )}
             </>

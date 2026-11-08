@@ -512,6 +512,14 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-08｜游客打同名就回到原游客帳號｜Peter（AI 協助）
+- **問題**：游客登出、換瀏覽器或用無痕視窗後，打原本的名字會被說「已經有人用了」，回不去自己的帳號。
+- **改法**（Peter 決定，不用回來碼）：游客分頁自己打的名字若是「還沒設密碼的游客帳號」，就直接回到那個帳號（3 天刪除前都可以）；設了密碼的正式帳號、舊的只有名字的帳號、示範用戶照樣擋下。游客分頁會預填這個瀏覽器上次的游客名字。登入頁提醒「别人输入同样的名字也进得去，想保护记录请到设置设密码」。
+- **改了哪些檔案**：`server/account/nameLogin.ts`、`src/lib/api/account.ts`、`src/features/friend/LoginPage.tsx`、`tests/social/name-login.test.ts`。
+- **驗證**：`tsc -b`、vitest 1053/1053、build。
+
+---
+
 ### 2026-11-07｜P0-1 LLM 平台探測腳本｜Peter（AI 協助）｜分支 opt/P0-1-llm-probe
 - **做了什麼**：新增獨立 CLI，對每個聊天模型的 default／Qwen 關 thinking／GLM 關 thinking 三種變體重複量測普通非串流、串流與 json_object；embedding 請求 1024 維並記錄實際長度。Markdown 報告依模型、模式與變體彙整 TTFT、總延遲、成功率、錯誤率、reasoning 字數、tokens 與維度。
 - **為什麼這樣做**：先建立可重複、可比較的模型能力基準，再由使用者實測選平台。JSON 能力檢查為獨立請求，透過額外的 `requestKind` 標記，不混入普通文本的成功率、延遲或 completion tokens；reasoning p50 依審查要求統計所有有回應的請求（包含失敗及 JSON 檢查），用 `responseReceived` 區分模型回應與純傳輸失敗，避免漏掉只輸出思考的模型。所有請求共享有界並行池，SDK 與每次請求都關閉自動重試；總時間限制維持 30 秒，輸出上限改為共用常數 1024 tokens，HELP 同步。

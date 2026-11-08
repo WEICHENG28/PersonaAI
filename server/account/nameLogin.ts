@@ -120,8 +120,12 @@ export async function loginAccount(input: { name?: string; password?: string }, 
 }
 
 /**
- * 游客：不用密碼直接進入。random=true（沒改過的隨機名字）→ 保證挑一個沒人用的；
- * 自己打的名字 → 有人用了就請他換一個（不會進到別人的帳號）。
+ * 游客：不用密碼直接進入。random=true（沒改過的隨機名字）→ 保證挑一個沒人用的。
+ * 自己打的名字：
+ * - 沒人用 → 建一個新的游客帳號。
+ * - 是還沒設密碼的游客帳號 → 回到那個帳號（Peter 2026-11-08 決定：游客本來就是體驗用、3 天後刪除，
+ *   換瀏覽器或登出後打同名就能回來；代價是知道名字的人也進得去，登入頁有提醒）。
+ * - 是設了密碼的正式帳號、舊的只有名字的帳號、示範用戶 → 擋下，不會進到別人的帳號。
  */
 export async function enterAsGuest(input: { name?: string; random?: boolean }, deps: AccountDeps): Promise<LoginResult> {
   if (input.random !== false || !input.name?.trim()) {
@@ -129,10 +133,15 @@ export async function enterAsGuest(input: { name?: string; random?: boolean }, d
   }
   const name = checkName(input.name)
   if (!name) return fail('invalid', `名字要在 1–${NAME_MAX} 个字之间`)
-  if ((await deps.isReservedName(name)) || (await deps.findAccount(name))) {
-    return fail('exists', '这个名字已经有人用了，换一个，或按旁边的按钮随机一个')
+  if (await deps.isReservedName(name)) return fail('exists', '这个名字已经有人用了，换一个，或按旁边的按钮随机一个')
+  const existing = await deps.findAccount(name)
+  if (!existing) return createAndEnter(name, deps, { guest: true })
+  if (existing.guest && !existing.hasPassword && existing.email) {
+    const token = await deps.issueLogin(existing.email)
+    return { ok: true, displayName: name, ...token, created: false, guest: true }
   }
-  return createAndEnter(name, deps, { guest: true })
+  if (existing.hasPassword) return fail('exists', '这个名字已经注册了。是你的话请切到「登录」输入密码，不是的话请换一个名字')
+  return fail('exists', '这个名字已经有人用了，换一个，或按旁边的按钮随机一个')
 }
 
 /**
