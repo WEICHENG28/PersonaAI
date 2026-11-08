@@ -17,6 +17,14 @@ const style = z.object({
   formality: z.enum(['casual', 'neutral', 'formal']),
 }).strict()
 export const twinSideSchema = z.object({ name: text, shareable, style, toneSamples: strings.optional() }).strict()
+/**
+ * 记忆题的判定规则（给 E-3 执行器）：
+ * - 只看模型这次撷取出的记忆（不含 existing）。
+ * - mustContain：每个片段都至少要被某一条记忆「包含」（子字符串比对，比对前去掉空白和标点）。
+ * - mustNotContain：任何一条记忆都不能包含其中任何一个片段（同样是子字符串比对）。
+ *   子字符串比对抓不到改写（例如「用户很喜欢昆虫」），所以 E-3 另外用评审模型做语义检查，两者都通过才算通过。
+ * - maxCount：撷取出的记忆条数上限（0 表示这句话什么都不该记）。三种条件同时成立才算通过。
+ */
 export const memoryScenarioSchema = z.object({
   id, kind: z.literal('memory'), userText: text, recent: strings, existing: strings,
   expect: z.object({ mustContain: strings.optional(), mustNotContain: strings.optional(),

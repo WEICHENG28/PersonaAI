@@ -171,6 +171,24 @@
     "expect": {"taskIntent": false}
   },
   {
+    "id": "friend-nearmiss-01",
+    "kind": "friend",
+    "tags": ["near-miss"],
+    "history": [],
+    "userText": "周末想去爬山，就是还没想好去哪座。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
+    "id": "friend-nearmiss-02",
+    "kind": "friend",
+    "tags": ["near-miss"],
+    "history": [{"role": "friend", "content": "最近在忙什么？"}],
+    "userText": "在学做饭，昨天第一次做了红烧肉。",
+    "memories": [],
+    "expect": {"taskIntent": false}
+  },
+  {
     "id": "friend-closing-03",
     "kind": "friend",
     "tags": ["closing"],

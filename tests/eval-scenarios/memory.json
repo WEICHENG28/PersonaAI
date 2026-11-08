@@ -45,7 +45,7 @@
     "userText": "我以前喜欢滑板，现在已经不玩了。",
     "recent": [],
     "existing": [],
-    "expect": {"mustNotContain": ["用户现在喜欢滑板", "用户经常玩滑板"]}
+    "expect": {"mustNotContain": ["用户现在喜欢滑板", "用户经常玩滑板", "用户喜欢滑板"]}
   },
   {
     "id": "memory-past-02",
@@ -53,7 +53,7 @@
     "userText": "我小时候学过钢琴，毕业后就没再练了。",
     "recent": [],
     "existing": [],
-    "expect": {"mustNotContain": ["用户经常练钢琴", "用户现在正在学钢琴"]}
+    "expect": {"mustNotContain": ["用户经常练钢琴", "用户现在正在学钢琴", "用户喜欢弹钢琴"]}
   },
   {
     "id": "memory-past-03",
@@ -61,7 +61,7 @@
     "userText": "我去年准备过考试，那段时间每天刷题，现在已经考完了。",
     "recent": [],
     "existing": [],
-    "expect": {"mustNotContain": ["用户正在备考", "用户每天刷题"]}
+    "expect": {"mustNotContain": ["用户正在备考", "用户每天刷题", "用户在准备考试"]}
   },
   {
     "id": "memory-other-01",

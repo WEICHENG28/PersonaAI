@@ -521,7 +521,7 @@
 ---
 
 ### 2026-11-07｜E-2 合成評測題庫 46 題｜AI 協助｜分支 opt/E-2-eval-scenarios
-- **接手（2026-11-08，Peter 的 AI）**：Jerry 的 #140 落後 main，改由分支 `opt/E-2-eval-scenarios-v2` 合入最新 main、解 DEVLOG 衝突（兩邊都留）並審查後開新 PR 取代 #140；題庫內容未改。
+- **接手（2026-11-08，Peter 的 AI）**：Jerry 的 #140 落後 main，改由分支 `opt/E-2-eval-scenarios-v2` 合入最新 main、解 DEVLOG 衝突（兩邊都留），開新 PR 取代 #140。獨立審查（APPROVE）後照建議修：過去式題加上最容易出錯的寫法（「用户喜欢滑板」等）到 mustNotContain；`scenario.ts` 寫明 E-3 的判定規則（子字串比對＋評審語義檢查）；數量檢查改成「至少」；friend 加 2 題 near-miss（只是聊活動，不是找人，taskIntent=false，對應 #109 修過的問題）。現在 48 題。
 - **做了什麼**：新增 scripts/eval/scenario.ts 的四類 Zod schema、型別與 loadScenarios；固定依 memory/profile/friend/twin 順序讀 UTF-8 JSON，驗證類型、題組與全域 id 唯一。載入器只讀檔案，不讀環境變數、不呼叫模型或資料庫。
 - **題目來源**：全部自行合成，採簡體中文與大陸用語；沒有真人姓名、手機號或地址。分身只用「合成角色甲／乙」，阿澈是既有虛構角色；未取用真實聊天資料。
 - **題組**：memory 16（否定 5、過去 3、他人 3、不確定 3、玩笑／假設 2）；profile 4（正反興趣混合）；friend 20（短句 4、情緒 4、問阿澈 3、分享 3、找人 3、收尾 3）；twin 6（含 long 句長與 emoji_level=3）。否定題包含「不喜欢昆虫」「对爬山没兴趣」「怕狗」「不吃辣」「不再熬夜」；找人題含有上下文的「好啊」。兩道否定題另含明確正向記憶，避免完全空輸出也能全通過。

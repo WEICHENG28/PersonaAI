@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import { join, dirname, basename } from 'node:path'
 import { expect, it } from 'vitest'
 import { loadScenarios, scenarioSchema } from '../../scripts/eval/scenario.js'
-it('loads 46 unique, valid scenarios with required suite counts', async () => {
+it('loads at least 46 unique, valid scenarios with required suite counts', async () => {
   const rows = await loadScenarios()
-  expect(rows).toHaveLength(46)
+  expect(rows.length).toBeGreaterThanOrEqual(46)
   expect(new Set(rows.map(row => row.id)).size).toBe(rows.length)
   for (const row of rows) expect(scenarioSchema.safeParse(row).success).toBe(true)
   for (const [kind, count] of Object.entries({ memory: 16, profile: 4, friend: 20, twin: 6 })) {
-    expect(rows.filter(row => row.kind === kind)).toHaveLength(count)
+    expect(rows.filter(row => row.kind === kind).length).toBeGreaterThanOrEqual(count)
   }
 })
 it('uses simplified synthetic content without long numbers', async () => {
@@ -21,7 +21,7 @@ it('uses simplified synthetic content without long numbers', async () => {
 it('covers memory categories and all five requested negative sentence forms', async () => {
   const memory = (await loadScenarios()).filter(row => row.kind === 'memory')
   for (const [category, count] of Object.entries({ negation: 5, past: 3, other: 3, uncertain: 3, hypothetical: 2 })) {
-    expect(memory.filter(row => row.id.startsWith(`memory-${category}-`))).toHaveLength(count)
+    expect(memory.filter(row => row.id.startsWith(`memory-${category}-`)).length).toBeGreaterThanOrEqual(count)
   }
   const negatives = memory.filter(row => row.id.startsWith('memory-negation-'))
   for (const phrase of ['不喜欢昆虫', '对爬山没兴趣', '怕狗', '不吃辣', '不再熬夜']) {
@@ -34,12 +34,12 @@ it('covers friend categories including contextual agreement and twin long/emoji 
   const rows = await loadScenarios()
   const friend = rows.filter(row => row.kind === 'friend')
   for (const [tag, count] of Object.entries({ short: 4, emotion: 4, ask_friend: 3, sharing: 3, find_people: 3, closing: 3 })) {
-    expect(friend.filter(row => row.tags.includes(tag))).toHaveLength(count)
+    expect(friend.filter(row => row.tags.includes(tag)).length).toBeGreaterThanOrEqual(count)
   }
   expect(friend.some(row => row.userText === '好啊' && row.history.length > 0)).toBe(true)
   expect(rows.some(row => row.kind === 'twin' && [row.a, row.b].some(side => side.style.sentence_length === 'long' && side.style.emoji_level === 3))).toBe(true)
 })
-it('rejects malformed kinds and invalid style/count fields', () => {
+it('rejects malformed scenario kinds', () => {
   expect(scenarioSchema.safeParse({ id: 'bad', kind: 'unknown' }).success).toBe(false)
 })
 
@@ -66,4 +66,11 @@ it.each(['duplicate', 'wrong-kind', 'invalid-json'])('rejects malformed corpus: 
     if (dirname(root) !== tmpdir() || !basename(root).startsWith('personaai-e2-')) throw new Error('Unexpected temporary path')
     await rm(root, { recursive: true })
   }
+})
+
+it('has near-miss friend cases where talking about an activity is not a find-people task', async () => {
+  const friend = (await loadScenarios()).filter(row => row.kind === 'friend')
+  const nearMiss = friend.filter(row => row.tags.includes('near-miss'))
+  expect(nearMiss.length).toBeGreaterThanOrEqual(2)
+  for (const row of nearMiss) expect(row.expect?.taskIntent).toBe(false)
 })
