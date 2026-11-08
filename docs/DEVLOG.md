@@ -529,6 +529,16 @@
 
 ---
 
+### 2026-11-07｜E-2 合成評測題庫 46 題｜AI 協助｜分支 opt/E-2-eval-scenarios
+- **接手（2026-11-08，Peter 的 AI）**：Jerry 的 #140 落後 main，改由分支 `opt/E-2-eval-scenarios-v2` 合入最新 main、解 DEVLOG 衝突（兩邊都留），開新 PR 取代 #140。獨立審查（APPROVE）後照建議修：過去式題加上最容易出錯的寫法（「用户喜欢滑板」等）到 mustNotContain；`scenario.ts` 寫明 E-3 的判定規則（子字串比對＋評審語義檢查）；數量檢查改成「至少」；friend 加 2 題 near-miss（只是聊活動，不是找人，taskIntent=false，對應 #109 修過的問題）。現在 48 題。
+- **做了什麼**：新增 scripts/eval/scenario.ts 的四類 Zod schema、型別與 loadScenarios；固定依 memory/profile/friend/twin 順序讀 UTF-8 JSON，驗證類型、題組與全域 id 唯一。載入器只讀檔案，不讀環境變數、不呼叫模型或資料庫。
+- **題目來源**：全部自行合成，採簡體中文與大陸用語；沒有真人姓名、手機號或地址。分身只用「合成角色甲／乙」，阿澈是既有虛構角色；未取用真實聊天資料。
+- **題組**：memory 16（否定 5、過去 3、他人 3、不確定 3、玩笑／假設 2）；profile 4（正反興趣混合）；friend 20（短句 4、情緒 4、問阿澈 3、分享 3、找人 3、收尾 3）；twin 6（含 long 句長與 emoji_level=3）。否定題包含「不喜欢昆虫」「对爬山没兴趣」「怕狗」「不吃辣」「不再熬夜」；找人題含有上下文的「好啊」。兩道否定題另含明確正向記憶，避免完全空輸出也能全通過。
+- **改了哪些檔案**：scripts/eval/scenario.ts、tests/eval-scenarios/{memory,profile,friend,twin}.json、tests/eval/scenarios.test.ts、本 B 線紀錄。未修改 #134／#136／#138 的程式或測試檔，未帶入其分支。
+- **驗證**：先觀察缺少載入模組的失敗，再實作；驗證 46 題全部 parse、id 唯一、各類數量、五種指定否定句型、常見繁體字與長數字掃描、long/emoji 組合、無效 JSON／重複 id／錯題組拒絕，以及無效 turns/maxCount/emoji 拒絕。完整測試與型別檢查結果見 PR。
+- **踩到的坑／注意事項**：本次只驗證題庫及標註，不代表模型通過記憶或自然度評測；mustContain／mustNotContain 是待 E-3 執行器使用的文字約束，不是完整語義評審。temp 測試資料位於隔離目錄並驗證路徑後清理。
+- **還沒做完／待辦**：模型實測與評分執行器留 E-3；未呼叫真實平台、不讀 .env.local、不寫 Supabase、不安裝套件。保留 Draft PR，等待人工審查。
+
 ### 2026-11-07｜P0-1 LLM 平台探測腳本｜Peter（AI 協助）｜分支 opt/P0-1-llm-probe
 - **做了什麼**：新增獨立 CLI，對每個聊天模型的 default／Qwen 關 thinking／GLM 關 thinking 三種變體重複量測普通非串流、串流與 json_object；embedding 請求 1024 維並記錄實際長度。Markdown 報告依模型、模式與變體彙整 TTFT、總延遲、成功率、錯誤率、reasoning 字數、tokens 與維度。
 - **為什麼這樣做**：先建立可重複、可比較的模型能力基準，再由使用者實測選平台。JSON 能力檢查為獨立請求，透過額外的 `requestKind` 標記，不混入普通文本的成功率、延遲或 completion tokens；reasoning p50 依審查要求統計所有有回應的請求（包含失敗及 JSON 檢查），用 `responseReceived` 區分模型回應與純傳輸失敗，避免漏掉只輸出思考的模型。所有請求共享有界並行池，SDK 與每次請求都關閉自動重試；總時間限制維持 30 秒，輸出上限改為共用常數 1024 tokens，HELP 同步。

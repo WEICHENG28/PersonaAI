@@ -1,0 +1,50 @@
+[
+  {
+    "id": "twin-dialogue-01",
+    "kind": "twin",
+    "a": {"name": "合成角色甲", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["摄影", "登山"], "chat_style": "温和，愿意分享具体感受", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "long", "tone": "温和，愿意分享具体感受", "emoji_level": 3, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "b": {"name": "合成角色乙", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["登山", "画画"], "chat_style": "轻松，回应直接但友善", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "short", "tone": "轻松，回应直接但友善", "emoji_level": 0, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "openingTopic": "周末散步时发现的小景色",
+    "turns": 8
+  },
+  {
+    "id": "twin-dialogue-02",
+    "kind": "twin",
+    "a": {"name": "合成角色甲", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["烘焙", "读书"], "chat_style": "温和，愿意分享具体感受", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "long", "tone": "温和，愿意分享具体感受", "emoji_level": 3, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "b": {"name": "合成角色乙", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["烘焙", "电影"], "chat_style": "轻松，回应直接但友善", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "medium", "tone": "轻松，回应直接但友善", "emoji_level": 2, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "openingTopic": "第一次烤面包的经历",
+    "turns": 8
+  },
+  {
+    "id": "twin-dialogue-03",
+    "kind": "twin",
+    "a": {"name": "合成角色甲", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["跑步", "音乐"], "chat_style": "温和，愿意分享具体感受", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "short", "tone": "温和，愿意分享具体感受", "emoji_level": 0, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "b": {"name": "合成角色乙", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["跑步", "羽毛球"], "chat_style": "轻松，回应直接但友善", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "short", "tone": "轻松，回应直接但友善", "emoji_level": 1, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "openingTopic": "怎样安排轻松的运动",
+    "turns": 8
+  },
+  {
+    "id": "twin-dialogue-04",
+    "kind": "twin",
+    "a": {"name": "合成角色甲", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["画画", "电影"], "chat_style": "温和，愿意分享具体感受", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "medium", "tone": "温和，愿意分享具体感受", "emoji_level": 1, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "b": {"name": "合成角色乙", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["电影", "读书"], "chat_style": "轻松，回应直接但友善", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "long", "tone": "轻松，回应直接但友善", "emoji_level": 3, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "openingTopic": "看完电影后留下的一个画面",
+    "turns": 8
+  },
+  {
+    "id": "twin-dialogue-05",
+    "kind": "twin",
+    "a": {"name": "合成角色甲", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["读书", "音乐"], "chat_style": "温和，愿意分享具体感受", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "medium", "tone": "温和，愿意分享具体感受", "emoji_level": 0, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "b": {"name": "合成角色乙", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["读书", "画画"], "chat_style": "轻松，回应直接但友善", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "medium", "tone": "轻松，回应直接但友善", "emoji_level": 0, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "openingTopic": "读书时喜欢安静还是放音乐",
+    "turns": 12
+  },
+  {
+    "id": "twin-dialogue-06",
+    "kind": "twin",
+    "a": {"name": "合成角色甲", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["羽毛球", "烘焙"], "chat_style": "温和，愿意分享具体感受", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "long", "tone": "温和，愿意分享具体感受", "emoji_level": 3, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "b": {"name": "合成角色乙", "shareable": {"intro": "喜欢交流日常的小发现", "interests": ["羽毛球", "摄影"], "chat_style": "轻松，回应直接但友善", "looking_for": "兴趣相近、交流自然的朋友"}, "style": {"sentence_length": "long", "tone": "轻松，回应直接但友善", "emoji_level": 3, "formality": "casual"}, "toneSamples": ["这个小细节挺有意思，我想再试一次。", "慢慢聊就好，我不着急。"]},
+    "openingTopic": "打完球后怎样放松",
+    "turns": 12
+  }
+]
