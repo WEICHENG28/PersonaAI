@@ -1,0 +1,26 @@
+[
+  {
+    "id": "profile-mixed-01",
+    "kind": "profile",
+    "userLines": ["我喜欢登山，也喜欢摄影。", "我不喜欢昆虫，别把昆虫相关的活动推荐给我。"],
+    "expect": {"interestsMustInclude": ["登山", "摄影"], "interestsMustNotInclude": ["昆虫"]}
+  },
+  {
+    "id": "profile-mixed-02",
+    "kind": "profile",
+    "userLines": ["我平时喜欢读书和画画。", "我对爬山没兴趣。"],
+    "expect": {"interestsMustInclude": ["读书", "画画"], "interestsMustNotInclude": ["爬山", "登山"]}
+  },
+  {
+    "id": "profile-mixed-03",
+    "kind": "profile",
+    "userLines": ["我喜欢看电影和做烘焙。", "我怕狗，也不吃辣。"],
+    "expect": {"interestsMustInclude": ["电影", "烘焙"], "interestsMustNotInclude": ["狗", "养狗", "辣", "吃辣"]}
+  },
+  {
+    "id": "profile-mixed-04",
+    "kind": "profile",
+    "userLines": ["我喜欢跑步和听音乐。", "我不再熬夜了，也不喜欢打游戏。"],
+    "expect": {"interestsMustInclude": ["跑步", "音乐"], "interestsMustNotInclude": ["熬夜", "游戏"]}
+  }
+]
