@@ -540,6 +540,16 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-08｜N-1 阿澈改用真正的多輪訊息、精簡 prompt｜Peter（AI 協助）｜分支 opt/N-1-friend-turns
+- **做了什麼**：新增 `server/lib/llm/turns.ts` 的 `toAlternatingTurns`（同角色合併、開頭是 assistant 補「（打开聊天）」）。`buildFriendPrompt` 改成真正的 user／assistant 多輪：阿澈的話是 assistant、任務卡加「[任务确认卡]」、最後一則是用戶這句；nudge 最後一則是固定文案「（用户有一阵子没回消息了）」（拿掉舊的 `[mode: nudge]` 前綴）。`01_friend.ts` 的【说话方式】與舊「朋友感／主動延伸」段換成計畫固定文案（含【这次可以分享的事】【这次可以问起的事】【主动接话】），沒有事件或回憶時整段省略；拿掉舊範例（「鉤子」「骰子王」）。人格、邊界、任務辨認、輸出段不動。
+- **和計畫不同（評測後加）**：固定文案後面補兩條：「对方带着情绪…先回应这个情绪本身，不要马上问原因或细节」「不要用『是 A 还是 B』这种二选一的问法」。只套固定文案時評審 3.87、問號 55%、catch 從 3.86 掉到 3.41（評審理由：沒接情緒、二選一像問卷）；補上後如下。
+- **評測**（friend 22 題，學校平台）：評審平均 3.55 → **4.17**（not_interview 3.09→4.36、persona 2.95→3.68、length 3.23→4.55、catch 3.86→3.73），問號結尾 64% → **36%**，p50 2.7s → 1.4s，找人意圖 22/22。盲測表在 Peter 電腦 `.local/eval/n1b-20261108-1310/blind-pairs.csv`。
+- **還沒好的**：找人回覆用「社交 Agent」「任务确认卡」被評審扣 persona（任務辨認段規定的說法，計畫說不動）；事件每輪都給（N-2 處理）。
+- **改了哪些檔案**：`server/lib/llm/turns.ts`、`server/prompts/01_friend.ts`、`server/friend/reply.ts`、`tests/friend/reply.test.ts`、`tests/social/turns.test.ts`。
+- **驗證**：`tsc -b`、vitest 全綠；`chat.test.ts`、`nudge.test.ts` 不改通過。
+
+---
+
 ### 2026-11-08｜E-3 評測執行器、盲測對照、模型選定流程｜Peter（AI 協助）｜分支 opt/E-3-eval-runner
 - **做了什麼**：`scripts/eval/run.ts`（CLI，會真的呼叫平台，只給人跑）依題組跑：記憶用 `extractMemoryCandidates`（規則比對＋評審語義檢查，兩者都過才算通過）、檔案用新的 `extractProfileCandidates`（再過 `dropNegatedInterests`，和正式流程一樣）、阿澈用 `generateFriendReply`（新用戶、第一個事件）、分身用 `createTwinReply`＋記憶體 TwinStore（守門只套規則），最後一則加 `CLOSING_INSTRUCTION`。每則回覆用 `judgeReply` 打 5 項分數，算問號結尾、照抄（阿澈對示範句，B-1 前是空的；分身對自己這場說過的話）。用 `setLlmMetricSink` 收延遲、tokens、LLM 次數（不含評審）。輸出 `.local/eval/<label>-<時間>/` 的 results.jsonl、summary.md、config.json（只有模型名）。
 - `scripts/eval/report.ts`（summarize、suiteStats、toBlindPairs、csvEscape、buildConfig）、`suites.ts`（判定與跑法，依賴可注入）、`compare.ts`（兩次結果配對成 blind-pairs.csv＋blind-key.json，`winRate` 算新版勝率）。
