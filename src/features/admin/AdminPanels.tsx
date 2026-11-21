@@ -6,6 +6,51 @@ import { PanelStatus, useAdminData } from './adminData'
 
 const time = (iso: string) => new Date(iso).toLocaleString('zh-CN', { hour12: false })
 
+/** 设定密码（找回旧的只有名字的帐号、或用户忘记密码）。密码只送出一次，不会显示或存下来。 */
+function SetPasswordButton({ userId, name, onChanged }: { userId: string; name: string; onChanged(): void }) {
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const save = async () => {
+    setBusy(true)
+    setMsg(null)
+    try {
+      await adminApi.setPassword(userId, password)
+      setOpen(false)
+      setPassword('')
+      setMsg(`已设定，现在可以用「${name}」＋这个密码登录`)
+      onChanged()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '没有成功')
+    } finally {
+      setBusy(false)
+    }
+  }
+  if (!open) {
+    return (
+      <span style={{ display: 'inline-flex', gap: 'var(--space-2xs)', alignItems: 'center', flexWrap: 'wrap' }}>
+        <Button small variant="secondary" onClick={() => (setOpen(true), setMsg(null))}>
+          设定密码
+        </Button>
+        {msg && <span className="hint-inline">{msg}</span>}
+      </span>
+    )
+  }
+  return (
+    <span style={{ display: 'inline-flex', gap: 'var(--space-2xs)', alignItems: 'center', flexWrap: 'wrap' }}>
+      <input className="input" type="password" autoComplete="new-password" placeholder="新密码，至少 6 个字" value={password} maxLength={64} onChange={e => setPassword(e.target.value)} style={{ maxWidth: 200 }} />
+      <Button small variant="secondary" disabled={busy} onClick={() => (setOpen(false), setPassword(''))}>
+        取消
+      </Button>
+      <Button small disabled={busy || password.length < 6} onClick={() => void save()}>
+        {busy ? '保存中…' : '保存'}
+      </Button>
+      {msg && <span className="login-error">{msg}</span>}
+    </span>
+  )
+}
+
 /** 停用／恢复按钮（会先确认一次）。 */
 function BanButton({ userId, name, banned, onChanged }: { userId: string; name: string; banned: boolean; onChanged(): void }) {
   const [confirming, setConfirming] = useState(false)
@@ -109,7 +154,8 @@ export function UsersPanel({ onAuthError }: { onAuthError(e: unknown): void }) {
               <Chip tone={u.guest ? 'pear' : 'ink'}>{u.guest ? '游客' : u.hasPassword ? '正式帐号' : '没设密码'}</Chip>
               {u.inLobby && <Chip tone="mint">在大厅</Chip>}
               {u.reportedBy > 0 && <Chip tone="coral">被 {u.reportedBy} 人检举</Chip>}
-              <span style={{ marginLeft: 'auto' }}>
+              <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 'var(--space-xs)', flexWrap: 'wrap' }}>
+                <SetPasswordButton userId={u.id} name={u.name} onChanged={reload} />
                 <BanButton userId={u.id} name={u.name} banned={u.banned} onChanged={reload} />
               </span>
             </div>

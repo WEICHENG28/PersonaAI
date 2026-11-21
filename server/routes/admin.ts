@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { getServiceClient } from '../lib/supabase.js'
 import { invalidateAuthUser } from '../lib/authCache.js'
+import { checkPassword, internalEmail } from '../account/nameLogin.js'
 import { REPORT_ACTION } from '../social/safety.js'
 import { buildFunnel, loadOnboardingState } from '../social/onboarding.js'
 import { recentErrors } from '../lib/alerts.js'
@@ -54,6 +55,35 @@ const banBody = z.object({
   name: z.string().trim().min(1).max(40).optional(),
   banned: z.boolean(),
   reason: z.string().max(200).optional(),
+})
+
+const setPasswordBody = z.object({ userId: z.uuid(), password: z.string().max(200) })
+
+/**
+ * 管理員替帳號設定新密碼（找回舊的只有名字的帳號、或用戶忘記密碼）。
+ * 設好後就是正式帳號（has_password、不是游客），並清掉登入鎖定。不會把密碼寫進任何紀錄。
+ */
+adminRoutes.post('/admin/set-password', async (c) => {
+  const body = setPasswordBody.safeParse(await c.req.json().catch(() => null))
+  if (!body.success) return c.json({ ok: false, error: '要给 userId 和 password' }, 400)
+  const pwError = checkPassword(body.data.password)
+  if (pwError) return c.json({ ok: false, error: pwError }, 400)
+  const db = getServiceClient()
+  const { data: user, error } = await db.from('users').select('id, auth_id, display_name, is_seed').eq('id', body.data.userId).maybeSingle()
+  if (error) throw error
+  if (!user) return c.json({ ok: false, error: '找不到这个用户' }, 404)
+  if (user.is_seed || !user.auth_id) return c.json({ ok: false, error: '示范用户没有帐号，不能设密码' }, 400)
+  const { data: auth } = await db.auth.admin.getUserById(user.auth_id as string)
+  const { error: updateError } = await db.auth.admin.updateUserById(user.auth_id as string, {
+    password: body.data.password,
+    // 舊的匿名帳號沒有 email，補一個內部 email 才能用密碼登入（不寄信）
+    ...(auth.user?.email ? {} : { email: internalEmail(user.auth_id as string), email_confirm: true }),
+    app_metadata: { has_password: true, guest: false, login_fails: 0, locked_until: null },
+  })
+  if (updateError) throw updateError
+  invalidateAuthUser(user.auth_id as string)
+  await db.from('agent_logs').insert({ user_id: user.id, agent: 'guard', action: '管理员设定密码', reason: '找回帐号或重设密码' })
+  return c.json({ ok: true, data: { userId: user.id, name: user.display_name } })
 })
 
 /** 停用（banned=true）或恢復（false）帳號。用 users.id 或名字指定。停用＝不能登入、所有 API 回 403、從大廳隱藏。 */

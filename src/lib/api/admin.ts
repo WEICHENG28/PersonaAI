@@ -95,5 +95,6 @@ export const adminApi = {
   reports: () => call<AdminReport[]>('GET', '/api/admin/reports?limit=100'),
   users: (q: string) => call<AdminUser[]>('GET', `/api/admin/users?q=${encodeURIComponent(q)}`),
   errors: () => call<AdminError[]>('GET', '/api/admin/errors'),
+  setPassword: (userId: string, password: string) => call<{ userId: string; name: string }>('POST', '/api/admin/set-password', { userId, password }),
   ban: (userId: string, banned: boolean, reason?: string) => call<{ userId: string; name: string; banned: boolean }>('POST', '/api/admin/ban', { userId, banned, reason }),
 }

@@ -540,6 +540,12 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-21｜後台「设定密码」找回舊帳號、同名帳號優先有密碼的、修測試檔衝突標記｜Peter（AI 協助）
+- **為什麼**：Peter 的舊帳號「123」（10/31 只有名字、沒密碼）已經沒有瀏覽器登入著，自己救不回來。查資料庫（唯讀）發現「123」有 3 個帳號，常用的是最新那個（77 則對話、18 個任務），另外兩個是早期測試留下的空帳號。
+- **做了什麼**：`POST /api/admin/set-password {userId, password}`（要 `ADMIN_SECRET`）：設密碼、補內部 email、標成正式帳號（has_password、非游客）、清掉登入鎖定、清 auth 快取，日誌只記「管理员设定密码」不記密碼。後台「用户」每位多一個「设定密码」按鈕。`findAccount` 改成同名帳號裡「有設密碼的優先，都沒有才回最新的」（`pickAccount`），避免設了密碼卻登進同名空帳號。
+- **修正**：main 上 `tests/eval/judge.test.ts` 留著合併衝突標記（E-3 #157 合併時我漏處理），這個測試檔一直沒在跑；保留 E-3 版本（含 judgeMemory、評審模型測試）。
+- **改了哪些檔案**：`server/routes/admin.ts`、`server/account/supabaseDeps.ts`、`src/lib/api/admin.ts`、`src/features/admin/AdminPanels.tsx`、`tests/social/name-login.test.ts`、`tests/eval/judge.test.ts`。
+- **驗證**：`tsc -b`、vitest 1096/1096（沒有載入失敗的測試檔）、build。
 ### 2026-11-08｜N-1 阿澈改用真正的多輪訊息、精簡 prompt｜Peter（AI 協助）｜分支 opt/N-1-friend-turns
 - **做了什麼**：新增 `server/lib/llm/turns.ts` 的 `toAlternatingTurns`（同角色合併、開頭是 assistant 補「（打开聊天）」）。`buildFriendPrompt` 改成真正的 user／assistant 多輪：阿澈的話是 assistant、任務卡加「[任务确认卡]」、最後一則是用戶這句；nudge 最後一則是固定文案「（用户有一阵子没回消息了）」（拿掉舊的 `[mode: nudge]` 前綴）。`01_friend.ts` 的【说话方式】與舊「朋友感／主動延伸」段換成計畫固定文案（含【这次可以分享的事】【这次可以问起的事】【主动接话】），沒有事件或回憶時整段省略；拿掉舊範例（「鉤子」「骰子王」）。人格、邊界、任務辨認、輸出段不動。
 - **和計畫不同（評測後加）**：固定文案後面補兩條：「对方带着情绪…先回应这个情绪本身，不要马上问原因或细节」「不要用『是 A 还是 B』这种二选一的问法」。只套固定文案時評審 3.87、問號 55%、catch 從 3.86 掉到 3.41（評審理由：沒接情緒、二選一像問卷）；補上後如下。
