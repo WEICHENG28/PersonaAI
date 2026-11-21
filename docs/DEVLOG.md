@@ -546,6 +546,13 @@
 - **修正**：main 上 `tests/eval/judge.test.ts` 留著合併衝突標記（E-3 #157 合併時我漏處理），這個測試檔一直沒在跑；保留 E-3 版本（含 judgeMemory、評審模型測試）。
 - **改了哪些檔案**：`server/routes/admin.ts`、`server/account/supabaseDeps.ts`、`src/lib/api/admin.ts`、`src/features/admin/AdminPanels.tsx`、`tests/social/name-login.test.ts`、`tests/eval/judge.test.ts`。
 - **驗證**：`tsc -b`、vitest 1096/1096（沒有載入失敗的測試檔）、build。
+### 2026-11-08｜N-1 阿澈改用真正的多輪訊息、精簡 prompt｜Peter（AI 協助）｜分支 opt/N-1-friend-turns
+- **做了什麼**：新增 `server/lib/llm/turns.ts` 的 `toAlternatingTurns`（同角色合併、開頭是 assistant 補「（打开聊天）」）。`buildFriendPrompt` 改成真正的 user／assistant 多輪：阿澈的話是 assistant、任務卡加「[任务确认卡]」、最後一則是用戶這句；nudge 最後一則是固定文案「（用户有一阵子没回消息了）」（拿掉舊的 `[mode: nudge]` 前綴）。`01_friend.ts` 的【说话方式】與舊「朋友感／主動延伸」段換成計畫固定文案（含【这次可以分享的事】【这次可以问起的事】【主动接话】），沒有事件或回憶時整段省略；拿掉舊範例（「鉤子」「骰子王」）。人格、邊界、任務辨認、輸出段不動。
+- **和計畫不同（評測後加）**：固定文案後面補兩條：「对方带着情绪…先回应这个情绪本身，不要马上问原因或细节」「不要用『是 A 还是 B』这种二选一的问法」。只套固定文案時評審 3.87、問號 55%、catch 從 3.86 掉到 3.41（評審理由：沒接情緒、二選一像問卷）；補上後如下。
+- **評測**（friend 22 題，學校平台）：評審平均 3.55 → **4.17**（not_interview 3.09→4.36、persona 2.95→3.68、length 3.23→4.55、catch 3.86→3.73），問號結尾 64% → **36%**，p50 2.7s → 1.4s，找人意圖 22/22。盲測表在 Peter 電腦 `.local/eval/n1b-20261108-1310/blind-pairs.csv`。
+- **還沒好的**：找人回覆用「社交 Agent」「任务确认卡」被評審扣 persona（任務辨認段規定的說法，計畫說不動）；事件每輪都給（N-2 處理）。
+- **改了哪些檔案**：`server/lib/llm/turns.ts`、`server/prompts/01_friend.ts`、`server/friend/reply.ts`、`tests/friend/reply.test.ts`、`tests/social/turns.test.ts`。
+- **驗證**：`tsc -b`、vitest 全綠；`chat.test.ts`、`nudge.test.ts` 不改通過。
 
 ---
 

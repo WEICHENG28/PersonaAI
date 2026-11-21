@@ -44,34 +44,78 @@ const ctx: FriendTurnContext = {
   userText: '在准备考试',
 }
 
-describe('buildFriendPrompt（E-1：保持原本的壓平格式）', () => {
-  it('system 和原本 chat.ts 組出來的一樣（沒有回憶時填「无」）', () => {
+describe('buildFriendPrompt（N-1：真正的多輪訊息）', () => {
+  it('system 由 renderFriendSystem 組出（沒有回憶就不放那段）', () => {
     const { system } = buildFriendPrompt(ctx)
     expect(system).toBe(
       renderFriendSystem({
         lifeState: '有点累；在整理照片',
         eventText: '今天去看了展',
-        recallMemory: '无',
+        recallMemory: null,
         memories: '- 用户喜欢登山',
         crisisResource: CONFIG.CRISIS_RESOURCE,
       }),
     )
-    expect(buildFriendPrompt({ ...ctx, eventText: null }).system).toContain('无')
+    expect(system).not.toContain('【这次可以问起的事】')
+    expect(system).toContain('【这次可以分享的事】今天去看了展')
   })
 
-  it('整段對話壓成一則 user 訊息', () => {
-    expect(buildFriendPrompt(ctx).messages).toEqual([{ role: 'user', content: '阿澈：最近在忙什么？\n用户：在准备考试' }])
+  it('阿澈的話是 assistant、用戶是 user，開頭補「（打开聊天）」，最後一則是用戶這句', () => {
+    expect(buildFriendPrompt(ctx).messages).toEqual([
+      { role: 'user', content: '（打开聊天）' },
+      { role: 'assistant', content: '最近在忙什么？' },
+      { role: 'user', content: '在准备考试' },
+    ])
   })
 
-  it('沒有歷史時用用戶這句話', () => {
-    expect(buildFriendPrompt({ ...ctx, history: [] }).messages[0]!.content).toBe('在准备考试')
+  it('歷史裡還沒有用戶這句時補在最後；連續的 user 合併', () => {
+    const msgs = buildFriendPrompt({ ...ctx, history: [{ role: 'user', kind: 'chat', content: '嗨' }], userText: '在准备考试' }).messages
+    expect(msgs).toEqual([{ role: 'user', content: '嗨\n在准备考试' }])
+    expect(buildFriendPrompt({ ...ctx, history: [] }).messages).toEqual([{ role: 'user', content: '在准备考试' }])
   })
 
-  it('nudge：加上主動接話的說明，沒有紀錄時寫「还没有聊天记录」', () => {
-    const nudge = buildFriendPrompt({ ...ctx, isNudge: true }).messages[0]!.content
-    expect(nudge.startsWith('[mode: nudge] 用户停止回复了一段时间')).toBe(true)
-    expect(nudge.endsWith(historyText(ctx.history))).toBe(true)
-    expect(buildFriendPrompt({ ...ctx, isNudge: true, history: [] }).messages[0]!.content).toContain('（还没有聊天记录）')
+  it('任務確認卡加標記，模型知道那是卡片', () => {
+    const msgs = buildFriendPrompt({
+      ...ctx,
+      history: [
+        { role: 'user', kind: 'chat', content: '帮我找人' },
+        { role: 'friend', kind: 'task_card', content: '帮你找 3 位喜欢登山的朋友' },
+        { role: 'user', kind: 'chat', content: '好' },
+      ],
+      userText: '好',
+    }).messages
+    expect(msgs[1]).toEqual({ role: 'assistant', content: '[任务确认卡] 帮你找 3 位喜欢登山的朋友' })
+  })
+
+  it('nudge：最後一則是固定文案「（用户有一阵子没回消息了）」', () => {
+    const msgs = buildFriendPrompt({ ...ctx, isNudge: true, history: ctx.history.slice(0, 1) }).messages
+    expect(msgs.at(-1)).toEqual({ role: 'user', content: '（用户有一阵子没回消息了）' })
+    expect(buildFriendPrompt({ ...ctx, isNudge: true, history: [] }).messages).toEqual([{ role: 'user', content: '（用户有一阵子没回消息了）' }])
+  })
+
+  it('historyText 仍給評測、日誌用', () => {
+    expect(historyText(ctx.history)).toBe('阿澈：最近在忙什么？\n用户：在准备考试')
+  })
+})
+
+describe('renderFriendSystem（N-1 固定文案）', () => {
+  const base = { lifeState: '平稳；在家', memories: '（还没有长期记忆）', crisisResource: '热线' }
+  it('不含舊範例和未替換的佔位符；含新的說話方式', () => {
+    const sys = renderFriendSystem({ ...base, eventText: '看展', recallMemory: '周末去漫展' })
+    for (const bad of ['鉤', '骰子王', '{{']) expect(sys).not.toContain(bad)
+    expect(sys).toContain('你最近两次回复都以问题结尾的话，这次不要再问。')
+    expect(sys).toContain('【这次可以问起的事】之前用户提过：周末去漫展。')
+    expect(sys).toContain('【主动接话】如果最后一条用户消息是「（用户有一阵子没回消息了）」')
+  })
+
+  it('沒有事件、沒有回憶時，兩段都省略', () => {
+    const sys = renderFriendSystem({ ...base, eventText: null, recallMemory: null })
+    expect(sys).not.toContain('这次可以分享的事')
+    expect(sys).not.toContain('这次可以问起的事')
+  })
+
+  it('值裡的 $ 不會被當成取代語法', () => {
+    expect(renderFriendSystem({ ...base, eventText: '花了 $& 元', recallMemory: null })).toContain('花了 $& 元')
   })
 })
 
