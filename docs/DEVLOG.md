@@ -540,6 +540,15 @@
 
 ## B：社交 Agent 線（Peter）
 
+### 2026-11-21｜後台「设定密码」找回舊帳號、同名帳號優先有密碼的、修測試檔衝突標記｜Peter（AI 協助）
+- **為什麼**：Peter 的舊帳號「123」（10/31 只有名字、沒密碼）已經沒有瀏覽器登入著，自己救不回來。查資料庫（唯讀）發現「123」有 3 個帳號，常用的是最新那個（77 則對話、18 個任務），另外兩個是早期測試留下的空帳號。
+- **做了什麼**：`POST /api/admin/set-password {userId, password}`（要 `ADMIN_SECRET`）：設密碼、補內部 email、標成正式帳號（has_password、非游客）、清掉登入鎖定、清 auth 快取，日誌只記「管理员设定密码」不記密碼。後台「用户」每位多一個「设定密码」按鈕。`findAccount` 改成同名帳號裡「有設密碼的優先，都沒有才回最新的」（`pickAccount`），避免設了密碼卻登進同名空帳號。
+- **修正**：main 上 `tests/eval/judge.test.ts` 留著合併衝突標記（E-3 #157 合併時我漏處理），這個測試檔一直沒在跑；保留 E-3 版本（含 judgeMemory、評審模型測試）。
+- **改了哪些檔案**：`server/routes/admin.ts`、`server/account/supabaseDeps.ts`、`src/lib/api/admin.ts`、`src/features/admin/AdminPanels.tsx`、`tests/social/name-login.test.ts`、`tests/eval/judge.test.ts`。
+- **驗證**：`tsc -b`、vitest 1096/1096（沒有載入失敗的測試檔）、build。
+
+---
+
 ### 2026-11-08｜E-3 評測執行器、盲測對照、模型選定流程｜Peter（AI 協助）｜分支 opt/E-3-eval-runner
 - **做了什麼**：`scripts/eval/run.ts`（CLI，會真的呼叫平台，只給人跑）依題組跑：記憶用 `extractMemoryCandidates`（規則比對＋評審語義檢查，兩者都過才算通過）、檔案用新的 `extractProfileCandidates`（再過 `dropNegatedInterests`，和正式流程一樣）、阿澈用 `generateFriendReply`（新用戶、第一個事件）、分身用 `createTwinReply`＋記憶體 TwinStore（守門只套規則），最後一則加 `CLOSING_INSTRUCTION`。每則回覆用 `judgeReply` 打 5 項分數，算問號結尾、照抄（阿澈對示範句，B-1 前是空的；分身對自己這場說過的話）。用 `setLlmMetricSink` 收延遲、tokens、LLM 次數（不含評審）。輸出 `.local/eval/<label>-<時間>/` 的 results.jsonl、summary.md、config.json（只有模型名）。
 - `scripts/eval/report.ts`（summarize、suiteStats、toBlindPairs、csvEscape、buildConfig）、`suites.ts`（判定與跑法，依賴可注入）、`compare.ts`（兩次結果配對成 blind-pairs.csv＋blind-key.json，`winRate` 算新版勝率）。

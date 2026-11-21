@@ -17,10 +17,16 @@ function toInfo(user: AuthUser): AccountInfo {
   }
 }
 
+/** 同名帳號（新→舊）裡挑一個：有密碼的優先，沒有就最新的。 */
+export function pickAccount(newestFirst: readonly AccountInfo[]): AccountInfo | null {
+  return newestFirst.find(a => a.hasPassword) ?? newestFirst[0] ?? null
+}
+
 export function supabaseAccountDeps(): AccountDeps {
   const db = getServiceClient()
   return {
     async findAccount(name) {
+      // 早期（10/31 前）同一個名字可能有好幾個帳號：優先回「設了密碼的那個」，都沒有才回最新的
       const { data, error } = await db
         .from('users')
         .select('auth_id')
@@ -28,13 +34,14 @@ export function supabaseAccountDeps(): AccountDeps {
         .eq('is_seed', false)
         .not('auth_id', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+        .limit(5)
       if (error) throw error
-      if (!data?.auth_id) return null
-      const { data: auth, error: authError } = await db.auth.admin.getUserById(data.auth_id as string)
-      if (authError || !auth.user) return null
-      return toInfo(auth.user)
+      const infos: AccountInfo[] = []
+      for (const row of data ?? []) {
+        const { data: auth, error: authError } = await db.auth.admin.getUserById(row.auth_id as string)
+        if (!authError && auth.user) infos.push(toInfo(auth.user))
+      }
+      return pickAccount(infos)
     },
     async getAccount(authId) {
       const { data, error } = await db.auth.admin.getUserById(authId)

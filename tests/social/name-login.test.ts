@@ -169,3 +169,13 @@ describe('設定密碼', () => {
     expect(calls.upgraded).toEqual([])
   })
 })
+
+describe('同名帳號挑哪一個（早期同名可能有好幾個）', () => {
+  it('有設密碼的優先，都沒有就回最新的', async () => {
+    const { pickAccount } = await import('../../server/account/supabaseDeps')
+    const a = (authId: string, hasPassword: boolean) => ({ authId, email: `${authId}@x`, hasPassword, guest: false })
+    expect(pickAccount([a('new', false), a('old', true)])?.authId).toBe('old')
+    expect(pickAccount([a('new', false), a('old', false)])?.authId).toBe('new')
+    expect(pickAccount([])).toBeNull()
+  })
+})
