@@ -1,12 +1,13 @@
 /**
  * 阿澈「這一輪要說什麼」的純函式（E-1）：組 prompt、呼叫模型，不碰資料庫。
  * chat.ts 負責讀寫資料庫，評測工具（scripts/eval）直接呼叫這裡，兩邊用同一套生成邏輯。
- * 本任務只搬家、不改行為：prompt 仍是「整段對話壓成一則 user 訊息」的舊格式（N-1 才改成多輪）。
+ * N-1：改成真正的 user／assistant 多輪訊息（原本整段對話壓成一則 user 訊息）。
  */
 import { CONFIG } from '../lib/config.js'
 import { llmJson, type LlmMessage } from '../lib/llm/index.js'
 import type { LlmMetric } from '../lib/llm/metrics.js'
-import { friendReplySchema, renderFriendSystem, type FriendReply } from '../prompts/01_friend.js'
+import { NUDGE_USER_MESSAGE, friendReplySchema, renderFriendSystem, type FriendReply } from '../prompts/01_friend.js'
+import { toAlternatingTurns } from '../lib/llm/turns.js'
 
 export interface FriendHistoryItem {
   role: 'user' | 'friend'
@@ -37,24 +38,34 @@ export interface FriendPrompt {
   messages: LlmMessage[]
 }
 
-const NUDGE_PREFIX = '[mode: nudge] 用户停止回复了一段时间，现在请阿澈主动接话，分享一件和最近话题相关的事或问一个轻松的问题。上下文：\n'
-
+/** 評測、日誌用的純文字版對話（不是給模型的格式）。 */
 export function historyText(history: FriendHistoryItem[]): string {
   return history.map(m => `${m.role === 'user' ? '用户' : '阿澈'}：${m.content}`).join('\n')
 }
 
-/** 組這一輪的 prompt（目前的壓平格式：整段對話放進一則 user 訊息）。 */
+/** 一則歷史訊息在模型眼中的樣子：阿澈說的是 assistant；任務確認卡加標記，模型才知道那是卡片。 */
+function toLlmMessage(m: FriendHistoryItem): LlmMessage {
+  if (m.role === 'user') return { role: 'user', content: m.content }
+  return { role: 'assistant', content: m.kind === 'task_card' ? `[任务确认卡] ${m.content}` : m.content }
+}
+
+/**
+ * 組這一輪的 prompt（N-1）：真正的多輪訊息，阿澈說過的話是 assistant。
+ * 最後一則一定是 user：一般是用戶這句；nudge 是固定文案「（用户有一阵子没回消息了）」。
+ */
 export function buildFriendPrompt(ctx: FriendTurnContext): FriendPrompt {
   const system = renderFriendSystem({
     lifeState: ctx.lifeState,
-    eventText: ctx.eventText ?? '无',
-    recallMemory: ctx.recallMemory ?? '无',
+    eventText: ctx.eventText,
+    recallMemory: ctx.recallMemory,
     memories: ctx.memories,
     crisisResource: CONFIG.CRISIS_RESOURCE,
   })
-  const recentText = historyText(ctx.history)
-  const content = ctx.isNudge ? `${NUDGE_PREFIX}${recentText || '（还没有聊天记录）'}` : recentText || ctx.userText
-  return { system, messages: [{ role: 'user', content }] }
+  const items = ctx.history.map(toLlmMessage)
+  const last = ctx.history.at(-1)
+  if (ctx.isNudge) items.push({ role: 'user', content: NUDGE_USER_MESSAGE })
+  else if (!(last?.role === 'user' && last.content.trim() === ctx.userText.trim())) items.push({ role: 'user', content: ctx.userText })
+  return { system, messages: toAlternatingTurns(items) }
 }
 
 export interface GenerateOptions {
